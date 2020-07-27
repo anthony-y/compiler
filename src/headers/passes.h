@@ -11,6 +11,6 @@ void check_ast(Context *, Ast *);
 //   inferred variable declarations
 //   unresolved struct types
 //
-void fill_in_types(Context *, Ast *);
+void resolve_and_infer_types(Context *, Ast *);
 
 #endif

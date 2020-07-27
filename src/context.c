@@ -42,6 +42,7 @@ void compile_error_end() {
 }
 
 // TODO make it a hash table
+// TODO ascend through the blocks until file scope
 AstNode *lookup_local(AstNode *nodein, char *name) {
     assert(nodein->tag == Node_BLOCK);
     AstBlock *in = (AstBlock*)nodein;
@@ -60,9 +61,8 @@ AstNode *lookup_local(AstNode *nodein, char *name) {
     return NULL;
 }
 
-void add_symbol(Context *c, AstNode *n, char *name) {
-    Symbol s = (Symbol){.decl=n, .status=Symbol_UNRESOLVED};
-    shput(c->symbol_table, name, s);
+inline void add_symbol(Context *c, AstNode *n, char *name) {
+    shput(c->symbol_table, name, n);
 }
 
 void init_context(Context *c, const char *file_path) {

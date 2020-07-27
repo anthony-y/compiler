@@ -18,9 +18,8 @@ void check_block(Context *ctx, AstBlock *block, AstNodeType restriction);
     // const values -> type
     // lookup the const value -> type
 
-//
 // Returns true if `first` and `second` point to the same Type, false otherwise.
-//
+// Does not print errors.
 static bool do_pointer_types_match(Type *first, Type *second) {
     if (first->data.base == second->data.base) {
         return true; // both types point to the same thing
@@ -32,10 +31,9 @@ static bool do_pointer_types_match(Type *first, Type *second) {
     return false;
 }
 
-//
 // Utility function to unwrap a pointer to it's ultimate base type.
 // Returns the unwrapped pointer, and return the depth to `out_depth`.
-//
+// Does not print errors.
 static inline Type *unwrap_pointer_type(Type *ptr, int *out_depth) {
     assert(ptr->kind == Type_POINTER);
     int depth = 0;
@@ -47,6 +45,49 @@ static inline Type *unwrap_pointer_type(Type *ptr, int *out_depth) {
     return ptr;
 }
 
+// Performs semantic analysis on a function call.
+// Returns true if the call was semantically correct, otherwise false.
+// Writes the return type to `out_return_type` ONLY if it is SUCCEEDS.
+// Prints its own errors.
+static bool check_call(Context *ctx, AstNode *callnode, Type **out_return_type) {
+    AstCall *call = &callnode->as.function_call;
+    char *name = call->name->as.ident.name;
+
+    u64 index = shgeti(ctx->symbol_table, name); // TODO when local procedures are implemented, this will need to be a check using lookup_local or something else (maybe a prospective find_proc which is optimized for global scope first, and then local scope).
+    if (index == -1) {
+        compile_error(ctx, callnode->token, "Attempted to call undeclared procedure \"%s\"", name);
+        return false;
+    }
+
+    AstNode *symbol = ctx->symbol_table[index].value;
+    if (symbol->tag != Node_PROCEDURE) {
+        compile_error(ctx, callnode->token, "\"%s\" is not a procedure", name);
+        return false;
+    }
+
+    *out_return_type = symbol->as.procedure.return_type->as.type;
+    return true;
+}
+
+// Performs semantic analysis on an identifier.
+// Returns true if it points to a declaration, otherwise false.
+// However, it may not point to a Node_VAR, you need to check for this.
+// Writes said declaration to `out_decl_site` ONLY if it succeeds.
+static bool check_ident(Context *ctx, AstNode *identnode, AstNode **out_decl_site) {
+    char *name = identnode->as.ident.name;
+    AstNode *hopefully_var = lookup_local(ctx->curr_checker_proc->block, name);
+    if (!hopefully_var) {
+        *out_decl_site = NULL;
+        return false;
+    }
+    if (hopefully_var->tag != Node_VAR) {
+        compile_error(ctx, identnode->token, "\"%s\" is not a variable", name);
+        return false;
+    }
+    *out_decl_site = hopefully_var;
+    return true;
+}
+
 //
 // Returns true if `expr` is compatible with `type`.
 // Type can be passed as NULL, however do not pass `out_actual_type` as NULL.
@@ -55,45 +96,32 @@ static inline Type *unwrap_pointer_type(Type *ptr, int *out_depth) {
 //
 bool does_type_describe_expr(Context *ctx, Type *type, AstNode *expr, Type **out_actual_type) {
     if (expr->tag == Node_CALL) {
-        const AstCall *call = &expr->as.function_call;
-        char *name = call->name->as.ident.name;
-        u64 index = shgeti(ctx->symbol_table, name);
-        if (index == -1) {
-            assert(false); // todo
-            return false;
-        }
-
-        Symbol *symbol = &ctx->symbol_table[index].value;
-        if (symbol->decl->tag != Node_PROCEDURE) {
+        Type *return_type = NULL;
+        if (!check_call(ctx, expr, &return_type)) {
             *out_actual_type = ctx->error_type;
-            compile_error(ctx, expr->token, "\"%s\" is not a procedure", name);
             return false;
         }
-
-        Type *return_type = symbol->decl->as.procedure.return_type->as.type;
+        assert(return_type);
         *out_actual_type = return_type;
 
-        if (return_type->kind == Type_POINTER && type->kind == Type_POINTER) {
-            return do_pointer_types_match(type, return_type);
-        }
+        if (return_type->kind == Type_POINTER && type->kind == Type_POINTER) return do_pointer_types_match(type, return_type);
 
-        if (return_type->kind == Type_ALIAS) {
-            return (return_type == type);
-        }
-
+        if (return_type->kind == Type_ALIAS) return (return_type == type);
         return (type == return_type);
     }
 
     if (expr->tag == Node_IDENT) {
-        char *name = ((AstIdent*)expr)->name;
-        AstNode *hopefully_var = lookup_local(ctx->curr_checker_proc->block, name);
-        if (hopefully_var->tag != Node_VAR) {
+        AstNode *var_decl = NULL;
+        if (!check_ident(ctx, expr, &var_decl)) {
             *out_actual_type = ctx->error_type;
-            compile_error(ctx, expr->token, "\"%s\" is not a variable", name);
             return false;
         }
-        AstVar *asvar = &hopefully_var->as.var;
-        return does_type_describe_expr(ctx, type, asvar->value, out_actual_type);
+        if (var_decl->tag != Node_VAR) {
+            compile_error(ctx, expr->token, "\"%s\" is not a variable");
+            *out_actual_type = ctx->error_type;
+            return false;
+        }
+        return does_type_describe_expr(ctx, type, var_decl->as.var.value, out_actual_type);
     }
 
     // If the type we're comparing against is an alias, unwrap it to it's 'base' type.
@@ -113,19 +141,13 @@ bool does_type_describe_expr(Context *ctx, Type *type, AstNode *expr, Type **out
             return (type == ctx->type_bool);
         }
         if (unary->op == Token_CARAT) { // address-of operator
-            AstIdent *the_ident = (unary->expr->tag == Node_IDENT ? &unary->expr->as.ident : NULL);
             Type *expr_type = NULL;
 
             int addressof_depth = 1; // we'll use this a bit later on to create the real type of the expression.
             while (unary->expr->tag == Node_UNARY && unary->expr->as.unary.op == Token_CARAT) {
                 unary = &unary->expr->as.unary;
-                if (unary->expr->tag == Node_IDENT) {
-                    the_ident = (AstIdent *)unary->expr;
-                }
                 addressof_depth++;
             }
-
-            assert(the_ident);
 
             // It's a literal, you can't get a pointer a literal
             if (unary->expr->tag > Node_LITERALS_START && unary->expr->tag < Node_LITERALS_END) {
@@ -135,34 +157,31 @@ bool does_type_describe_expr(Context *ctx, Type *type, AstNode *expr, Type **out
             }
 
             if (unary->expr->tag == Node_CALL) {
-                compile_error(ctx, expr->token, "EXPRESSION PARSING IS NOW MORE FIXED");
-                return true;
+                if (!check_call(ctx, unary->expr, &expr_type)) {
+                    *out_actual_type = ctx->error_type;
+                    return false;
+                }
             }
 
-            assert(unary->expr->tag == Node_IDENT); // TODO more
-
             if (unary->expr->tag == Node_IDENT) {
-                char *name = the_ident->name;
-                AstNode *decl = lookup_local(ctx->curr_checker_proc->block, name);
-
-                if (!decl) {
+                AstNode *decl = NULL;
+                char *name = unary->expr->as.ident.name;
+                if (!check_ident(ctx, unary->expr, &decl)) {
                     *out_actual_type = ctx->error_type;
-                    compile_error(ctx, expr->token, "Undeclared variable \"%s\"", name);
                     return false;
                 }
-
                 if (decl->tag != Node_VAR) {
                     *out_actual_type = ctx->error_type;
-                    compile_error(ctx, expr->token, "Cannot get the address of \"%s\", as it is not a variable or procedure call", name); // TODO bad error message
+                    compile_error(ctx, expr->token, "Cannot get the address of \"%s\", as it is not a variable", name);
                     return false;
                 }
-
                 expr_type = decl->as.var.typename->as.type;
             }
 
             // TODO The following code is independent of what the expression was,
             // it just relies on the expressions resulting type. So, to add checking
             // for function calls, etc. just evaluate them to a type and then do this.
+
             assert(expr_type);
 
             // Both of these start out as the same value, but by the end

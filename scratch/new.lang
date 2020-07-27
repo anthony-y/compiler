@@ -7,18 +7,17 @@ proc test(): Whatever {
     z := true;
     w : ^bool = ^z;
     return ^^w;
-
-    
 }
 
 type Whatever: ^^^bool;
 
-proc call_me(): Whatever {
-    return null;
+proc num(): int {
+
 }
 
 proc main() {
-    arr: []string;
-    value := test();
+    arr: [][]string;
+    value :^int= ^num();
+    boolean := value;
     return;
 }

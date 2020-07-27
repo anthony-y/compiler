@@ -31,7 +31,6 @@ AstNode *make_error_node(Parser *p, Token tok, const char *msg) {
 
     p->error_count++;
 
-    // TODO temp
     //printf("Error: line %lu in %s: %s\n", tok.line, NULL, n->error.msg);
 
     return n;
@@ -43,7 +42,6 @@ void change_error_message(Parser *p, AstNode *node, const char *msg) {
     node->error.msg = arena_alloc(&p->error_msg_allocator, strlen(msg));
     strcpy(node->error.msg, msg);
 
-    // TODO temp
     printf("Error: %s on line %lu: %s\n", NULL, node->error.line, node->error.msg);
 }
 */

@@ -14,11 +14,6 @@
 
 static char *read_file(const char *path);
 
-//
-// Allocate and zero out syntax
-//   t: *T = alloct(1){0};
-//
-
 // From parser.c, circular dependency in the header files.
 Ast parse(Context *);
 
@@ -87,7 +82,7 @@ int main(int arg_count, char *args[]) {
 
     // TODO maybe merge these idk
     if (check_types_were_declared(&context)) { // potentially could still error, and is likely to
-        fill_in_types(&context, &ast); // and this relies on the last call not failing
+        resolve_and_infer_types(&context, &ast); // and this relies on the last call not failing
     } else goto end;
 
     check_ast(&context, &ast); // type and semantic checking

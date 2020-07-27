@@ -33,8 +33,7 @@ Type *make_pointer_type(Type *base) {
     return out;
 }
 
-// Allocates a builtin/primitive type and places it into the type table.
-static inline Type *make_primitive(Context *ctx, char *name, u64 size, Signage signage) {
+static inline Type *make_and_insert_primitive(Context *ctx, char *name, u64 size, Signage signage) {
     Type *t = make_type(Type_PRIMITIVE, name, size);
     t->data.signage = signage;
     shput(ctx->type_table, name, t);
@@ -56,8 +55,6 @@ void init_types(Context *ctx, SourceStats *stats) {
     // We need room for two potential allocations per type;
     // one for the actual type, and an extra for its placeholder
     // if it is used before its declaration.
-    //
-    // TODO this might change when I do proper symbol resolution.
     stats->declared_types *= 2;
 
     u64 total_types = (num_builtins + stats->pointer_types + stats->declared_types);
@@ -66,30 +63,26 @@ void init_types(Context *ctx, SourceStats *stats) {
     sh_new_arena(ctx->type_table); // initialize the type table as a string hash map
 
     // The following `sizeof` expressions do not 
-    ctx->type_int = make_primitive(ctx, "int", sizeof(s64), Signage_SIGNED);
+    ctx->type_int = make_and_insert_primitive(ctx, "int", sizeof(s64), Signage_SIGNED);
 
-    ctx->type_s64 = make_primitive(ctx, "s64", sizeof(s64), Signage_SIGNED);
-    ctx->type_u64 = make_primitive(ctx, "u64", sizeof(u64), Signage_UNSIGNED);
+    ctx->type_s64 = make_and_insert_primitive(ctx, "s64", sizeof(s64), Signage_SIGNED);
+    ctx->type_u64 = make_and_insert_primitive(ctx, "u64", sizeof(u64), Signage_UNSIGNED);
 
-    ctx->type_s32 = make_primitive(ctx, "s32", sizeof(s32), Signage_SIGNED);
-    ctx->type_u32 = make_primitive(ctx, "u32", sizeof(u32), Signage_UNSIGNED);
+    ctx->type_s32 = make_and_insert_primitive(ctx, "s32", sizeof(s32), Signage_SIGNED);
+    ctx->type_u32 = make_and_insert_primitive(ctx, "u32", sizeof(u32), Signage_UNSIGNED);
 
-    ctx->type_s16 = make_primitive(ctx, "s16", sizeof(s16), Signage_SIGNED);
-    ctx->type_u16 = make_primitive(ctx, "u16", sizeof(u16), Signage_UNSIGNED);
+    ctx->type_s16 = make_and_insert_primitive(ctx, "s16", sizeof(s16), Signage_SIGNED);
+    ctx->type_u16 = make_and_insert_primitive(ctx, "u16", sizeof(u16), Signage_UNSIGNED);
 
-    ctx->type_s8 = make_primitive(ctx, "s8", sizeof(s8), Signage_SIGNED);
-    ctx->type_u8 = make_primitive(ctx, "u8", sizeof(u8), Signage_UNSIGNED);
+    ctx->type_s8 = make_and_insert_primitive(ctx, "s8", sizeof(s8), Signage_SIGNED);
+    ctx->type_u8 = make_and_insert_primitive(ctx, "u8", sizeof(u8), Signage_UNSIGNED);
 
-    ctx->type_bool = make_primitive(ctx, "bool", sizeof(u8), Signage_NaN);
-    ctx->type_void = make_primitive(ctx, "void", 0, Signage_NaN);
-    ctx->type_string = make_primitive(ctx, "string", sizeof(StringType), Signage_NaN);
+    ctx->type_bool = make_and_insert_primitive(ctx, "bool", sizeof(u8), Signage_NaN);
+    ctx->type_void = make_and_insert_primitive(ctx, "void", 0, Signage_NaN);
+    ctx->type_string = make_and_insert_primitive(ctx, "string", sizeof(StringType), Signage_NaN);
 
     // This isn't inserted into the type table, it's only referred to directly by its pointer handle.
     ctx->decoy_ptr = make_type(Type_POINTER, "pointer", 0);
-
-    // Might need this again later but probs not
-    // ctx->type_unknown_named = arena_alloc(&type_arena, sizeof(Type));
-    // *ctx->type_unknown_named = (Type){0};
 }
 
 // During parse-time, names of types which were as of yet undeclared, were accumulated.
@@ -107,7 +100,7 @@ bool check_types_were_declared(Context *ctx) {
     return false;
 }
 
-void fill_in_deferred_type(Context *c, Type **type) {
+void resolve_a_type(Context *c, Type **type) {
     switch ((*type)->kind) {
     default: return;
     case Type_DEFERRED_NAMED: {
@@ -120,26 +113,26 @@ void fill_in_deferred_type(Context *c, Type **type) {
     case Type_POINTER:
     case Type_ARRAY: {
         // Recurse into the base types.
-        fill_in_deferred_type(c, &(*type)->data.base);
+        resolve_a_type(c, &(*type)->data.base);
         return;
     }
     case Type_ALIAS:
-        fill_in_deferred_type(c, &(*type)->data.alias_of);
+        resolve_a_type(c, &(*type)->data.alias_of);
         return;
     }
 }
 
-void infer_type(Context *c, AstNode *n) {
+void infer_type_in_node(Context *c, AstNode *n) {
     switch (n->tag) {
     case Node_VAR: {
         AstVar *var = &n->as.var;
-        if (!(var->flags & VAR_IS_INFERRED)) break;
+        assert(var->flags & VAR_IS_INFERRED);
         var->typename->as.type = type_from_expr(c, var->value);
     } break;
     }
 }
 
-void fill_in_types(Context *c, Ast *ast) {
+void resolve_and_infer_types(Context *c, Ast *ast) {
     if (!ast || !ast->nodes || ast->len == 0) return;
 
     for (int i = 0; i < ast->len; i++) {
@@ -151,20 +144,21 @@ void fill_in_types(Context *c, Ast *ast) {
         case Node_VAR: {
             AstVar *var = &node->as.var;
             if (!(var->flags & VAR_IS_INFERRED)) {
-                fill_in_deferred_type(c, &var->typename->as.type);
+                resolve_a_type(c, &var->typename->as.type);
                 continue;
             }
-            infer_type(c, node);
+            infer_type_in_node(c, node);
         } break;
         case Node_PROCEDURE: {
             AstProcedure *proc = &node->as.procedure;
-            fill_in_types(c, proc->block->as.block.statements);
-            fill_in_deferred_type(c, &proc->return_type->as.type);
+            c->curr_checker_proc = proc; // TODO HACK
+            resolve_and_infer_types(c, proc->block->as.block.statements);
+            resolve_a_type(c, &proc->return_type->as.type);
         } break;
         case Node_TYPEDEF: {
             AstTypedef *td = &node->as.typedef_;
             if (td->of->tag == Node_STRUCT) {
-                fill_in_types(c, td->of->as.struct_.members->as.block.statements);
+                resolve_and_infer_types(c, td->of->as.struct_.members->as.block.statements);
             }
         } break;
         }

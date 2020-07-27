@@ -7,10 +7,7 @@ static int num_errs_printed = 0;
 
 static inline void print_error_node(Context *c, AstNode *err) {
     if (!err || err->tag != Node_ERROR) return;
-
-    // TODO filename
     fprintf(stderr, "%s:%lu: Error: %s\n", c->current_file_path, err->token.line, err->as.error.msg);
-
     num_errs_printed++;
 }
 
@@ -70,12 +67,17 @@ static void print_statement_errors(Context *c, AstNode *node) {
         const AstProcedure *proc = &node->as.procedure;
         print_ast_errors(c, proc->params);
         print_error_node(c, proc->return_type);
-        print_ast_errors(c, proc->block->as.block.statements);
+        print_statement_errors(c, proc->block);
+    }
+
+    else if (node->tag == Node_BLOCK) {
+        const AstBlock *block = &node->as.block;
+        print_ast_errors(c, block->statements);
     }
 
     else if (node->tag == Node_STRUCT) {
         const AstStruct *def = &node->as.struct_;
-        print_ast_errors(c, def->members->as.block.statements);
+        print_statement_errors(c, def->members);
     }
 
     else if (node->tag == Node_TYPEDEF) {
@@ -89,10 +91,8 @@ static void print_statement_errors(Context *c, AstNode *node) {
 
     else if (node->tag == Node_VAR) {
         const AstVar *def = &node->as.var;
-        
-        // TODO segfault
         print_error_node(c, def->typename);
-        print_expression_errors(c, def->value);
+        if (def->flags & VAR_IS_INITED) print_error_node(c, def->value);
     }
 
     else if (node->tag == Node_DEFER) {
@@ -105,7 +105,7 @@ static void print_statement_errors(Context *c, AstNode *node) {
 
     else if (node->tag == Node_WHILE) {
         print_expression_errors(c, node->as.while_.condition);
-        print_ast_errors(c, node->as.while_.block);
+        print_statement_errors(c, node->as.while_.block);
     }
 
     else if (node->tag == Node_IF) {

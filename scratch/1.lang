@@ -1,4 +1,4 @@
-typedef Test: struct {
+type Test: struct {
     fields: Field;
 }
 
@@ -10,6 +10,6 @@ proc main(): int {
     return 10;
 }
 
-typedef Field: struct {
-    name: Test;
+type Field: struct {
+    name: ^Field;
 }

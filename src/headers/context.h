@@ -13,15 +13,6 @@
 
 #define CONTEXT_SCRATCH_SIZE 1024
 
-typedef struct Symbol {
-    AstNode *decl; // where was this symbol declared?
-    enum {
-        Symbol_RESOLVED,
-        Symbol_RESOLVING,
-        Symbol_UNRESOLVED,
-    } status;
-} Symbol;
-
 typedef struct Context {
     const char *current_file_path;
 
@@ -35,8 +26,8 @@ typedef struct Context {
     Token *deferred_names; // stb stretchy buffer
 
     // stb hash tables
-    struct {char *key; Symbol value;} *symbol_table;
-    struct {char *key; Type * value;} *type_table;
+    struct {char *key; AstNode *value;} *symbol_table;
+    struct {char *key; Type    *value;} *type_table;
 
     /* Handles to types in the type table
        for easy comparison in type-checking, etc. */

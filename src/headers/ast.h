@@ -119,7 +119,7 @@ typedef struct {
 
 typedef struct {
     struct AstNode *condition;
-    struct Ast *block;
+    struct AstNode *block;
 } AstWhile;
 
 typedef struct {
@@ -219,7 +219,6 @@ typedef struct AstNode {
 
         Type *type;
     } as;
-
     AstNodeType tag;
     Token token;
 } AstNode;

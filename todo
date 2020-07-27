@@ -1,0 +1,33 @@
+
+//
+// AST
+//
+AstBlocks should have have hashtables instead of linear arrays for declarations.
+    Fix the subtree allocator leak.
+
+Maybe add AstNode flags and NODE_CHECKED back in, and use a table to lookup any values that need to be returned.
+
+//
+// Checker
+//
+
+Check in typedef'd structs that they don't mention their own names unless it's a pointer.
+
+Check that procs with return types have return statements.
+
+When local procedures are implemented, proc calls will need to be checked using lookup_local or something else.
+
+Should does_type_describe_expr even need to account for missing symbols? Maybe they should have already been resolved.
+    //// Sort of already fixed this with just subfunctions that return necessary info back after doing common checking.
+
+//
+// Misc
+//
+Name table, then most likely can make type_table and symbol_table have Name* keys, which can just be compared directly instead of doing strcmp every time.
+
+//
+// Syntax
+//
+
+Allocate and zero out syntax
+t: *T = alloct(1){0};

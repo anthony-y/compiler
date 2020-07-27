@@ -129,7 +129,7 @@ static AstNode *parse_simple_expr(Context *c) {
         parser_next(p);
 
         AstNode *unary = ast_node(p, Node_UNARY, start);
-        unary->as.unary.expr = parse_simple_expr(c);
+        unary->as.unary.expr = parse_expression(c, 1);
         unary->as.unary.op = start.type;
         return unary;
     }
@@ -285,7 +285,7 @@ static AstNode *parse_block(Context *c) {
             ast_add(decls, statement);
         }
         ast_add(stmts, statement);
-        consume(p, Token_SEMI_COLON);        
+        consume(p, Token_SEMI_COLON);  
     }
     block->as.block.decls = decls;
     block->as.block.statements = stmts;
@@ -504,15 +504,7 @@ static AstNode *parse_while(Context *c) {
         return make_error_node(p, start, "Expected a block on while loop.");
     }
 
-    Ast *body = make_subtree(p);
-    while (!consume(p, Token_CLOSE_BRACE)) {
-        AstNode *statement = parse_statement(c);
-        ast_add(body, statement);
-        consume(p, Token_SEMI_COLON);
-    }
-    consume(p, Token_SEMI_COLON);
-
-    node->as.while_.block = body;
+    node->as.while_.block = parse_block(c);
 
     return node;
 }
@@ -542,12 +534,12 @@ static AstNode *parse_var(Context *c) {
     //     name := value
     if (consume(p, Token_EQUAL)) {
         AstNode *value = parse_expression(c, 1);
+        node->as.var.flags |= VAR_IS_INITED;
         if (value->tag == Node_ERROR) {
             parser_recover_to_declaration(p);
             return value;
         }
         node->as.var.flags |= VAR_IS_INFERRED;
-        node->as.var.flags |= VAR_IS_INITED;
         node->as.var.value = value;
 
         add_symbol(c, node, name.text); // TODO IMPORTANT ensure no redeclarations
@@ -572,8 +564,8 @@ static AstNode *parse_var(Context *c) {
     // Assignment on explicitly-typed decls:
     //     name: Type = value
     if (consume(p, Token_EQUAL)) {
-        node->as.var.flags |= VAR_IS_INITED;
         AstNode *value = parse_expression(c, 1);
+        node->as.var.flags |= VAR_IS_INITED;
         if (value->tag == Node_ERROR) {
             parser_recover_to_declaration(p);
             return value;
@@ -809,10 +801,7 @@ static void parser_recover_to_declaration(Parser *p) {
 
 void parser_init(Parser *p, const TokenList *l, const SourceStats *stats) {
     // Rough estimate of how many AST nodes we'll need.
-
-    // NOTE TODO I FEEL LIKE THIS SHOULDN'T WORK AS WELL AS IT DOES
-    //const u64 n = (l->len);
-    const u64 n = (u64)(l->len * 0.8);
+    const u64 n = (u64)(l->len * 0.9);
 
     /* Initialize the allocator for the AST nodes */
     arena_init(&p->node_allocator, n, sizeof(AstNode), 8);
