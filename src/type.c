@@ -27,6 +27,12 @@ Type *make_type(TypeKind kind, char *name, u64 size) {
     return t;
 }
 
+Type *make_pointer_type(Type *base) {
+    Type *out = make_type(Type_POINTER, "", sizeof(void*));
+    out->data.base = base;
+    return out;
+}
+
 // Allocates a builtin/primitive type and places it into the type table.
 static inline Type *make_primitive(Context *ctx, char *name, u64 size, Signage signage) {
     Type *t = make_type(Type_PRIMITIVE, name, size);
@@ -78,7 +84,7 @@ void init_types(Context *ctx, SourceStats *stats) {
     ctx->type_void = make_primitive(ctx, "void", 0, Signage_NaN);
     ctx->type_string = make_primitive(ctx, "string", sizeof(StringType), Signage_NaN);
 
-    // These two aren't inserted into the type table, and are only referred to directly by their pointer handles.
+    // This isn't inserted into the type table, it's only referred to directly by its pointer handle.
     ctx->decoy_ptr = make_type(Type_POINTER, "pointer", 0);
 
     // Might need this again later but probs not

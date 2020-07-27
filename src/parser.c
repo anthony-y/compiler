@@ -425,8 +425,7 @@ static AstNode *parse_typename(Context *c) {
         AstNode *base = parse_typename(c);
         if (base->tag == Node_ERROR) return base;
 
-        type_node->as.type = make_type(Type_POINTER, "*", sizeof(void *));
-        type_node->as.type->data.base = base->as.type;
+        type_node->as.type = make_pointer_type(base->as.type);
 
         return type_node;
     } break;

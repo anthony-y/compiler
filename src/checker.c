@@ -116,7 +116,7 @@ bool does_type_describe_expr(Context *ctx, Type *type, AstNode *expr, Type **out
             AstIdent *the_ident = (unary->expr->tag == Node_IDENT ? &unary->expr->as.ident : NULL);
             Type *expr_type = NULL;
 
-            int addressof_depth = 1;
+            int addressof_depth = 1; // we'll use this a bit later on to create the real type of the expression.
             while (unary->expr->tag == Node_UNARY && unary->expr->as.unary.op == Token_CARAT) {
                 unary = &unary->expr->as.unary;
                 if (unary->expr->tag == Node_IDENT) {
@@ -164,10 +164,15 @@ bool does_type_describe_expr(Context *ctx, Type *type, AstNode *expr, Type **out
             // it just relies on the expressions resulting type. So, to add checking
             // for function calls, etc. just evaluate them to a type and then do this.
             assert(expr_type);
-            Type *resulting_type = make_type(Type_POINTER, "", sizeof(void *));
+
+            // Both of these start out as the same value, but by the end
+            // resulting_type will still point to the outer pointer type,
+            // and inner_type will point to the inner-most pointer.
+            Type *resulting_type = make_pointer_type(NULL);
             Type *inner_type = resulting_type;
+
             for (int i = 1; i < addressof_depth; i++) { // i starts at 1 because we're already 1 deep
-                Type *inner_ptr = make_type(Type_POINTER, "", sizeof(void *));
+                Type *inner_ptr = make_pointer_type(NULL);
                 inner_type->data.base = inner_ptr;
                 inner_type = inner_ptr;
             }

@@ -50,6 +50,7 @@ typedef struct Type {
 } Type;
 
 Type *make_type(TypeKind kind, char *name, u64 size);
+Type *make_pointer_type(Type *base_type);
 void print_type(Type *, FILE *);
 
 // Gonna declare these in main.c before or I'll get a circular dependency
