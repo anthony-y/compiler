@@ -1,0 +1,100 @@
+//
+// Entry point
+//
+proc main(): int {
+    i := os.args.count == 2
+    if !a {
+        printf("Incorrect number of arguments.\n")
+        return 0
+    } else if 1 {
+        return 1
+    } else {
+
+    }
+    
+    lexer: Lexer;
+    lexer_init(&lexer, file_data)
+
+    e := (m * c) * (m * c) + 1
+    
+    return 0
+}
+
+typedef Lexer: struct {
+    curr: *u8
+    start: *u8
+    line: u64
+    column: u32
+    last: int
+    string_allocator: struct {
+        block: *u8;
+        cap: int;
+        len: int;
+    }
+    //string_allocator: mem.Pool
+}
+
+Token_EOF := 0
+
+proc lexer_init(l: *Lexer, file_data: string): bool {
+    l.curr = s.data
+    l.start = s.data
+    l.line = 1
+    l.column = 1
+    l.last = Token_EOF
+    return true
+}
+
+//
+// Entry point
+//
+proc main(): int {
+    i := os.args.count == 2
+    if true {
+        printf("Incorrect number of arguments.\n")
+        return 0
+    } else if 1 {
+        return 1
+    } else {
+
+    }
+    
+    lexer: Lexer;
+    lexer_init(&lexer, file_data)
+
+    e := (m * c) * (m * c) + 1
+    
+    return 0
+}
+
+typedef L: struct {
+    curr: *u8
+    start: *u8
+    line: u64
+    column: u32
+    last: int
+    string_allocator: struct {
+        block: *u8;
+        cap: int;
+        len: int;
+    }
+    //string_allocator: mem.Pool
+}
+
+Token_EOF := 0
+
+proc lexer_init(l: *Lexer, file_data: string): bool {
+    l.curr = s.data
+    l.start = s.data
+    l.line = 1
+    l.column = 1
+    l.last = Token_EOF
+    return true
+}
+
+//
+// Entry point
+//
+proc m() {
+    i := os.args.count == 2
+}

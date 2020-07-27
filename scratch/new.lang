@@ -1,0 +1,41 @@
+type Fun: struct {
+    big_number: u64;
+    string_ptr: ^string;
+}
+
+proc test(): Whatever {
+    z := true;
+    w : ^bool = ^z;
+    return ^^z;
+
+    // POINTER OPERATORS AND TYPE THINGY NEED TO CHANGE
+    // ANY MORE THAN 1 AMPERSAN (FOR AN ADDRESS-OP OP)
+    // GETS COMBINED BY THE LEXER
+    //
+    // Either change the operators OR be more intelligent in lexing
+
+    // note to morning self:
+        // current checker code should work
+        // if it doesnt, try the backup on Desktop
+
+    // Precedence bug
+    // The name of this call is a unary operator
+    // This is annoying for type checking because
+    //
+    // Solution:
+    //    the unary address-of has a Node_CALL as its subexpr
+    // 
+    //return &call_me();
+}
+
+type Whatever: ^^bool;
+
+proc call_me(): Whatever {
+    return null;
+}
+
+proc main() {
+    arr: []string;
+    value := test();
+    return;
+}

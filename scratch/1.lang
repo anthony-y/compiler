@@ -1,0 +1,15 @@
+typedef Test: struct {
+    fields: Field;
+}
+
+proc whatever(): int {
+    return 9
+}
+
+proc main(): int {
+    return 10;
+}
+
+typedef Field: struct {
+    name: Test;
+}
