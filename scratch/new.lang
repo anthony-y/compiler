@@ -6,7 +6,7 @@ type Fun: struct {
 proc test(): Whatever {
     z := true;
     w : ^bool = ^z;
-    return ^^z;
+    return ^^w;
 
     // POINTER OPERATORS AND TYPE THINGY NEED TO CHANGE
     // ANY MORE THAN 1 AMPERSAN (FOR AN ADDRESS-OP OP)
@@ -28,7 +28,7 @@ proc test(): Whatever {
     //return &call_me();
 }
 
-type Whatever: ^^bool;
+type Whatever: ^^^bool;
 
 proc call_me(): Whatever {
     return null;

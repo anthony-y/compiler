@@ -43,7 +43,7 @@ static inline Type *unwrap_pointer_type(Type *ptr, int *out_depth) {
         ptr = ptr->data.base;
         depth++;
     }
-    *out_depth = depth;
+    if (out_depth) *out_depth = depth;
     return ptr;
 }
 
@@ -113,7 +113,7 @@ bool does_type_describe_expr(Context *ctx, Type *type, AstNode *expr, Type **out
             return (type == ctx->type_bool);
         }
         if (unary->op == Token_CARAT) { // address-of operator
-            AstIdent *the_ident = NULL;
+            AstIdent *the_ident = (unary->expr->tag == Node_IDENT ? &unary->expr->as.ident : NULL);
             Type *expr_type = NULL;
 
             int addressof_depth = 1;
@@ -145,6 +145,12 @@ bool does_type_describe_expr(Context *ctx, Type *type, AstNode *expr, Type **out
                 char *name = the_ident->name;
                 AstNode *decl = lookup_local(ctx->curr_checker_proc->block, name);
 
+                if (!decl) {
+                    *out_actual_type = ctx->error_type;
+                    compile_error(ctx, expr->token, "Undeclared variable \"%s\"", name);
+                    return false;
+                }
+
                 if (decl->tag != Node_VAR) {
                     *out_actual_type = ctx->error_type;
                     compile_error(ctx, expr->token, "Cannot get the address of \"%s\", as it is not a variable or procedure call", name); // TODO bad error message
@@ -170,12 +176,7 @@ bool does_type_describe_expr(Context *ctx, Type *type, AstNode *expr, Type **out
 
             if (type->kind != Type_POINTER) return false;
 
-            int type_ptr_depth; unwrap_pointer_type(type, &type_ptr_depth);
-
-            bool result = (type_ptr_depth == addressof_depth &&
-                do_pointer_types_match(type, resulting_type));
-
-            return result;
+            return do_pointer_types_match(type, resulting_type);
         }
     } break;
     case Node_BINARY: {
