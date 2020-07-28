@@ -127,7 +127,9 @@ void infer_type_in_node(Context *c, AstNode *n) {
     case Node_VAR: {
         AstVar *var = &n->as.var;
         assert(var->flags & VAR_IS_INFERRED);
-        var->typename->as.type = type_from_expr(c, var->value);
+        Type *valuetype = type_from_expr(c, var->value);
+        if (valuetype == c->error_type) return; // error already got printed
+        var->typename->as.type = valuetype;
     } break;
     }
 }

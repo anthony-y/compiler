@@ -555,10 +555,6 @@ static AstNode *parse_var(Context *c) {
         node->as.var.flags |= VAR_TYPE_IS_ANON_STRUCT;
     }
 
-    if (typename->as.type == c->type_void) {
-        return make_error_node(p, typename->token, "Only procedures may use the \"void\" type.");
-    }
-
     node->as.var.typename = typename;
 
     // Assignment on explicitly-typed decls:

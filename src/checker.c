@@ -13,6 +13,8 @@
 
 void check_statement(Context *ctx, AstNode *node);
 void check_block(Context *ctx, AstBlock *block, AstNodeType restriction);
+Type *type_from_expr(Context *ctx, AstNode *expr);
+
 
 // TODO consider
     // const values -> type
@@ -23,12 +25,37 @@ void check_block(Context *ctx, AstBlock *block, AstNodeType restriction);
 static bool do_pointer_types_match(Type *first, Type *second) {
     if (first->data.base == second->data.base) {
         return true; // both types point to the same thing
+    } else if (!first->data.base || !second->data.base) { // TODO add Context* to this func, to check directly for Context.decoy_ptr, atm this will suffice since decoy_ptr is the only pointer type without a base type.
+        return true; // one of them is the decoy pointer type, which can be assigned to any pointer type.
     } else if (first->data.base->kind != second->data.base->kind) {
         return false; // they don't point to the same type
-    } else if (first->data.base->kind == Type_POINTER) { // since the initial case failed, this is effectively checking that both types are pointers to pointers.
+    } else if (first->data.base->kind == Type_POINTER) { // since the previous case failed, this is effectively checking that both types are pointers to pointers.
         return do_pointer_types_match(first->data.base, second->data.base);
     }
     return false;
+}
+
+static bool do_types_match(Type *a, Type *b) {
+    if (a->kind == Type_ALIAS && b->kind == Type_ALIAS) return (a == b);
+
+    if (a->kind == Type_ALIAS) {
+        a = a->data.alias_of;
+        return do_types_match(a, b);
+    }
+    // ^
+    // This allows us to ensure that literals can be compared with aliases,
+    // but still be restrictive about alias vs alias matching.
+    // \/
+    if (b->kind == Type_ALIAS) {
+        b = b->data.alias_of;
+        return do_types_match(b, a);
+    }
+
+    if (a->kind == Type_POINTER && b->kind == Type_POINTER) return do_pointer_types_match(a, b);
+    if (a->kind != b->kind) return false;
+    if (a != b) return false;
+
+    return true;
 }
 
 // Utility function to unwrap a pointer to it's ultimate base type.
@@ -49,6 +76,7 @@ static inline Type *unwrap_pointer_type(Type *ptr, int *out_depth) {
 // Returns true if the call was semantically correct, otherwise false.
 // Writes the return type to `out_return_type` ONLY if it is SUCCEEDS.
 // Prints its own errors.
+// You may pass `out_return_type` as NULL.
 static bool check_call(Context *ctx, AstNode *callnode, Type **out_return_type) {
     AstCall *call = &callnode->as.function_call;
     char *name = call->name->as.ident.name;
@@ -65,23 +93,59 @@ static bool check_call(Context *ctx, AstNode *callnode, Type **out_return_type) 
         return false;
     }
 
-    *out_return_type = symbol->as.procedure.return_type->as.type;
+    AstProcedure *proc = &symbol->as.procedure;
+    int proc_arg_count = (proc->params ? proc->params->len : 0);
+    if (!call->params) {
+        if (proc_arg_count != 0) {
+            compile_error(ctx, callnode->token, "Call to \"%s\" specifies no arguments, but it's defined to expect %d of them", name, proc_arg_count);
+            return false;
+        }
+        if (out_return_type) *out_return_type = symbol->as.procedure.return_type->as.type;
+        return true;
+    }
+
+    int call_arg_count = call->params->len;
+
+    if (call_arg_count > proc_arg_count) {
+        int diff = call_arg_count - proc_arg_count;
+        compile_error(ctx, callnode->token, "%d too many arguments in call to \"%s\"", diff, name);
+        return false;
+    }
+
+    if (call_arg_count < proc->params->len) {
+        int diff = proc_arg_count - call_arg_count;
+        compile_error(ctx, callnode->token, "%d too few arguments in call to \"%s\"", diff, name);
+        return false;
+    }
+
+    assert(call_arg_count == proc_arg_count);
+
+    for (int i = 0; i < call_arg_count; i++) {
+        Type *caller_type = type_from_expr(ctx, call->params->nodes[i]);
+        if (caller_type == ctx->error_type) return false;
+        Type *defn_type = proc->params->nodes[i]->as.var.typename->as.type;
+        if (!do_types_match(caller_type, defn_type)) {
+            compile_error_start(ctx, callnode->token, "type mismatch: argument %d of procedure \"%s\" is defined as type ", i+1, name);
+            print_type(defn_type, stderr);
+            compile_error_add_line(ctx, " but caller provided argument of type ");
+            print_type(caller_type, stderr);
+            compile_error_end();
+        }
+    }
+
+    if (out_return_type) *out_return_type = symbol->as.procedure.return_type->as.type;
     return true;
 }
 
 // Performs semantic analysis on an identifier.
 // Returns true if it points to a declaration, otherwise false.
-// However, it may not point to a Node_VAR, you need to check for this.
+// However, it may not point to a Node_VAR, callers need to check for this.
 // Writes said declaration to `out_decl_site` ONLY if it succeeds.
 static bool check_ident(Context *ctx, AstNode *identnode, AstNode **out_decl_site) {
     char *name = identnode->as.ident.name;
-    AstNode *hopefully_var = lookup_local(ctx->curr_checker_proc->block, name);
+    AstNode *hopefully_var = lookup_local(ctx->curr_checker_proc->block, name); // TODO when lookup_local scoures outer scopes, this will return nodes that could be procedures, etc. which will fix the poor error message I get right now if `name` is actually the name of a procedure.
     if (!hopefully_var) {
-        *out_decl_site = NULL;
-        return false;
-    }
-    if (hopefully_var->tag != Node_VAR) {
-        compile_error(ctx, identnode->token, "\"%s\" is not a variable", name);
+        compile_error(ctx, identnode->token, "Undeclared identifier \"%s\"", name);
         return false;
     }
     *out_decl_site = hopefully_var;
@@ -116,6 +180,7 @@ bool does_type_describe_expr(Context *ctx, Type *type, AstNode *expr, Type **out
             *out_actual_type = ctx->error_type;
             return false;
         }
+        assert(var_decl);
         if (var_decl->tag != Node_VAR) {
             compile_error(ctx, expr->token, "\"%s\" is not a variable");
             *out_actual_type = ctx->error_type;
@@ -203,6 +268,7 @@ bool does_type_describe_expr(Context *ctx, Type *type, AstNode *expr, Type **out
             return do_pointer_types_match(type, resulting_type);
         }
     } break;
+
     case Node_BINARY: {
         const AstBinary *binary = &expr->as.binary;
         if (is_assignment(*binary)) {
@@ -213,6 +279,7 @@ bool does_type_describe_expr(Context *ctx, Type *type, AstNode *expr, Type **out
             return (type == ctx->type_bool);
         }
     } break;
+
     // Literals
     case Node_NIL:
         *out_actual_type = ctx->decoy_ptr;
@@ -236,9 +303,11 @@ bool does_type_describe_expr(Context *ctx, Type *type, AstNode *expr, Type **out
 
 // Wrapper around `does_type_describe_expr` which discards the boolean value
 // of said function and just returns the actual type of `expr`.
+// Callers of this function must check that the type is not ctx->error_type.
 Type *type_from_expr(Context *ctx, AstNode *expr) {
     Type *ret = NULL;
     does_type_describe_expr(ctx, ctx->type_void, expr, &ret);
+    if (ret == ctx->error_type) return ctx->error_type;
     assert(ret);
     return ret;
 }
@@ -282,6 +351,12 @@ bool check_var(Context *ctx, AstNode *node) {
         return true;
 
     Type *type = var->typename->as.type;
+
+    if (type == ctx->type_void) {
+        compile_error(ctx, node->token, "Only procedures may use the \"void\" type");
+        return false;
+    }
+
     Type *value_type = NULL;
 
     if (!does_type_describe_expr(ctx, type, var->value, &value_type)) {
@@ -301,6 +376,7 @@ bool check_var(Context *ctx, AstNode *node) {
 void check_if(Context *ctx, AstNode *node) {
     AstIf *iff = &node->as.if_;
     Type *expr_type = type_from_expr(ctx, iff->condition);
+    if (expr_type == ctx->error_type) return;
     if (expr_type != ctx->type_bool) {
         compile_error_start(ctx, node->token, "'If' statement requires a condition which evaluates to a boolean, this one evaluates to ");
         print_type(expr_type, stderr);
@@ -335,6 +411,9 @@ void check_statement(Context *ctx, AstNode *node) {
         break;
     case Node_IF:
         check_if(ctx, node);
+        break;
+    case Node_CALL:
+        check_call(ctx, node, NULL);
         break;
     case Node_RETURN: {
         check_proc_return_value(ctx, node);

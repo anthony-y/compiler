@@ -8,6 +8,12 @@ AstBlocks should have have hashtables instead of linear arrays for declarations.
 Maybe add AstNode flags and NODE_CHECKED back in, and use a table to lookup any values that need to be returned.
 
 //
+// Name resolution
+//
+
+IF the checker becomes cluttered with repeated error handling for symbol table lookups, we will need a different approach. I'm thinking: do the same as for unknown types; add a placeholder and then go back and swap them out for the real thing at the end.
+
+//
 // Checker
 //
 

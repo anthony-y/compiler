@@ -10,14 +10,15 @@ proc test(): Whatever {
 }
 
 type Whatever: ^^^bool;
-
-proc num(): int {
+type Alias2: ^^^bool;
+proc value(i: Alias2) {
 
 }
 
 proc main() {
-    arr: [][]string;
-    value :^int= ^num();
-    boolean := value;
+    val : Whatever = test()
+    //boolean : bool = value; // bad error message
+    b := false;
+    value(null);
     return;
 }
