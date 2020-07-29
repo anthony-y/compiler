@@ -21,7 +21,7 @@ proc have_fun(): u32 {
     sum_string: string = "Hi"
     f.string_ptr = ^sum_string;
     f.my_a.my_s = ""
-    //a: string = f.sum_string;
+    a: ^string = f.string_ptr;
     return 100
 }
 

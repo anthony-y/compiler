@@ -16,6 +16,7 @@ void check_block(Context *ctx, AstBlock *block, AstNodeType restriction);
 Type *type_from_expr(Context *ctx, AstNode *expr);
 void check_struct(Context *ctx, AstNode *structdef);
 bool check_assignment(Context *ctx, AstBinary *binary);
+Type *resolve_accessor(Context *ctx, AstBinary *accessor);
 
 
 // TODO consider
@@ -220,6 +221,15 @@ bool does_type_describe_expr(Context *ctx, Type *type, AstNode *expr, Type **out
         if (is_assignment(*binary)) {
             return check_assignment(ctx, binary);
         }
+        if (binary->op == Token_DOT) {
+            Type *result = resolve_accessor(ctx, binary);
+            if (!result) {
+                *out_actual_type = ctx->error_type;
+                return false;
+            }
+            *out_actual_type = result;
+            return do_types_match(result, type);
+        }
     } break;
 
     case Node_UNARY: {
@@ -414,7 +424,7 @@ void check_if(Context *ctx, AstNode *node) {
     } else check_statement(ctx, iff->block_or_stmt);
 }
 
-Type *resolve_accessor(Context *ctx, AstBinary *accessor, bool nested) {
+Type *resolve_accessor(Context *ctx, AstBinary *accessor) {
     assert(accessor->op == Token_DOT);
     assert(accessor->right->tag == Node_IDENT);
     Name *rhs = accessor->right->as.ident;
@@ -445,7 +455,7 @@ Type *resolve_accessor(Context *ctx, AstBinary *accessor, bool nested) {
     }
 
     else if (accessor->left->tag == Node_BINARY) {
-        lhs_type = resolve_accessor(ctx, &accessor->left->as.binary, false);
+        lhs_type = resolve_accessor(ctx, &accessor->left->as.binary);
         if (!lhs_type) return NULL;
     }
 
@@ -491,7 +501,7 @@ bool check_assignment(Context *ctx, AstBinary *binary) {
     else if (left->tag == Node_BINARY) {
         AstBinary *accessor = &left->as.binary;
         assert(accessor->op == Token_DOT); // TODO probs replace with real error
-        Type *hopefully_left_type = resolve_accessor(ctx, accessor, /*nested=*/false);
+        Type *hopefully_left_type = resolve_accessor(ctx, accessor);
         if (!hopefully_left_type) return false;
         left_type = hopefully_left_type;
     }
@@ -537,6 +547,7 @@ void check_statement(Context *ctx, AstNode *node) {
         check_call(ctx, node, NULL);
         break;
     case Node_BINARY: {
+        // Guaranteed to be an assignment by parser
         AstBinary *bin = &node->as.binary;
         check_assignment(ctx, bin);
     } break;
