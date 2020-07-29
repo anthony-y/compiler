@@ -1,19 +1,26 @@
 type Whatever: ^^^bool;
+type a: struct {my_s: string};
 type Fun: struct {
     big_number: u64;
     string_ptr: ^string;
+    my_a: a;
 }
 
 proc test(): Whatever {
     z := true;
+    x :  int = 0
+    x = have_fun()
+    //z = x = 10;
     w : ^bool = ^z;
     return ^^w;
 }
 
-proc have_fun(): Fun {
+proc have_fun(): u32 {
     f: Fun;
-    f.big_number = 10
-    f.string_ptr = 10
+    // f.big_number = 10
+    // f.string_ptr = 10
+    // f.a.my_s = ""
+    return 100
 }
 
 proc main() {

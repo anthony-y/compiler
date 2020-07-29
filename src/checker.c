@@ -15,6 +15,7 @@ void check_statement(Context *ctx, AstNode *node);
 void check_block(Context *ctx, AstBlock *block, AstNodeType restriction);
 Type *type_from_expr(Context *ctx, AstNode *expr);
 void check_struct(Context *ctx, AstNode *structdef);
+bool check_assignment(Context *ctx, AstBinary *binary);
 
 
 // TODO consider
@@ -47,6 +48,10 @@ static bool do_types_match(Type *a, Type *b) {
     } else if (b->kind == Type_ALIAS) {
         b = b->data.alias_of;
         return do_types_match(b, a);
+    }
+
+    if (a->kind == Type_PRIMITIVE && b->kind == Type_PRIMITIVE && a->data.signage != Signage_NaN && b->data.signage != Signage_NaN) { // both types are integer types
+        return (a->data.signage == b->data.signage && a->size == b->size);
     }
 
     if (a->kind == Type_POINTER && b->kind == Type_POINTER) return do_pointer_types_match(a, b);
@@ -172,10 +177,13 @@ bool does_type_describe_expr(Context *ctx, Type *type, AstNode *expr, Type **out
         assert(return_type);
         *out_actual_type = return_type;
 
-        if (return_type->kind == Type_POINTER && type->kind == Type_POINTER) return do_pointer_types_match(type, return_type);
-
+        // For return types, aliases must match exactly.
         if (return_type->kind == Type_ALIAS) return (return_type == type);
-        return (type == return_type);
+
+        // In other words, if the type is an int, allow any other integer type to be compatible with it.
+        if (type == ctx->type_int) return (return_type->kind == Type_PRIMITIVE && return_type->data.signage != Signage_NaN);
+
+        return do_types_match(return_type, type);
     }
 
     if (expr->tag == Node_IDENT) {
@@ -203,12 +211,24 @@ bool does_type_describe_expr(Context *ctx, Type *type, AstNode *expr, Type **out
     }
 
     switch (expr->tag) {
+    case Node_BINARY: {
+        AstBinary *binary = &expr->as.binary;
+        if (is_binary_comparison(*binary)) {
+            *out_actual_type = ctx->type_bool;
+            return (type == ctx->type_bool);
+        }
+        if (is_assignment(*binary)) {
+            return check_assignment(ctx, binary);
+        }
+    } break;
+
     case Node_UNARY: {
         const AstUnary *unary = &expr->as.unary;
         if (unary->op == Token_BANG) {
             *out_actual_type = ctx->type_bool;
             return (type == ctx->type_bool);
         }
+        // TODO dereference
         if (unary->op == Token_CARAT) { // address-of operator
             Type *expr_type = NULL;
 
@@ -270,17 +290,6 @@ bool does_type_describe_expr(Context *ctx, Type *type, AstNode *expr, Type **out
             if (type->kind != Type_POINTER) return false;
 
             return do_pointer_types_match(type, resulting_type);
-        }
-    } break;
-
-    case Node_BINARY: {
-        const AstBinary *binary = &expr->as.binary;
-        if (is_binary_comparison(*binary)) {
-            *out_actual_type = ctx->type_bool;
-            return (type == ctx->type_bool);
-        }
-        if (is_assignment(*binary)) {
-            // TODO scope lol
         }
     } break;
 
@@ -405,6 +414,42 @@ void check_if(Context *ctx, AstNode *node) {
     } else check_statement(ctx, iff->block_or_stmt);
 }
 
+bool check_assignment(Context *ctx, AstBinary *binary) {
+    assert(is_assignment(*binary));
+
+    bool is_math_assign = binary->op != Token_EQUAL; // is it a normal assignment? or *=, etc.
+    AstNode *left = binary->left; // the name or member access
+    AstNode *right = binary->right; // the value
+    assert(right->tag != Node_BINARY);
+    Type *left_type = NULL;
+    if (left->tag == Node_IDENT) {
+        Name *assigning_to = left->as.ident;
+        AstNode *left_decl;
+        if (!check_ident(ctx, left, &left_decl)) {
+            return false;
+        }
+        if (left_decl->tag != Node_VAR) {
+            compile_error(ctx, left->token, "Cannot assign to \"%s\" as it is not a variable", assigning_to->text);
+            return false;
+        }
+        left_type = left_decl->as.var.typename->as.type;
+    }
+    if (right->tag == Node_BINARY) {
+        left_type = type_from_expr(ctx, right);
+    }
+    assert(left_type);
+    Type *right_type = NULL;
+    if (!does_type_describe_expr(ctx, left_type, right, &right_type)) {
+        compile_error_start(ctx, left->token, "type mismatch: cannot assign value of type ");
+        print_type(right_type, stderr);
+        compile_error_add_line(ctx, " to variable of type ");
+        print_type(left_type, stderr);
+        compile_error_end();
+        return false;
+    }
+    return true;
+}
+
 void check_block(Context *ctx, AstBlock *block, AstNodeType restriction) {
     for (int i = 0; i < block->statements->len; i++) {
         AstNode *stmt = block->statements->nodes[i];
@@ -432,6 +477,10 @@ void check_statement(Context *ctx, AstNode *node) {
     case Node_CALL:
         check_call(ctx, node, NULL);
         break;
+    case Node_BINARY: {
+        AstBinary *bin = &node->as.binary;
+        check_assignment(ctx, bin);
+    } break;
     case Node_RETURN: {
         check_proc_return_value(ctx, node);
     } break;
