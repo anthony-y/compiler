@@ -10,16 +10,18 @@ proc test(): Whatever {
     z := true;
     x :  int = 0
     x = have_fun()
-    //z = x = 10;
+    z = false;
     w : ^bool = ^z;
     return ^^w;
 }
 
 proc have_fun(): u32 {
     f: Fun;
-    // f.big_number = 10
-    // f.string_ptr = 10
-    // f.a.my_s = ""
+    f.big_number = 10
+    sum_string: string = "Hi"
+    f.string_ptr = ^sum_string;
+    f.my_a.my_s = ""
+    //a: string = f.sum_string;
     return 100
 }
 

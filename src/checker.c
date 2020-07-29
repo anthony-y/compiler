@@ -363,13 +363,13 @@ bool check_var(Context *ctx, AstNode *node) {
 
     if (var->flags & VAR_IS_INFERRED) return true;
 
-    if (var->flags & VAR_TYPE_IS_ANON_STRUCT) {
-        check_struct(ctx, var->typename->as.type->data.user);
-    }
-
     Type *type = var->typename->as.type;
 
-    if (type == ctx->type_void) {
+    if (var->flags & VAR_TYPE_IS_ANON_STRUCT) {
+        check_struct(ctx, type->data.user);
+    }
+
+    else if (type == ctx->type_void) {
         compile_error(ctx, var->typename->token, "Only procedures may use the \"void\" type");
         return false;
     }
@@ -414,14 +414,67 @@ void check_if(Context *ctx, AstNode *node) {
     } else check_statement(ctx, iff->block_or_stmt);
 }
 
+Type *resolve_accessor(Context *ctx, AstBinary *accessor, bool nested) {
+    assert(accessor->op == Token_DOT);
+    assert(accessor->right->tag == Node_IDENT);
+    Name *rhs = accessor->right->as.ident;
+
+    // lookup left in scope
+    // ensure its a struct instance (its type is a struct)
+    // use lookup_local to find the field corresponding to name on the RHS
+    // return the type of the field
+
+    Type *lhs_type = NULL;
+
+    if (accessor->left->tag == Node_IDENT) {
+        Name *lhs = accessor->left->as.ident;
+        AstNode *lhs_decl = NULL;
+        if (!check_ident(ctx, accessor->left, &lhs_decl)) {
+            return NULL;
+        }
+        if (lhs_decl->tag != Node_VAR) {
+            compile_error(ctx, accessor->left->token, "Cannot access member in \"%s\" because it's not a variable", lhs->text);
+            return NULL;
+        }
+
+        lhs_type = lhs_decl->as.var.typename->as.type;
+        if (lhs_type->kind != Type_STRUCT) {
+            compile_error(ctx, accessor->left->token, "Cannot access member in \"%s\" because it's not a struct instance", lhs->text);
+            return NULL;
+        }
+    }
+
+    else if (accessor->left->tag == Node_BINARY) {
+        lhs_type = resolve_accessor(ctx, &accessor->left->as.binary, false);
+        if (!lhs_type) return NULL;
+    }
+
+    assert(lhs_type);
+
+    AstStruct *struct_def = &lhs_type->data.user->as.struct_;
+    AstNode *field = lookup_local(struct_def->members, rhs);
+    if (!field) {
+        compile_error(ctx, accessor->right->token, "No such field as \"%s\" in struct field access", rhs->text);
+        return NULL;
+    }
+    if (field->tag != Node_VAR) {
+        assert(false); // should have been checked by now, ill see if i can make this go off
+    }
+    return field->as.var.typename->as.type;
+}
+
 bool check_assignment(Context *ctx, AstBinary *binary) {
     assert(is_assignment(*binary));
 
     bool is_math_assign = binary->op != Token_EQUAL; // is it a normal assignment? or *=, etc.
     AstNode *left = binary->left; // the name or member access
     AstNode *right = binary->right; // the value
+
     assert(right->tag != Node_BINARY);
-    Type *left_type = NULL;
+
+    Type *left_type  = NULL; // needs to be discovered depending on what left->tag is
+    Type *right_type = NULL; // filled in later by does_type_describe_expr
+
     if (left->tag == Node_IDENT) {
         Name *assigning_to = left->as.ident;
         AstNode *left_decl;
@@ -434,11 +487,17 @@ bool check_assignment(Context *ctx, AstBinary *binary) {
         }
         left_type = left_decl->as.var.typename->as.type;
     }
-    if (right->tag == Node_BINARY) {
-        left_type = type_from_expr(ctx, right);
+
+    else if (left->tag == Node_BINARY) {
+        AstBinary *accessor = &left->as.binary;
+        assert(accessor->op == Token_DOT); // TODO probs replace with real error
+        Type *hopefully_left_type = resolve_accessor(ctx, accessor, /*nested=*/false);
+        if (!hopefully_left_type) return false;
+        left_type = hopefully_left_type;
     }
+
     assert(left_type);
-    Type *right_type = NULL;
+
     if (!does_type_describe_expr(ctx, left_type, right, &right_type)) {
         compile_error_start(ctx, left->token, "type mismatch: cannot assign value of type ");
         print_type(right_type, stderr);
