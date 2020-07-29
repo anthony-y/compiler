@@ -92,6 +92,7 @@ static void print_statement_errors(Context *c, AstNode *node) {
     else if (node->tag == Node_VAR) {
         const AstVar *def = &node->as.var;
         print_error_node(c, def->typename);
+        if (def->flags & VAR_TYPE_IS_ANON_STRUCT) print_statement_errors(c, def->typename);
         if (def->flags & VAR_IS_INITED) print_error_node(c, def->value);
     }
 
@@ -111,6 +112,17 @@ static void print_statement_errors(Context *c, AstNode *node) {
     else if (node->tag == Node_IF) {
         print_expression_errors(c, node->as.if_.condition);
         print_statement_errors(c, node->as.if_.block_or_stmt);
+    }
+
+    else if (node->tag == Node_TYPENAME) {
+        Type *astype = node->as.type;
+        if (astype->kind == Type_STRUCT) {
+            print_statement_errors(c, astype->data.user);
+        }
+    }
+
+    else {
+        fprintf(stderr, "Internal compiler error: print_statement_errors shouldn't have got here. Node type is %d.\n", node->tag);
     }
 }
 

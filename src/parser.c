@@ -285,7 +285,7 @@ static AstNode *parse_block(Context *c) {
             ast_add(decls, statement);
         }
         ast_add(stmts, statement);
-        consume(p, Token_SEMI_COLON);  
+        consume(p, Token_SEMI_COLON);
     }
     block->as.block.decls = decls;
     block->as.block.statements = stmts;
@@ -341,7 +341,7 @@ static AstNode *parse_typedef(Context *c) {
     }
 
     if (shgeti(c->type_table, name.text) != -1) {
-        assert(strlen(name.text) < 71); // TODO lol
+        assert(name.length < 61); // TODO lol
         char *buffer = arena_alloc(&c->scratch, 100);
         sprintf(buffer, "Type \"%s\" was declared more than once.", name.text);
         AstNode *err = make_error_node(p, name, buffer);
@@ -446,7 +446,7 @@ static AstNode *parse_typename(Context *c) {
     } break;
     }
 
-    return make_error_node(p, *p->prev, "Expected a type name.");
+    return make_error_node(p, *p->prev, "Expected a type name."); // TODO bad error message, vague
 }
 
 static AstNode *parse_if(Context *c) {

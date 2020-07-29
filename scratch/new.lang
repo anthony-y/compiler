@@ -10,27 +10,15 @@ proc test(): Whatever {
     return ^^w;
 }
 
-type Alias2: ^^^bool;
-proc value(i: Alias2) {
-
+proc have_fun(): Fun {
+    f: Fun;
+    f.big_number = 10
+    f.string_ptr = 10
 }
 
-type S: struct {
-    whatever: string;
-    es: struct {
-        s: u32
-    }
-}
-
-type V: int;
-
-i : V;
-
-proc main(): V {
-    val : Whatever = test()
+proc main() {
     //boolean : bool = value; // bad error message
-    a := 10
-    b := a;
-    value(null);
-    return 10;
+    val : Whatever = test()
+
+    //value: struct{n: u64; s: string} = #place have_fun()
 }

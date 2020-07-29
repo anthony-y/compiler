@@ -14,6 +14,7 @@
 void check_statement(Context *ctx, AstNode *node);
 void check_block(Context *ctx, AstBlock *block, AstNodeType restriction);
 Type *type_from_expr(Context *ctx, AstNode *expr);
+void check_struct(Context *ctx, AstNode *structdef);
 
 
 // TODO consider
@@ -353,6 +354,10 @@ bool check_var(Context *ctx, AstNode *node) {
 
     if (var->flags & VAR_IS_INFERRED) return true;
 
+    if (var->flags & VAR_TYPE_IS_ANON_STRUCT) {
+        check_struct(ctx, var->typename->as.type->data.user);
+    }
+
     Type *type = var->typename->as.type;
 
     if (type == ctx->type_void) {
@@ -433,11 +438,16 @@ void check_statement(Context *ctx, AstNode *node) {
     }
 }
 
+void check_struct(Context *ctx, AstNode *structdef) {
+    assert(structdef->tag == Node_STRUCT);
+    AstBlock *fields = &structdef->as.struct_.members->as.block;
+    check_block(ctx, fields, Node_VAR);
+}
+
 void check_typedef(Context *ctx, AstNode *node) {
     AstTypedef *td = &node->as.typedef_;
     if (td->of->tag == Node_STRUCT) {
-        AstBlock *fields = &td->of->as.struct_.members->as.block;
-        check_block(ctx, fields, Node_VAR);
+        check_struct(ctx, td->of);
         return;
     }
     if (td->of->tag == Node_TYPENAME) {
