@@ -36,6 +36,12 @@ AstNode *make_error_node(Parser *p, Token tok, const char *msg) {
     return n;
 }
 
+AstNode *make_ident_node(struct Context *c, Token tok) {
+    AstNode *n = ast_node(&c->parser, Node_IDENT, tok);
+    n->as.ident = make_name(c, tok);
+    return n;
+}
+
 /*
 void change_error_message(Parser *p, AstNode *node, const char *msg) {
     assert(node->tag == Node_ERROR);
@@ -45,12 +51,6 @@ void change_error_message(Parser *p, AstNode *node, const char *msg) {
     printf("Error: %s on line %lu: %s\n", NULL, node->error.line, node->error.msg);
 }
 */
-
-AstNode *make_ident_node(struct Parser *p, Token tok) {
-    AstNode *name_node = ast_node(p, Node_IDENT, tok);
-    name_node->as.ident.name = tok.text;
-    return name_node;
-}
 
 inline bool is_assignment(AstBinary b) {
     return (b.op > Token_ASSIGNMENTS_START && b.op < Token_ASSIGNMENTS_END);

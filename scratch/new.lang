@@ -15,10 +15,18 @@ proc value(i: Alias2) {
 
 }
 
+type S: struct {
+    whatever: string;
+    es: struct {
+        s: S
+    }
+}
+
 proc main() {
     val : Whatever = test()
     //boolean : bool = value; // bad error message
-    b := false;
+    a := 10
+    b := a;
     value(null);
     return;
 }

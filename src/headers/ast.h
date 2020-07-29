@@ -7,6 +7,8 @@
 
 struct Parser;
 struct Ast;
+struct Name; // context.h
+struct Context;
 
 typedef enum ExpressionType {
     Node_ZERO, // nothing, just a sentinal value
@@ -81,7 +83,7 @@ typedef struct {
 typedef struct {
     struct Ast *params;
     struct AstNode *block;
-    struct AstNode *identifier;
+    struct AstNode *name;
     struct AstNode *return_type;
 } AstProcedure;
 
@@ -125,10 +127,6 @@ typedef struct {
 typedef struct {
     struct AstNode *expr;
 } AstReturn;
-
-typedef struct {
-    char *name;
-} AstIdent;
 
 typedef struct {
     union {
@@ -205,7 +203,6 @@ typedef struct AstNode {
         AstFor for_;
         AstWhile while_;
         AstReturn return_;
-        AstIdent ident;
         AstLiteral literal;
         AstCall function_call;
         AstBinary binary;
@@ -216,7 +213,7 @@ typedef struct AstNode {
         AstArrayIndex array_index;
         AstDefer defer;
         AstBlock block;
-
+        struct Name *ident;
         Type *type;
     } as;
     AstNodeType tag;
@@ -237,7 +234,7 @@ void ast_add(Ast *, AstNode *);
 AstNode *ast_node(struct Parser *p, AstNodeType tag, Token t);
 
 AstNode *make_error_node(struct Parser *p, Token tok, const char *msg);
-AstNode *make_ident_node(struct Parser *p, Token tok);
+AstNode *make_ident_node(struct Context *c, Token tok);
 
 bool is_assignment(AstBinary);
 bool is_binary_comparison(AstBinary);

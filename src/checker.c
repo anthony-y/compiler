@@ -38,15 +38,12 @@ static bool do_pointer_types_match(Type *first, Type *second) {
 static bool do_types_match(Type *a, Type *b) {
     if (a->kind == Type_ALIAS && b->kind == Type_ALIAS) return (a == b);
 
+    // This allows us to ensure that literals can be compared with aliases,
+    // but still be restrictive about alias vs alias matching.
     if (a->kind == Type_ALIAS) {
         a = a->data.alias_of;
         return do_types_match(a, b);
-    }
-    // ^
-    // This allows us to ensure that literals can be compared with aliases,
-    // but still be restrictive about alias vs alias matching.
-    // \/
-    if (b->kind == Type_ALIAS) {
+    } else if (b->kind == Type_ALIAS) {
         b = b->data.alias_of;
         return do_types_match(b, a);
     }
@@ -79,7 +76,8 @@ static inline Type *unwrap_pointer_type(Type *ptr, int *out_depth) {
 // You may pass `out_return_type` as NULL.
 static bool check_call(Context *ctx, AstNode *callnode, Type **out_return_type) {
     AstCall *call = &callnode->as.function_call;
-    char *name = call->name->as.ident.name;
+
+    char *name = call->name->as.ident->text;
 
     u64 index = shgeti(ctx->symbol_table, name); // TODO when local procedures are implemented, this will need to be a check using lookup_local or something else (maybe a prospective find_proc which is optimized for global scope first, and then local scope).
     if (index == -1) {
@@ -141,11 +139,11 @@ static bool check_call(Context *ctx, AstNode *callnode, Type **out_return_type) 
 // Returns true if it points to a declaration, otherwise false.
 // However, it may not point to a Node_VAR, callers need to check for this.
 // Writes said declaration to `out_decl_site` ONLY if it succeeds.
-static bool check_ident(Context *ctx, AstNode *identnode, AstNode **out_decl_site) {
-    char *name = identnode->as.ident.name;
+static bool check_ident(Context *ctx, AstNode *node, AstNode **out_decl_site) {
+    Name *name = node->as.ident;
     AstNode *hopefully_var = lookup_local(ctx->curr_checker_proc->block, name); // TODO when lookup_local scoures outer scopes, this will return nodes that could be procedures, etc. which will fix the poor error message I get right now if `name` is actually the name of a procedure.
     if (!hopefully_var) {
-        compile_error(ctx, identnode->token, "Undeclared identifier \"%s\"", name);
+        compile_error(ctx, node->token, "Undeclared identifier \"%s\"", name->text);
         return false;
     }
     *out_decl_site = hopefully_var;
@@ -230,7 +228,7 @@ bool does_type_describe_expr(Context *ctx, Type *type, AstNode *expr, Type **out
 
             if (unary->expr->tag == Node_IDENT) {
                 AstNode *decl = NULL;
-                char *name = unary->expr->as.ident.name;
+                char *name = unary->expr->as.ident->text;
                 if (!check_ident(ctx, unary->expr, &decl)) {
                     *out_actual_type = ctx->error_type;
                     return false;
@@ -404,7 +402,7 @@ void check_statement(Context *ctx, AstNode *node) {
     switch (node->tag) {
     case Node_PROCEDURE:
         ctx->curr_checker_proc = (AstProcedure*)node;
-        check_block(ctx, (AstBlock *)((AstProcedure*)node)->block, Node_ZERO);
+        check_block(ctx, (AstBlock *)((AstProcedure *)node)->block, Node_ZERO);
         break;
     case Node_VAR:
         check_var(ctx, node);
@@ -450,8 +448,8 @@ void check_ast(Context *ctx, Ast *ast) {
         switch (node->tag) {
         default: continue;
         case Node_PROCEDURE:
-            ctx->curr_checker_proc = (AstProcedure*)node;
-            check_block(ctx, (AstBlock *)((AstProcedure*)node)->block, Node_ZERO);
+            ctx->curr_checker_proc = (AstProcedure *)node;
+            check_block(ctx, (AstBlock *)((AstProcedure *)node)->block, Node_ZERO);
             break;
 
         case Node_VAR:

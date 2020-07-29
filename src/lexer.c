@@ -2,6 +2,8 @@
 #include "headers/token.h"
 #include "headers/context.h"
 
+#include "headers/stb/stb_ds.h"
+
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -121,9 +123,6 @@ static Token tokenize_string(Lexer *tz) {
     return token_new(tz, Token_STRING_LIT);
 }
 
-/*
-    Actual tokenization logic now
-*/
 static Token tokenize_number(Lexer *tz) {
     TokenType t = Token_INT_LIT;
 
@@ -321,37 +320,29 @@ Token next_token(Lexer *tz) {
     return token_new(tz, Token_UNKNOWN);
 }
 
-bool lexer_lex(Lexer *l, TokenList *list, SourceStats *stats) {
+bool lexer_lex(Context *ctx, TokenList *list, SourceStats *stats) {
+    Lexer *l = &ctx->lexer;
+    TokenType last;
     while (true) {
-        TokenType last = l->last;
+        last = l->last;
         Token t = next_token(l);
 
         switch (t.type) {
         case Token_UNKNOWN:
         case Token_ERROR:
             return false;
-
         case Token_TYPEDEF:
             stats->declared_types++;
             break;
-
-        case Token_EQUAL:
-            if (last == Token_COLON)
-                stats->declared_types++;
-            break;
-
         case Token_IDENT:
+            
         case Token_RESERVED_TYPE:
         case Token_CARAT:
-            if (last == Token_CARAT)
-                stats->pointer_types++;
+            if (last == Token_CARAT) stats->pointer_types++;
             break;
-
         case Token_OPEN_PAREN:
-            if (last == Token_IDENT)
-                stats->argument_lists++;
+            if (last == Token_IDENT) stats->argument_lists++;
             break;
-
         case Token_OPEN_BRACE:
             stats->blocks++;
             break;

@@ -13,6 +13,21 @@
 
 #define CONTEXT_SCRATCH_SIZE 1024
 
+#if 0
+typedef struct Symbol {
+    AstNode *decl;
+    enum {
+        Sym_UNRESOLVED,
+        Sym_RESOLVED,
+        Sym_RESOLVING,
+    } status;
+} Symbol;
+#endif
+
+typedef struct Name {
+    char *text;
+} Name;
+
 typedef struct Context {
     const char *current_file_path;
 
@@ -28,6 +43,9 @@ typedef struct Context {
     // stb hash tables
     struct {char *key; AstNode *value;} *symbol_table;
     struct {char *key; Type    *value;} *type_table;
+    struct {char *key; Name    *value;} *name_table;
+
+    Name *name_bad_proc;
 
     /* Handles to types in the type table
        for easy comparison in type-checking, etc. */
@@ -39,8 +57,10 @@ typedef struct Context {
     Type *error_type; // returned during type/semantic checking in does_type_describe_expr if an error occurred.
 } Context;
 
+// Contains statistics about the source code
+// which can be used to compute allocation sizes.
+// Filled out by the lexer.
 typedef struct SourceStats {
-    // These values are estimates from lexical analysis
     u64 declared_types;
     u64 pointer_types;
     u64 argument_lists;
@@ -54,6 +74,7 @@ void compile_error_add_line(Context *ctx, const char *fmt, ...);
 void compile_error_end();
 
 void init_context(Context *c, const char *file_path);
+void free_context(Context *c);
 
 // From types.c, couldn't declare in types.h because of a circular dependency with context.h
 void init_types(Context *, SourceStats *);
@@ -61,7 +82,9 @@ void free_types(Context *);
 
 bool check_types_were_declared(Context *);
 
+Name *make_name(Context *, Token from);
+
 void add_symbol(Context *, AstNode *, char *name);
-AstNode *lookup_local(AstNode *block, char *name);
+AstNode *lookup_local(AstNode *in, Name *);
 
 #endif

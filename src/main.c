@@ -56,7 +56,7 @@ int main(int arg_count, char *args[]) {
         gettimeofday(&start, NULL);
     #endif
 
-    if (!lexer_lex(&context.lexer, &tokens, &stats)) return 1;
+    if (!lexer_lex(&context, &tokens, &stats)) return 1;
 
     #ifdef __linux__
         gettimeofday(&end, NULL);
@@ -99,7 +99,6 @@ end:
     free_types(&context);
     parser_free(&context.parser, &ast);
     lexer_free(&context.lexer);
-    arena_free(&context.scratch);
     free(file_data);
 
     return 0;

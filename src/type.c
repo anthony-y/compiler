@@ -28,11 +28,12 @@ Type *make_type(TypeKind kind, char *name, u64 size) {
 }
 
 Type *make_pointer_type(Type *base) {
-    Type *out = make_type(Type_POINTER, "", sizeof(void*));
+    Type *out = make_type(Type_POINTER, NULL, sizeof(void*));
     out->data.base = base;
     return out;
 }
 
+// Allocates a type, fills out its basic fields, adds it to the type table and returns it.
 static inline Type *make_and_insert_primitive(Context *ctx, char *name, u64 size, Signage signage) {
     Type *t = make_type(Type_PRIMITIVE, name, size);
     t->data.signage = signage;
@@ -83,6 +84,7 @@ void init_types(Context *ctx, SourceStats *stats) {
 
     // This isn't inserted into the type table, it's only referred to directly by its pointer handle.
     ctx->decoy_ptr = make_type(Type_POINTER, "pointer", 0);
+    ctx->decoy_ptr->data.base = NULL;
 }
 
 // During parse-time, names of types which were as of yet undeclared, were accumulated.

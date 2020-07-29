@@ -43,22 +43,34 @@ void compile_error_end() {
 
 // TODO make it a hash table
 // TODO ascend through the blocks until file scope
-AstNode *lookup_local(AstNode *nodein, char *name) {
+AstNode *lookup_local(AstNode *nodein, Name *name) {
     assert(nodein->tag == Node_BLOCK);
-    AstBlock *in = (AstBlock*)nodein;
+    AstBlock *in = (AstBlock *)nodein;
     for (int i = 0; i < in->decls->len; i++) {
         AstNode *decl = in->decls->nodes[i];
-        char *decl_name = NULL;
+        Name *decl_name = NULL;
         switch (decl->tag) {
-        case Node_VAR: decl_name = ((AstVar*)decl)->name->as.ident.name; break;
-        case Node_PROCEDURE: decl_name = ((AstProcedure*)decl)->identifier->as.ident.name; break;
-        case Node_TYPEDEF: decl_name = ((AstTypedef*)decl)->name->as.ident.name; break;
+        case Node_VAR: decl_name = ((AstVar*)decl)->name->as.ident; break;
+        case Node_PROCEDURE: decl_name = ((AstProcedure*)decl)->name->as.ident; break;
+        case Node_TYPEDEF: decl_name = ((AstTypedef*)decl)->name->as.ident; break;
         }
-        if (strcmp(decl_name, name) == 0) { // TODO name table
+        if (decl_name == name) {
             return decl;
         }
     }
     return NULL;
+}
+
+Name *make_name(Context *ctx, Token token) {
+    Name *n = malloc(sizeof(Name));
+    char *txt = token.text;
+    n->text = txt;
+    u64 i = shgeti(ctx->name_table, txt);
+    if (i == -1) { // not in the table yet
+        shput(ctx->name_table, txt, n);
+        return n;
+    }
+    return ctx->name_table[i].value;
 }
 
 inline void add_symbol(Context *c, AstNode *n, char *name) {
@@ -70,4 +82,12 @@ void init_context(Context *c, const char *file_path) {
     c->current_file_path = file_path;
     c->deferred_names = NULL; // stb stretchy buffer
     arena_init(&c->scratch, CONTEXT_SCRATCH_SIZE, 1, 1);
+}
+
+void free_context(Context *c) {
+    u64 len = shlenu(c->name_table);
+    for (int i = 0; i < len; i++)
+        free(c->name_table[i].value);
+    shfree(c->name_table);
+    arena_free(&c->scratch);
 }

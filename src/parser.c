@@ -170,7 +170,7 @@ static AstNode *parse_simple_expr(Context *c) {
         }
 
         parser_next(p);
-        return make_ident_node(p, *p->prev);
+        return make_ident_node(c, *p->prev);
     }
     }
     return make_error_node(p, *p->prev, "Expected an expression.");
@@ -330,11 +330,11 @@ static AstNode *parse_typedef(Context *c) {
     
     Token name = *p->curr;
     if (!consume(p, Token_IDENT)) {
-        return make_error_node(p, *p->curr, "Typedefs must be given a name.");
+        return make_error_node(p, name, "Typedefs must be given a name.");
     }
 
     AstNode *n = ast_node(p, Node_TYPEDEF, name);
-    n->as.typedef_.name = make_ident_node(p, name);
+    n->as.typedef_.name = make_ident_node(c, name);
 
     if (!consume(p, Token_COLON)) {
         return make_error_node(p, *p->curr, "Expected a ':' in type definition.");
@@ -521,7 +521,7 @@ static AstNode *parse_var(Context *c) {
     parser_next(p);
 
     AstNode *node = ast_node(p, Node_VAR, name);
-    node->as.var.name = make_ident_node(p, name);
+    node->as.var.name = make_ident_node(c, name);
     node->as.var.flags = 0;
     node->as.var.typename = ast_node(p, Node_TYPENAME, *p->curr);
 
@@ -599,7 +599,7 @@ static AstNode *parse_proc(Context *c, bool in_typedef) {
     }
     Token name = *p->prev;
 
-    AstNode *name_node = make_ident_node(p, *p->prev);
+    AstNode *name_node = make_ident_node(c, *p->prev);
     Ast *params = NULL;
 
     if (!consume(p, Token_OPEN_PAREN)) {
@@ -646,7 +646,7 @@ static AstNode *parse_proc(Context *c, bool in_typedef) {
 
     AstNode *node = ast_node(p, Node_PROCEDURE, start);
     node->as.procedure.block = NULL;
-    node->as.procedure.identifier = name_node;
+    node->as.procedure.name = name_node;
     node->as.procedure.params = params;
 
     AstNode *return_type = ast_node(p, Node_TYPENAME, *p->curr);
@@ -705,7 +705,7 @@ static AstNode *parse_statement(Context *c) {
     case Token_IDENT: {
         // Function call
         if (p->curr[1].type == Token_OPEN_PAREN) {
-            AstNode *call_name = make_ident_node(p, *p->curr);
+            AstNode *call_name = make_ident_node(c, *p->curr);
             parser_next(p);
             return parse_call(c, call_name);
         }
