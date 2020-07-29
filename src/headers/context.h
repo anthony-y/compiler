@@ -36,19 +36,18 @@ typedef struct Context {
 
     int error_count;
 
-    Lexer lexer;
+    Lexer  lexer;
     Parser parser;
-    Arena scratch;
+    Arena  scratch;
 
     AstProcedure *curr_checker_proc;
+
     Token *deferred_names; // stb stretchy buffer
 
     // stb hash tables
     struct {char *key; AstNode *value;} *symbol_table;
     struct {char *key; Type    *value;} *type_table;
     struct {char *key; Name    *value;} *name_table;
-
-    Name *name_bad_proc;
 
     /* Handles to types in the type table
        for easy comparison in type-checking, etc. */
@@ -86,8 +85,8 @@ void free_types(Context *);
 bool check_types_were_declared(Context *);
 
 Name *make_name(Context *, Token from);
+AstNode *lookup_local(AstNode *in, Name *);
 
 void add_symbol(Context *, AstNode *, char *name);
-AstNode *lookup_local(AstNode *in, Name *);
 
 #endif

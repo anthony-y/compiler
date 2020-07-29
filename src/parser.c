@@ -751,7 +751,7 @@ Ast parse(Context *c) {
     ast_init(&nodes, 100);
 
     for (;;) {
-        arena_clear(&c->scratch);
+        arena_clear(&c->scratch); // clear the temp allocator
         Token curr = *p->curr;
         if (curr.type == Token_EOF) break;
         AstNode *node = parse_top_level(c);

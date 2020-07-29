@@ -32,7 +32,6 @@ void compile_error_start(Context *ctx, Token t, const char *fmt, ...) {
 void compile_error_add_line(Context *ctx, const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
-
     vfprintf(stderr, fmt, args);
     va_end(args);
 }
@@ -50,9 +49,9 @@ AstNode *lookup_local(AstNode *nodein, Name *name) {
         AstNode *decl = in->decls->nodes[i];
         Name *decl_name = NULL;
         switch (decl->tag) {
-        case Node_VAR: decl_name = ((AstVar*)decl)->name->as.ident; break;
-        case Node_PROCEDURE: decl_name = ((AstProcedure*)decl)->name->as.ident; break;
-        case Node_TYPEDEF: decl_name = ((AstTypedef*)decl)->name->as.ident; break;
+        case Node_VAR:       decl_name = ((AstVar *)      decl)->name->as.ident; break;
+        case Node_PROCEDURE: decl_name = ((AstProcedure *)decl)->name->as.ident; break;
+        case Node_TYPEDEF:   decl_name = ((AstTypedef *)  decl)->name->as.ident; break;
         }
         if (decl_name == name) {
             return decl;
@@ -81,7 +80,7 @@ void init_context(Context *c, const char *file_path) {
     *c = (Context){0};
     c->current_file_path = file_path;
     c->deferred_names = NULL; // stb stretchy buffer
-    arena_init(&c->scratch, CONTEXT_SCRATCH_SIZE, 1, 1);
+    arena_init(&c->scratch, CONTEXT_SCRATCH_SIZE, sizeof(u8), 1);
 }
 
 void free_context(Context *c) {

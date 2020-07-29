@@ -1,4 +1,8 @@
 
+Call modifiers e.g:
+    a := inline some_call()
+
+DEREFERENCE
 
 //
 // AST
@@ -28,11 +32,6 @@ When local procedures are implemented, proc calls will need to be checked using 
 
 Should does_type_describe_expr even need to account for missing symbols? Maybe they should have already been resolved.
     //// Sort of already fixed this with just subfunctions that return necessary info back after doing common checking.
-
-//
-// Misc
-//
-Name table, then most likely can make type_table and symbol_table have Name* keys, which can just be compared directly instead of doing strcmp every time.
 
 //
 // Syntax

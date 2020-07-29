@@ -99,7 +99,7 @@ static bool check_call(Context *ctx, AstNode *callnode, Type **out_return_type) 
 
     AstNode *symbol = ctx->symbol_table[index].value;
     if (symbol->tag != Node_PROCEDURE) {
-        compile_error(ctx, callnode->token, "\"%s\" is not a procedure", name);
+        compile_error(ctx, callnode->token, "Attempted to call \"%s\" which is not a procedure", name);
         return false;
     }
 
@@ -198,6 +198,10 @@ bool does_type_describe_expr(Context *ctx, Type *type, AstNode *expr, Type **out
             compile_error(ctx, expr->token, "\"%s\" is not a variable");
             *out_actual_type = ctx->error_type;
             return false;
+        }
+        AstVar *var = &var_decl->as.var;
+        if (!(var->flags & VAR_IS_INITED)) {
+            return do_types_match(var->typename->as.type, type);
         }
         return does_type_describe_expr(ctx, type, var_decl->as.var.value, out_actual_type);
     }
@@ -479,8 +483,6 @@ bool check_assignment(Context *ctx, AstBinary *binary) {
     bool is_math_assign = binary->op != Token_EQUAL; // is it a normal assignment? or *=, etc.
     AstNode *left = binary->left; // the name or member access
     AstNode *right = binary->right; // the value
-
-    assert(right->tag != Node_BINARY);
 
     Type *left_type  = NULL; // needs to be discovered depending on what left->tag is
     Type *right_type = NULL; // filled in later by does_type_describe_expr

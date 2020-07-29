@@ -6,28 +6,31 @@ type Fun: struct {
     my_a: a;
 }
 
-proc test(): Whatever {
+proc value(){}
+
+// TODO dump argument decls into block scope
+proc test(xyz: ^string): Whatever {
     z := true;
-    x :  int = 0
-    x = have_fun()
+    x := have_fun()
     z = false;
     w : ^bool = ^z;
     return ^^w;
 }
 
-proc have_fun(): u32 {
+proc have_fun(): Fun {
     f: Fun;
-    f.big_number = 10
-    sum_string: string = "Hi"
+    f.big_number = 10;
+    sum_string: string = "Hi";
     f.string_ptr = ^sum_string;
-    f.my_a.my_s = ""
+    f.my_a.my_s = "";
     a: ^string = f.string_ptr;
-    return 100
+    return f;
 }
 
 proc main() {
-    //boolean : bool = value; // bad error message
-    val : Whatever = test()
-
-    //value: struct{n: u64; s: string} = #place have_fun()
+    f: Fun;
+    my_string: string;
+    f.string_ptr = ^my_string;
+    val : Whatever = test(f.string_ptr);
+    // boolean : bool = value;
 }

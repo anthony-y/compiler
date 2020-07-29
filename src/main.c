@@ -12,6 +12,8 @@
 #include "headers/stb/stb_ds.h"
 #include "headers/stb/stretchy_buffer.h"
 
+#define perfstats 0
+
 static char *read_file(const char *path);
 
 // From parser.c, circular dependency in the header files.
@@ -51,25 +53,32 @@ int main(int arg_count, char *args[]) {
     lexer_init(&context.lexer, args[1], file_data);
 
     u64 lex_delta = 0;
-    #ifdef __linux__
-        struct timeval end, start;
-        gettimeofday(&start, NULL);
+    #if perfstats
+        struct timeval lend, lstart;
+        gettimeofday(&lstart, NULL);
     #endif
 
     if (!lexer_lex(&context, &tokens, &stats)) return 1;
-
-    #ifdef __linux__
-        gettimeofday(&end, NULL);
-        /* In microseconds */
-        lex_delta = (end.tv_sec - start.tv_sec) * 1000000 + end.tv_usec - start.tv_usec;
-    #endif
 
     if (tokens.len == 1) return 0;
 
     init_types(&context, &stats);
     parser_init(&context.parser, &tokens, &stats);
 
+    u64 parse_delta = 0;
+    #if perfstats
+        struct timeval pend, pstart;
+        gettimeofday(&pstart, NULL);
+    #endif
+
     ast = parse(&context);
+
+    #if perfstats
+        gettimeofday(&pend, NULL);
+        /* In microseconds */
+        parse_delta = (pend.tv_sec - pstart.tv_sec) * 1000000 + pend.tv_usec - pstart.tv_usec;
+    #endif
+
     context.error_count += context.parser.error_count;
 
     token_list_free(&tokens);
@@ -80,6 +89,12 @@ int main(int arg_count, char *args[]) {
         goto end;
     }
 
+    u64 check_delta = 0;
+    #if perfstats
+        struct timeval cend, cstart;
+        gettimeofday(&cstart, NULL);
+    #endif
+
     // TODO maybe merge these idk
     if (check_types_were_declared(&context)) { // potentially could still error, and is likely to
         resolve_and_infer_types(&context, &ast); // and this relies on the last call not failing
@@ -87,12 +102,26 @@ int main(int arg_count, char *args[]) {
 
     check_ast(&context, &ast); // type and semantic checking
 
+    #if perfstats
+        gettimeofday(&cend, NULL);
+        /* In microseconds */
+        check_delta = (cend.tv_sec - cstart.tv_sec) * 1000000 + cend.tv_usec - cstart.tv_usec;
+    #endif
+
     if (context.error_count > 0) {
         printf("\n");
     }
 
+    #if perfstats
+        gettimeofday(&lend, NULL);
+        /* In microseconds */
+        lex_delta = (lend.tv_sec - lstart.tv_sec) * 1000000 + lend.tv_usec - lstart.tv_usec;
+    #endif
+
 end:
     printf("Lexing took %ldus\n", lex_delta);
+    printf("Parsing took %ldus\n", parse_delta);
+    printf("Inferring, resolving and checking took %ldus\n", check_delta);
     printf("Parser used %lu nodes out of %lu allocated.\n", context.parser.node_count, context.parser.node_allocator.capacity);
     printf("Error count: %d\n", context.error_count);
 

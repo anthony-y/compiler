@@ -1,6 +1,9 @@
 //
 // Entry point
 //
+proc free(p: ^void){}
+proc printf(s: string){}
+
 proc main(): int {
     i := os.args.count == 2
     if !a {
@@ -11,6 +14,8 @@ proc main(): int {
     } else {
 
     }
+
+    file_data := ""
 
     lexer: ^Lexer = null
     lexer_init(lexer, file_data)
