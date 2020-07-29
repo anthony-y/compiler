@@ -1,3 +1,4 @@
+type Whatever: ^^^bool;
 type Fun: struct {
     big_number: u64;
     string_ptr: ^string;
@@ -9,7 +10,6 @@ proc test(): Whatever {
     return ^^w;
 }
 
-type Whatever: ^^^bool;
 type Alias2: ^^^bool;
 proc value(i: Alias2) {
 
@@ -18,15 +18,19 @@ proc value(i: Alias2) {
 type S: struct {
     whatever: string;
     es: struct {
-        s: S
+        s: u32
     }
 }
 
-proc main() {
+type V: int;
+
+i : V;
+
+proc main(): V {
     val : Whatever = test()
     //boolean : bool = value; // bad error message
     a := 10
     b := a;
     value(null);
-    return;
+    return 10;
 }

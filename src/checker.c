@@ -69,6 +69,11 @@ static inline Type *unwrap_pointer_type(Type *ptr, int *out_depth) {
     return ptr;
 }
 
+static Type *maybe_unwrap_type_alias(Type *alias) {
+    if (alias->kind != Type_ALIAS) return alias;
+    return alias->data.alias_of;
+}
+
 // Performs semantic analysis on a function call.
 // Returns true if the call was semantically correct, otherwise false.
 // Writes the return type to `out_return_type` ONLY if it is SUCCEEDS.
@@ -219,14 +224,14 @@ bool does_type_describe_expr(Context *ctx, Type *type, AstNode *expr, Type **out
                 return false;
             }
 
-            if (unary->expr->tag == Node_CALL) {
+            else if (unary->expr->tag == Node_CALL) {
                 if (!check_call(ctx, unary->expr, &expr_type)) {
                     *out_actual_type = ctx->error_type;
                     return false;
                 }
             }
 
-            if (unary->expr->tag == Node_IDENT) {
+            else if (unary->expr->tag == Node_IDENT) {
                 AstNode *decl = NULL;
                 char *name = unary->expr->as.ident->text;
                 if (!check_ident(ctx, unary->expr, &decl)) {
@@ -269,12 +274,12 @@ bool does_type_describe_expr(Context *ctx, Type *type, AstNode *expr, Type **out
 
     case Node_BINARY: {
         const AstBinary *binary = &expr->as.binary;
-        if (is_assignment(*binary)) {
-            // TODO scope lol
-        }
         if (is_binary_comparison(*binary)) {
             *out_actual_type = ctx->type_bool;
             return (type == ctx->type_bool);
+        }
+        if (is_assignment(*binary)) {
+            // TODO scope lol
         }
     } break;
 
@@ -318,6 +323,7 @@ bool check_proc_return_value(Context *ctx, AstNode *retnode) {
     AstReturn *r = &retnode->as.return_;
 
     if (!r->expr) {
+        return_type = maybe_unwrap_type_alias(return_type); // this allows type aliases of 'void' to work here.
         if (return_type != ctx->type_void) { // procedure return type is not void
             compile_error(ctx, retnode->token, "Only procedures declared as void can have value-less return statements");
             return false;
@@ -345,15 +351,23 @@ bool check_proc_return_value(Context *ctx, AstNode *retnode) {
 bool check_var(Context *ctx, AstNode *node) {
     AstVar *var = &node->as.var;
 
-    if (var->flags & VAR_IS_INFERRED || (!(var->flags & VAR_IS_INITED)))
-        return true;
+    if (var->flags & VAR_IS_INFERRED) return true;
 
     Type *type = var->typename->as.type;
 
     if (type == ctx->type_void) {
-        compile_error(ctx, node->token, "Only procedures may use the \"void\" type");
+        compile_error(ctx, var->typename->token, "Only procedures may use the \"void\" type");
         return false;
     }
+
+    else if (type->kind == Type_ALIAS && maybe_unwrap_type_alias(type) == ctx->type_void) {
+        compile_error_start(ctx, var->typename->token, "Variable is declared to have type \"%s\" ", type->name);
+        compile_error_add_line(ctx, "which is an alias of void; only procedures may use the \"void\" type");
+        compile_error_end();
+        return false;
+    }
+
+    if (!(var->flags & VAR_IS_INITED)) return true;
 
     Type *value_type = NULL;
 
@@ -428,8 +442,10 @@ void check_typedef(Context *ctx, AstNode *node) {
     }
     if (td->of->tag == Node_TYPENAME) {
         if (td->of->as.type->kind == Type_ALIAS) {
-            compile_error(ctx, node->token, "You cannot create a type alias from another type alias");
-            return;
+            compile_error(ctx, td->of->token, "You cannot create a type alias from another type alias");
+        }
+        if (td->of->as.type == ctx->type_void) {
+            //compile_error(ctx, td->of->token, "You cannot create a type alias from \"void\"");
         }
         return;
     }

@@ -1,4 +1,5 @@
 
+
 //
 // AST
 //
@@ -16,6 +17,8 @@ IF the checker becomes cluttered with repeated error handling for symbol table l
 //
 // Checker
 //
+
+Anonymous structs
 
 Check in typedef'd structs that they don't mention their own names unless it's a pointer.
 

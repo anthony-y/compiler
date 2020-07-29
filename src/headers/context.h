@@ -24,10 +24,13 @@ typedef struct Symbol {
 } Symbol;
 #endif
 
+// An entry in the name table.
 typedef struct Name {
     char *text;
 } Name;
 
+// Central compiler context, a reference to an instance of this struct is
+// passed to most functions in the compiler.
 typedef struct Context {
     const char *current_file_path;
 
