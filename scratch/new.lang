@@ -32,5 +32,10 @@ proc main() {
     my_string: string;
     f.string_ptr = ^my_string;
     val : Whatever = test(f.string_ptr);
+
+    a := true;
+	b := false;
+    c: bool = (a) && (b) || (c) // need proper name resolution :/
+
     // boolean : bool = value;
 }

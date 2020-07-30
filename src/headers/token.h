@@ -39,6 +39,7 @@ typedef enum {
     Token_CAST,
     Token_DEFER,
     Token_THEN,
+    Token_INLINE,
 
     Token_CLOSE_PAREN,
     Token_OPEN_BRACE,

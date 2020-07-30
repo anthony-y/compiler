@@ -23,39 +23,41 @@ Type *resolve_accessor(Context *ctx, AstBinary *accessor);
     // const values -> type
     // lookup the const value -> type
 
-// Returns true if `first` and `second` point to the same Type, false otherwise.
+// Returns true if `a` and `b` point to the same Type, false otherwise.
 // Does not print errors.
-static bool do_pointer_types_match(Type *first, Type *second) {
-    if (first->data.base == second->data.base) {
+static bool do_pointer_types_match(Context *ctx, Type *a, Type *b) {
+    if (a->data.base == ctx->type_void || b->data.base == ctx->type_void) {
+        return true; // ^void is compatible with all pointer types
+    } else if (a->data.base == b->data.base) {
         return true; // both types point to the same thing
-    } else if (!first->data.base || !second->data.base) { // TODO add Context* to this func, to check directly for Context.decoy_ptr, atm this will suffice since decoy_ptr is the only pointer type without a base type.
+    } else if (a == ctx->decoy_ptr || b == ctx->decoy_ptr) { // TODO add Context* to this func, to check directly for Context.decoy_ptr, atm this will suffice since decoy_ptr is the only pointer type without a base type.
         return true; // one of them is the decoy pointer type, which can be assigned to any pointer type.
-    } else if (first->data.base->kind != second->data.base->kind) {
+    } else if (a->data.base->kind != b->data.base->kind) {
         return false; // they don't point to the same type
-    } else if (first->data.base->kind == Type_POINTER) { // since the previous case failed, this is effectively checking that both types are pointers to pointers.
-        return do_pointer_types_match(first->data.base, second->data.base);
+    } else if (a->data.base->kind == Type_POINTER) { // since the previous case failed, this is effectively checking that both types are pointers to pointers.
+        return do_pointer_types_match(ctx, a->data.base, b->data.base);
     }
     return false;
 }
 
-static bool do_types_match(Type *a, Type *b) {
+static bool do_types_match(Context *ctx, Type *a, Type *b) {
     if (a->kind == Type_ALIAS && b->kind == Type_ALIAS) return (a == b);
 
     // This allows us to ensure that literals can be compared with aliases,
     // but still be restrictive about alias vs alias matching.
     if (a->kind == Type_ALIAS) {
         a = a->data.alias_of;
-        return do_types_match(a, b);
+        return do_types_match(ctx, a, b);
     } else if (b->kind == Type_ALIAS) {
         b = b->data.alias_of;
-        return do_types_match(b, a);
+        return do_types_match(ctx, b, a);
     }
 
     if (a->kind == Type_PRIMITIVE && b->kind == Type_PRIMITIVE && a->data.signage != Signage_NaN && b->data.signage != Signage_NaN) { // both types are integer types
         return (a->data.signage == b->data.signage && a->size == b->size);
     }
 
-    if (a->kind == Type_POINTER && b->kind == Type_POINTER) return do_pointer_types_match(a, b);
+    if (a->kind == Type_POINTER && b->kind == Type_POINTER) return do_pointer_types_match(ctx, a, b);
     if (a->kind != b->kind) return false;
     if (a != b) return false;
 
@@ -134,7 +136,7 @@ static bool check_call(Context *ctx, AstNode *callnode, Type **out_return_type) 
         Type *caller_type = type_from_expr(ctx, call->params->nodes[i]);
         if (caller_type == ctx->error_type) return false;
         Type *defn_type = proc->params->nodes[i]->as.var.typename->as.type;
-        if (!do_types_match(caller_type, defn_type)) {
+        if (!do_types_match(ctx, caller_type, defn_type)) {
             compile_error_start(ctx, callnode->token, "type mismatch: argument %d of procedure \"%s\" is defined as type ", i+1, name);
             print_type(defn_type, stderr);
             compile_error_add_line(ctx, " but caller provided argument of type ");
@@ -184,7 +186,7 @@ bool does_type_describe_expr(Context *ctx, Type *type, AstNode *expr, Type **out
         // In other words, if the type is an int, allow any other integer type to be compatible with it.
         if (type == ctx->type_int) return (return_type->kind == Type_PRIMITIVE && return_type->data.signage != Signage_NaN);
 
-        return do_types_match(return_type, type);
+        return do_types_match(ctx, return_type, type);
     }
 
     if (expr->tag == Node_IDENT) {
@@ -201,7 +203,7 @@ bool does_type_describe_expr(Context *ctx, Type *type, AstNode *expr, Type **out
         }
         AstVar *var = &var_decl->as.var;
         if (!(var->flags & VAR_IS_INITED)) {
-            return do_types_match(var->typename->as.type, type);
+            return do_types_match(ctx, var->typename->as.type, type);
         }
         return does_type_describe_expr(ctx, type, var_decl->as.var.value, out_actual_type);
     }
@@ -216,6 +218,17 @@ bool does_type_describe_expr(Context *ctx, Type *type, AstNode *expr, Type **out
     }
 
     switch (expr->tag) {
+    case Node_CAST: {
+        AstCast *cast = &expr->as.cast;
+        // TODO check if the casts expression can even be casted to the requested type
+        bool matches = do_types_match(ctx, cast->typename->as.type, type);
+        if (matches) {
+            *out_actual_type = cast->typename->as.type;
+            return true;
+        }
+        return false;
+    } break;
+
     case Node_BINARY: {
         AstBinary *binary = &expr->as.binary;
         if (is_binary_comparison(*binary)) {
@@ -232,15 +245,26 @@ bool does_type_describe_expr(Context *ctx, Type *type, AstNode *expr, Type **out
                 return false;
             }
             *out_actual_type = result;
-            return do_types_match(result, type);
+            return do_types_match(ctx, result, type);
         }
+        // All that's left is +, -, / and *
+        // TODO
     } break;
 
     case Node_UNARY: {
         const AstUnary *unary = &expr->as.unary;
         if (unary->op == Token_BANG) {
+            Type *real_expr_type = type_from_expr(ctx, unary->expr);
+            if (real_expr_type->kind != Type_POINTER && real_expr_type != ctx->type_bool) {
+                *out_actual_type = ctx->error_type;
+                compile_error(ctx, expr->token, "Unary \"not\" expression must have a boolean or pointer operand");
+                return false;
+            }
             *out_actual_type = ctx->type_bool;
             return (type == ctx->type_bool);
+        }
+        if (unary->op == Token_MINUS) { // TODO
+
         }
         // TODO dereference
         if (unary->op == Token_CARAT) { // address-of operator
@@ -303,7 +327,7 @@ bool does_type_describe_expr(Context *ctx, Type *type, AstNode *expr, Type **out
 
             if (type->kind != Type_POINTER) return false;
 
-            return do_pointer_types_match(type, resulting_type);
+            return do_pointer_types_match(ctx, type, resulting_type);
         }
     } break;
 
@@ -498,6 +522,10 @@ bool check_assignment(Context *ctx, AstBinary *binary) {
             return false;
         }
         left_type = left_decl->as.var.typename->as.type;
+    }
+
+    else if (left->tag == Node_INDEX) {
+        // TODO
     }
 
     else if (left->tag == Node_BINARY) {

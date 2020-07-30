@@ -80,6 +80,7 @@ static inline BinaryOperator get_binary_op_info(TokenType tt) {
 
     // Postfix operators are just binary ops with no right hand side
     case Token_OPEN_PAREN:
+        return (BinaryOperator){.prec=9, .left_assoc=true};
     case Token_OPEN_BRACKET:
         return (BinaryOperator){.prec=9, .left_assoc=true};
 
@@ -194,6 +195,24 @@ static AstNode *parse_postfix_expr(Context *c, AstNode *left) {
     return NULL;
 }
 
+static AstNode *maybe_parse_array_assignment(Context *c, AstNode *index) {
+    Parser *p = &c->parser;
+    if (p->curr->type < Token_ASSIGNMENTS_START && p->curr->type > Token_ASSIGNMENTS_END) {
+        // Not an assignment
+        return index;
+    }
+
+    Token op = *p->curr;
+    parser_next(p);
+
+    AstNode *value = parse_expression(c, 1);
+    AstNode *assign = ast_node(p, Node_BINARY, op);
+    assign->as.binary.left = index;
+    assign->as.binary.op = op.type;
+    assign->as.binary.right = value;
+    return assign;
+}
+
 static AstNode *parse_expression(Context *c, int min_prec) {
     Parser *p = &c->parser;
     AstNode *left = parse_simple_expr(c);
@@ -201,7 +220,7 @@ static AstNode *parse_expression(Context *c, int min_prec) {
         TokenType op = p->curr->type;
         BinaryOperator info = get_binary_op_info(op);
 
-        if ((op < Token_BINOP_START || op > Token_BINOP_END) || info.prec < min_prec) {
+        if ((op < Token_BINOP_START && op > Token_BINOP_END) || info.prec < min_prec) {
             break;
         }
 
@@ -209,7 +228,9 @@ static AstNode *parse_expression(Context *c, int min_prec) {
         if (info.left_assoc) next_min_prec++;
 
         AstNode *postfix = parse_postfix_expr(c, left);
-        if (postfix) return postfix;
+        if (postfix && postfix->tag == Node_CALL) return postfix;
+        if (postfix && postfix->tag == Node_INDEX)
+            return maybe_parse_array_assignment(c, postfix);
 
         parser_next(p);
 

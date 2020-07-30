@@ -1,8 +1,12 @@
 
-Call modifiers e.g:
-    a := inline some_call()
-
-DEREFERENCE
+Do proper symbol checking lol
+Check binary maths
+Dereference
+Check if the casts expression can even be casted to the requested type
+Foreign function decorator
+Call modifiers e.g: a := inline some_call()
+Check if branches
+Check while loops
 
 //
 // AST

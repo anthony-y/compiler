@@ -70,9 +70,12 @@ typedef struct AstError {
     s32 column;
 } AstError;
 
-static const u8 VAR_IS_INFERRED         = 1 << 0;
-static const u8 VAR_TYPE_IS_ANON_STRUCT = 1 << 1;
-static const u8 VAR_IS_INITED           = 1 << 2;
+enum {
+    VAR_IS_INFERRED         = 1 << 0,
+    VAR_TYPE_IS_ANON_STRUCT = 1 << 1,
+    VAR_IS_INITED           = 1 << 2,
+};
+
 typedef struct {
     struct AstNode *name;
     struct AstNode *value;
@@ -138,9 +141,15 @@ typedef struct {
     } data;
 } AstLiteral;
 
+enum {
+    CALL_MOD_NONE = 0,
+    CALL_MOD_INLINE,
+};
+
 typedef struct {
     struct AstNode *name;
     struct Ast *params;
+    int flags;
 } AstCall;
 
 typedef struct {

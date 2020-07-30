@@ -1,0 +1,7 @@
+proc main() {
+    message := inline get_message()
+}
+
+proc get_message(): string {
+    return "Hi"
+}

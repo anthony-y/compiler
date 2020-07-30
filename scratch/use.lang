@@ -1,0 +1,26 @@
+proc alloc(_: u64){} // #foreign
+proc free(_: ^void){} // #foreign
+proc mem_copy(dest: ^void, src: ^void, n: int){}
+
+proc c_str_length(s: ^u8): int {
+	new_s: ^u8
+	while s {
+		s += 1
+	}
+	return new_s - s
+}
+
+proc to_c_string(s: string): ^u8 {
+	c_str := cast(^u8)alloc(s.length+1)
+	mem_copy(c_str, s.data, s.length)
+	//c_str[s.length] = 0
+	return c_str
+}
+
+proc main() {
+	i := ^name
+	a := !i
+	name_c := to_c_string(name)
+	name := "Anthony"	
+	free(name_c)
+}
