@@ -183,7 +183,7 @@ typedef struct {
 } AstCast;
 
 typedef struct {
-    struct AstNode *array;
+    struct AstNode *name;
     struct AstNode *index;
 } AstArrayIndex;
 

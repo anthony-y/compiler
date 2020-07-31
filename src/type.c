@@ -82,6 +82,8 @@ void init_types(Context *ctx, SourceStats *stats) {
     ctx->type_void = make_and_insert_primitive(ctx, "void", 0, Signage_NaN);
     ctx->type_string = make_and_insert_primitive(ctx, "string", sizeof(StringType), Signage_NaN);
 
+    //Type *string = make_type(Type_STRUCT, "string", sizeof(StringType));
+
     // This isn't inserted into the type table, it's only referred to directly by its pointer handle.
     ctx->decoy_ptr = make_type(Type_POINTER, "pointer", 0);
     ctx->decoy_ptr->data.base = NULL;

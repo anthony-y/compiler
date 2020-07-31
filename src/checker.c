@@ -220,12 +220,17 @@ bool does_type_describe_expr(Context *ctx, Type *type, AstNode *expr, Type **out
     switch (expr->tag) {
     case Node_CAST: {
         AstCast *cast = &expr->as.cast;
+        if (type == ctx->type_void) { // we're in type inference, so just allow it
+            *out_actual_type = cast->typename->as.type;
+            return true;
+        }
         // TODO check if the casts expression can even be casted to the requested type
         bool matches = do_types_match(ctx, cast->typename->as.type, type);
         if (matches) {
             *out_actual_type = cast->typename->as.type;
             return true;
         }
+        *out_actual_type = ctx->error_type;
         return false;
     } break;
 
@@ -255,6 +260,9 @@ bool does_type_describe_expr(Context *ctx, Type *type, AstNode *expr, Type **out
         const AstUnary *unary = &expr->as.unary;
         if (unary->op == Token_BANG) {
             Type *real_expr_type = type_from_expr(ctx, unary->expr);
+            if (real_expr_type == ctx->error_type) {
+                return false;
+            }
             if (real_expr_type->kind != Type_POINTER && real_expr_type != ctx->type_bool) {
                 *out_actual_type = ctx->error_type;
                 compile_error(ctx, expr->token, "Unary \"not\" expression must have a boolean or pointer operand");
@@ -525,7 +533,31 @@ bool check_assignment(Context *ctx, AstBinary *binary) {
     }
 
     else if (left->tag == Node_INDEX) {
-        // TODO
+        AstArrayIndex *indexer = &left->as.array_index;
+        if (indexer->name->tag == Node_IDENT) {
+            AstNode *arrdecl;
+            if (!check_ident(ctx, indexer->name, &arrdecl)) {
+                return false;
+            }
+            if (arrdecl->tag != Node_VAR) {
+                compile_error(ctx, indexer->name->token, "Cannot index into \"%s\" because it is not a variable", indexer->name->as.ident->text);
+                return false;
+            }
+            Type *arrtype = arrdecl->as.var.typename->as.type;
+            if (arrtype->kind != Type_ARRAY && arrtype->kind != Type_POINTER) {
+                compile_error(ctx, indexer->name->token, "Cannot index into \"%s\" because it is not an array or pointer", indexer->name->as.ident->text);
+                return false;
+            }
+            left_type = arrtype->data.base;
+        }
+        else if (indexer->name->tag == Node_BINARY) {
+            AstBinary *bin = &indexer->name->as.binary;
+            if (bin->op != Token_DOT) {
+                compile_error(ctx, indexer->name->token, "Name of array index must be identifier or struct member access");
+                return false;
+            }
+            left_type = resolve_accessor(ctx, bin);
+        }
     }
 
     else if (left->tag == Node_BINARY) {

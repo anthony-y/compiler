@@ -21,8 +21,9 @@ static AstNode *parse_call(Context *, AstNode *name);
 static AstNode *parse_expression(Context *, int min_precedence);
 static AstNode *parse_statement(Context *);
 static AstNode *parse_proc(Context *c, bool in_typedef);
-static AstNode *parse_var(Context *);
+static AstNode *parse_var(Context *, bool top_level);
 static AstNode *parse_typename(Context *);
+static AstNode *parse_top_level(Context *);
 
 // These are implemented at the very bottom of the file
 static inline AstNode *int_literal(Parser *);
@@ -184,7 +185,7 @@ static AstNode *parse_postfix_expr(Context *c, AstNode *left) {
     case Token_OPEN_BRACKET: {
         parser_next(p);
         AstNode *index = ast_node(p, Node_INDEX, *p->prev);
-        index->as.array_index.array = left;
+        index->as.array_index.name = left;
         index->as.array_index.index = parse_expression(c, 1);
         if (!consume(p, Token_CLOSE_BRACKET)) {
             return make_error_node(p, *p->curr, "Uneven brackets on array index.");
@@ -215,6 +216,7 @@ static AstNode *maybe_parse_array_assignment(Context *c, AstNode *index) {
 
 static AstNode *parse_expression(Context *c, int min_prec) {
     Parser *p = &c->parser;
+    Token start = *p->curr;
     AstNode *left = parse_simple_expr(c);
     while (true) {
         TokenType op = p->curr->type;
@@ -228,18 +230,17 @@ static AstNode *parse_expression(Context *c, int min_prec) {
         if (info.left_assoc) next_min_prec++;
 
         AstNode *postfix = parse_postfix_expr(c, left);
-        if (postfix && postfix->tag == Node_CALL) return postfix;
+        if (postfix && postfix->tag == Node_CALL)
+            return postfix;
         if (postfix && postfix->tag == Node_INDEX)
             return maybe_parse_array_assignment(c, postfix);
 
         parser_next(p);
 
-        AstNode *right = parse_expression(c, next_min_prec);
-
-        AstNode *new_left = ast_node(p, Node_BINARY, *p->curr);
+        AstNode *new_left = ast_node(p, Node_BINARY, start);
         new_left->as.binary.left = left;
         new_left->as.binary.op = op;
-        new_left->as.binary.right = right;
+        new_left->as.binary.right = parse_expression(c, next_min_prec);;
 
         left = new_left;
     }
@@ -348,8 +349,9 @@ static AstNode *parse_struct(Context *c) {
 static AstNode *parse_typedef(Context *c) {
     Parser *p = &c->parser;
     parser_next(p);
-    
+
     Token name = *p->curr;
+
     if (!consume(p, Token_IDENT)) {
         return make_error_node(p, name, "Typedefs must be given a name.");
     }
@@ -530,7 +532,7 @@ static AstNode *parse_while(Context *c) {
     return node;
 }
 
-static AstNode *parse_var(Context *c) {
+static AstNode *parse_var(Context *c, bool top_level) {
     Parser *p = &c->parser;
 
     if (p->curr->type != Token_IDENT) {
@@ -590,7 +592,7 @@ static AstNode *parse_var(Context *c) {
         node->as.var.value = value;
     }
 
-    add_symbol(c, node, name.text);
+    if (top_level) add_symbol(c, node, name.text);
 
     return node;
 }
@@ -649,7 +651,7 @@ static AstNode *parse_proc(Context *c, bool in_typedef) {
             }
 
             // Each parameter is just a variable declaration.
-            AstNode *arg = parse_var(c);
+            AstNode *arg = parse_var(c, /*top_level=*/false);
             if (arg->tag == Node_ERROR) {
                 parser_recover(p, Token_CLOSE_PAREN);
                 return arg;
@@ -706,7 +708,7 @@ static AstNode *parse_top_level(Context *c) {
     Parser *p = &c->parser;
     switch (p->curr->type) {
     case Token_PROC: return parse_proc(c, false);
-    case Token_IDENT: return parse_var(c);
+    case Token_IDENT: return parse_var(c, /*top_level=*/true);
     case Token_TYPEDEF: return parse_typedef(c);
     }
     AstNode *err = make_error_node(p, *p->curr, "Unknown top level statement.");
@@ -733,7 +735,7 @@ static AstNode *parse_statement(Context *c) {
 
         // Variable declaration
         if (p->curr[1].type == Token_COLON) {
-            return parse_var(c);
+            return parse_var(c, /*top_level=*/false);
         }
 
         AstNode *expr = parse_expression(c, 1);

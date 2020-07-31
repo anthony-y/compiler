@@ -53,6 +53,7 @@ typedef enum {
     Token_BAR,
     Token_DOT_DOT,
     Token_CARAT,
+    Token_HASH,
 
     Token_BINOP_START,
 

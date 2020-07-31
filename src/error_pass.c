@@ -41,7 +41,7 @@ static void print_expression_errors(Context *c, AstNode *node) {
         print_expression_errors(c, node->as.function_call.name);
         break;
     case Node_INDEX:
-        print_expression_errors(c, node->as.array_index.array);
+        print_expression_errors(c, node->as.array_index.name);
         print_expression_errors(c, node->as.array_index.index);
         break;
     case Node_CAST:

@@ -167,7 +167,7 @@ static Token tokenize_ident_or_keyword(Lexer *tz) {
     case 'i': {
         if (len == 3 && strncmp(tz->start+1, "nt", 2) == 0) return token_new(tz, Token_RESERVED_TYPE);
         if (len == 2 && strncmp(tz->start+1, "f", 1) == 0) return token_new(tz, Token_IF);
-        if (len == 7 && strncmp(tz->start+1, "nline", 6) == 0) return token_new(tz, Token_INLINE);
+        if (len == 6 && strncmp(tz->start+1, "nline", 5) == 0) return token_new(tz, Token_INLINE);
         if (len == 6 && strncmp(tz->start+1, "mport", 5) == 0) return token_new(tz, Token_IMPORT);
     } break;
 
@@ -298,6 +298,7 @@ Token next_token(Lexer *tz) {
         case ':': return token_new(tz, Token_COLON);
         case ';': return token_new(tz, Token_SEMI_COLON);
         case '^': return token_new(tz, Token_CARAT);
+        case '#': return token_new(tz, Token_HASH);
 
         // Binary operators: +, *=, <, /=, !=, ==, etc.
         case '*': return token_new(tz, next_if_match(tz, '=') ? Token_STAR_EQUAL    : Token_STAR);
