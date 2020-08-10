@@ -295,7 +295,8 @@ static AstNode *parse_block(Context *c) {
     Token open = *p->prev;
 
     AstNode *block = ast_node(p, Node_BLOCK, open);
-    Ast *decls = make_subtree(p);
+    sh_new_arena(block->as.block.symbols); // TODO leak
+
     Ast *stmts = make_subtree(p);
 
     while (!consume(p, Token_CLOSE_BRACE)) {
@@ -304,12 +305,16 @@ static AstNode *parse_block(Context *c) {
             return make_error_node(p, open, "Unclosed block (missing a '}').");
         }
         if (statement->tag > Node_DECLS_START && statement->tag < Node_DECLS_END) {
-            ast_add(decls, statement);
+            Name *name = NULL;
+            if (statement->tag == Node_VAR) name = ((AstVar *)statement)->name->as.ident;
+            if (statement->tag == Node_PROCEDURE) name = ((AstProcedure *)statement)->name->as.ident;
+            if (statement->tag == Node_TYPEDEF) name = ((AstTypedef *)statement)->name->as.ident;
+            shput(block->as.block.symbols, name->text, ((Symbol){.decl=statement, .status=Sym_UNRESOLVED}));
         }
         ast_add(stmts, statement);
         consume(p, Token_SEMI_COLON);
     }
-    block->as.block.decls = decls;
+
     block->as.block.statements = stmts;
 
     return block;
@@ -565,7 +570,7 @@ static AstNode *parse_var(Context *c, bool top_level) {
         node->as.var.flags |= VAR_IS_INFERRED;
         node->as.var.value = value;
 
-        add_symbol(c, node, name.text); // TODO IMPORTANT ensure no redeclarations
+        if (top_level) add_symbol(c, node, name.text); // TODO IMPORTANT ensure no redeclarations
         return node;
     }
 

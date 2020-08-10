@@ -149,6 +149,7 @@ enum {
 typedef struct {
     struct AstNode *name;
     struct Ast *params;
+    AstProcedure *calling; // filled out in resolve.c
     int flags;
 } AstCall;
 
@@ -196,7 +197,7 @@ typedef struct {
     // statements will be added to statements and decls.
     // Initialized AstBlocks can be casted to an Ast.
     struct Ast *statements;
-    struct Ast *decls;
+    struct SymbolTable *symbols;
 } AstBlock;
 
 typedef struct AstNode {

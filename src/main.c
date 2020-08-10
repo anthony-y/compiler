@@ -12,7 +12,7 @@
 #include "headers/stb/stb_ds.h"
 #include "headers/stb/stretchy_buffer.h"
 
-#define perfstats 0
+#define perfstats 1
 
 static char *read_file(const char *path);
 
@@ -60,6 +60,12 @@ int main(int arg_count, char *args[]) {
 
     if (!lexer_lex(&context, &tokens, &stats)) return 1;
 
+    #if perfstats
+        gettimeofday(&lend, NULL);
+        /* In microseconds */
+        lex_delta = (lend.tv_sec - lstart.tv_sec) * 1000000 + lend.tv_usec - lstart.tv_usec;
+    #endif
+
     if (tokens.len == 1) return 0;
 
     init_types(&context, &stats);
@@ -95,12 +101,14 @@ int main(int arg_count, char *args[]) {
         gettimeofday(&cstart, NULL);
     #endif
 
-    // TODO maybe merge these idk
-    if (check_types_were_declared(&context)) { // potentially could still error, and is likely to
-        resolve_and_infer_types(&context, &ast); // and this relies on the last call not failing
-    } else goto end;
+    resolve_top_level(&context);
 
-    check_ast(&context, &ast); // type and semantic checking
+    // TODO maybe merge these idk
+    // if (check_types_were_declared(&context)) { // potentially could still error, and is likely to
+    //     resolve_and_infer_types(&context, &ast); // and this relies on the last call not failing
+    // } else goto end;
+
+    //check_ast(&context, &ast); // type and semantic checking
 
     #if perfstats
         gettimeofday(&cend, NULL);
@@ -111,12 +119,6 @@ int main(int arg_count, char *args[]) {
     if (context.error_count > 0) {
         printf("\n");
     }
-
-    #if perfstats
-        gettimeofday(&lend, NULL);
-        /* In microseconds */
-        lex_delta = (lend.tv_sec - lstart.tv_sec) * 1000000 + lend.tv_usec - lstart.tv_usec;
-    #endif
 
 end:
     printf("Lexing took %ldus\n", lex_delta);

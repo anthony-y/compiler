@@ -42,22 +42,12 @@ void compile_error_end() {
 
 // TODO make it a hash table
 // TODO ascend through the blocks until file scope
-AstNode *lookup_local(AstNode *nodein, Name *name) {
+Symbol *lookup_local(AstNode *nodein, Name *name) {
     assert(nodein->tag == Node_BLOCK);
     AstBlock *in = (AstBlock *)nodein;
-    for (int i = 0; i < in->decls->len; i++) {
-        AstNode *decl = in->decls->nodes[i];
-        Name *decl_name = NULL;
-        switch (decl->tag) {
-        case Node_VAR:       decl_name = ((AstVar *)      decl)->name->as.ident; break;
-        case Node_PROCEDURE: decl_name = ((AstProcedure *)decl)->name->as.ident; break;
-        case Node_TYPEDEF:   decl_name = ((AstTypedef *)  decl)->name->as.ident; break;
-        }
-        if (decl_name == name) {
-            return decl;
-        }
-    }
-    return NULL;
+    u64 index = shgeti(in->symbols, name->text);
+    if (index == -1) return NULL;
+    return &in->symbols[index].value;
 }
 
 Name *make_name(Context *ctx, Token token) {
@@ -73,7 +63,8 @@ Name *make_name(Context *ctx, Token token) {
 }
 
 inline void add_symbol(Context *c, AstNode *n, char *name) {
-    shput(c->symbol_table, name, n);
+    Symbol s = (Symbol){.decl=n, .status=Sym_UNRESOLVED};
+    shput(c->symbol_table, name, s);
 }
 
 void init_context(Context *c, const char *file_path) {

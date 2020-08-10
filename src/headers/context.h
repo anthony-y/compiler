@@ -13,7 +13,7 @@
 
 #define CONTEXT_SCRATCH_SIZE 1024
 
-#if 0
+#if 1
 typedef struct Symbol {
     AstNode *decl;
     enum {
@@ -28,6 +28,8 @@ typedef struct Symbol {
 typedef struct Name {
     char *text;
 } Name;
+
+typedef struct SymbolTable {char *key; Symbol value;} SymbolTable;
 
 // Central compiler context, a reference to an instance of this struct is
 // passed to most functions in the compiler.
@@ -45,7 +47,7 @@ typedef struct Context {
     Token *deferred_names; // stb stretchy buffer
 
     // stb hash tables
-    struct {char *key; AstNode *value;} *symbol_table;
+                       SymbolTable      *symbol_table;
     struct {char *key; Type    *value;} *type_table;
     struct {char *key; Name    *value;} *name_table;
 
@@ -85,8 +87,8 @@ void free_types(Context *);
 bool check_types_were_declared(Context *);
 
 Name *make_name(Context *, Token from);
-AstNode *lookup_local(AstNode *in, Name *);
+Symbol *lookup_local(AstNode *in, Name *);
 
-void add_symbol(Context *, AstNode *, char *name);
+void add_symbol(Context *, AstNode *decl, char *name);
 
 #endif

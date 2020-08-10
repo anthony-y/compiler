@@ -3,6 +3,7 @@ proc free(_: ^void){} // #foreign
 proc mem_copy(dest: ^void, src: ^void, n: int){}
 
 proc c_str_length(s: ^u8): int {
+	s := ""
 	new_s: ^u8
 	while s {
 		s += 1
@@ -13,16 +14,17 @@ proc c_str_length(s: ^u8): int {
 proc to_c_string(s: string): ^u8 {
 	s : string;
 	c_str := cast(^u8)alloc(s.length+1)
-	mem_copy(c_str, s.data, s.length)
+	//mem_copy(c_str, s.data, s.length) // s.data TODO
 	//c_str+s.length = 0 // Todo
 	c_str[s.length] = 0
 	return c_str
 }
 
 proc main() {
-	name := "Anthony"	
+	name := "Anthony"
 	i := ^name
 	a := !i
+	bb := 10 + 12 - "string"
 	name_c := to_c_string(name)
 	free(name_c)
 }

@@ -13,4 +13,6 @@ void check_ast(Context *, Ast *);
 //
 void resolve_and_infer_types(Context *, Ast *);
 
+void resolve_top_level(Context *);
+
 #endif

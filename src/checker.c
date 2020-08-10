@@ -93,26 +93,14 @@ static bool check_call(Context *ctx, AstNode *callnode, Type **out_return_type) 
 
     char *name = call->name->as.ident->text;
 
-    u64 index = shgeti(ctx->symbol_table, name); // TODO when local procedures are implemented, this will need to be a check using lookup_local or something else (maybe a prospective find_proc which is optimized for global scope first, and then local scope).
-    if (index == -1) {
-        compile_error(ctx, callnode->token, "Attempted to call undeclared procedure \"%s\"", name);
-        return false;
-    }
-
-    AstNode *symbol = ctx->symbol_table[index].value;
-    if (symbol->tag != Node_PROCEDURE) {
-        compile_error(ctx, callnode->token, "Attempted to call \"%s\" which is not a procedure", name);
-        return false;
-    }
-
-    AstProcedure *proc = &symbol->as.procedure;
+    AstProcedure *proc = call->calling;
     int proc_arg_count = (proc->params ? proc->params->len : 0);
     if (!call->params) {
         if (proc_arg_count != 0) {
             compile_error(ctx, callnode->token, "Call to \"%s\" specifies no arguments, but it's defined to expect %d of them", name, proc_arg_count);
             return false;
         }
-        if (out_return_type) *out_return_type = symbol->as.procedure.return_type->as.type;
+        if (out_return_type) *out_return_type = proc->return_type->as.type;
         return true;
     }
 
@@ -145,7 +133,7 @@ static bool check_call(Context *ctx, AstNode *callnode, Type **out_return_type) 
         }
     }
 
-    if (out_return_type) *out_return_type = symbol->as.procedure.return_type->as.type;
+    if (out_return_type) *out_return_type = proc->return_type->as.type;
     return true;
 }
 
@@ -154,14 +142,14 @@ static bool check_call(Context *ctx, AstNode *callnode, Type **out_return_type) 
 // However, it may not point to a Node_VAR, callers need to check for this.
 // Writes said declaration to `out_decl_site` ONLY if it succeeds.
 static bool check_ident(Context *ctx, AstNode *node, AstNode **out_decl_site) {
-    Name *name = node->as.ident;
-    AstNode *hopefully_var = lookup_local(ctx->curr_checker_proc->block, name); // TODO when lookup_local scoures outer scopes, this will return nodes that could be procedures, etc. which will fix the poor error message I get right now if `name` is actually the name of a procedure.
-    if (!hopefully_var) {
-        compile_error(ctx, node->token, "Undeclared identifier \"%s\"", name->text);
-        return false;
-    }
-    *out_decl_site = hopefully_var;
-    return true;
+    // Name *name = node->as.ident;
+    // Symbol *hopefully_var = lookup_local(ctx->curr_checker_proc->block, name); // TODO when lookup_local scoures outer scopes, this will return nodes that could be procedures, etc. which will fix the poor error message I get right now if `name` is actually the name of a procedure.
+    // if (!hopefully_var) {
+    //     compile_error(ctx, node->token, "Undeclared identifier \"%s\"", name->text);
+    //     return false;
+    // }
+    // *out_decl_site = hopefully_var;
+    // return true;
 }
 
 //
@@ -254,6 +242,20 @@ bool does_type_describe_expr(Context *ctx, Type *type, AstNode *expr, Type **out
         }
         // All that's left is +, -, / and *
         // TODO
+        Type *left_type = type_from_expr(ctx, binary->left);
+        Type *right_type = type_from_expr(ctx, binary->right);
+        if (left_type->kind != Type_POINTER || (left_type->kind == Type_PRIMITIVE && left_type->data.signage == Signage_NaN)) {
+            compile_error(ctx, binary->left->token, "Left hand side of arithmetic expression must be of one of these types: integer, floating point or pointer");
+            *out_actual_type = ctx->error_type;
+            return false;
+        }
+        if (right_type->kind != Type_POINTER || (right_type->kind == Type_PRIMITIVE && right_type->data.signage == Signage_NaN)) {
+            compile_error(ctx, binary->left->token, "Right hand side of arithmetic expression must be of one of these types: integer, floating point or pointer");
+            *out_actual_type = ctx->error_type;
+            return false;
+        }
+        *out_actual_type = ctx->type_int;
+        return (type->kind == Type_PRIMITIVE && type->data.signage != Signage_NaN);
     } break;
 
     case Node_UNARY: {
@@ -498,15 +500,15 @@ Type *resolve_accessor(Context *ctx, AstBinary *accessor) {
     assert(lhs_type);
 
     AstStruct *struct_def = &lhs_type->data.user->as.struct_;
-    AstNode *field = lookup_local(struct_def->members, rhs);
+    Symbol *field = lookup_local(struct_def->members, rhs);
     if (!field) {
         compile_error(ctx, accessor->right->token, "No such field as \"%s\" in struct field access", rhs->text);
         return NULL;
     }
-    if (field->tag != Node_VAR) {
+    if (field->decl->tag != Node_VAR) {
         assert(false); // should have been checked by now, ill see if i can make this go off
     }
-    return field->as.var.typename->as.type;
+    return field->decl->as.var.typename->as.type;
 }
 
 bool check_assignment(Context *ctx, AstBinary *binary) {
