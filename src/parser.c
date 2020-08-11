@@ -309,6 +309,7 @@ static AstNode *parse_block(Context *c) {
             if (statement->tag == Node_VAR) name = ((AstVar *)statement)->name->as.ident;
             if (statement->tag == Node_PROCEDURE) name = ((AstProcedure *)statement)->name->as.ident;
             if (statement->tag == Node_TYPEDEF) name = ((AstTypedef *)statement)->name->as.ident;
+            assert(name);
             shput(block->as.block.symbols, name->text, ((Symbol){.decl=statement, .status=Sym_UNRESOLVED}));
         }
         ast_add(stmts, statement);

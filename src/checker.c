@@ -462,55 +462,6 @@ void check_if(Context *ctx, AstNode *node) {
     } else check_statement(ctx, iff->block_or_stmt);
 }
 
-Type *resolve_accessor(Context *ctx, AstBinary *accessor) {
-    assert(accessor->op == Token_DOT);
-    assert(accessor->right->tag == Node_IDENT);
-    Name *rhs = accessor->right->as.ident;
-
-    // lookup left in scope
-    // ensure its a struct instance (its type is a struct)
-    // use lookup_local to find the field corresponding to name on the RHS
-    // return the type of the field
-
-    Type *lhs_type = NULL;
-
-    if (accessor->left->tag == Node_IDENT) {
-        Name *lhs = accessor->left->as.ident;
-        AstNode *lhs_decl = NULL;
-        if (!check_ident(ctx, accessor->left, &lhs_decl)) {
-            return NULL;
-        }
-        if (lhs_decl->tag != Node_VAR) {
-            compile_error(ctx, accessor->left->token, "Cannot access member in \"%s\" because it's not a variable", lhs->text);
-            return NULL;
-        }
-
-        lhs_type = lhs_decl->as.var.typename->as.type;
-        if (lhs_type->kind != Type_STRUCT) {
-            compile_error(ctx, accessor->left->token, "Cannot access member in \"%s\" because it's not a struct instance", lhs->text);
-            return NULL;
-        }
-    }
-
-    else if (accessor->left->tag == Node_BINARY) {
-        lhs_type = resolve_accessor(ctx, &accessor->left->as.binary);
-        if (!lhs_type) return NULL;
-    }
-
-    assert(lhs_type);
-
-    AstStruct *struct_def = &lhs_type->data.user->as.struct_;
-    Symbol *field = lookup_local(struct_def->members, rhs);
-    if (!field) {
-        compile_error(ctx, accessor->right->token, "No such field as \"%s\" in struct field access", rhs->text);
-        return NULL;
-    }
-    if (field->decl->tag != Node_VAR) {
-        assert(false); // should have been checked by now, ill see if i can make this go off
-    }
-    return field->decl->as.var.typename->as.type;
-}
-
 bool check_assignment(Context *ctx, AstBinary *binary) {
     assert(is_assignment(*binary));
 

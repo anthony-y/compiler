@@ -34,8 +34,9 @@ proc main() {
     val : Whatever = test(f.string_ptr);
 
     a := true;
-	b := false;
-    c: bool = (a) && (b) || (c) // need proper name resolution :/
+    b := false;
+    c := true;
+    c = (a) && (b) || (c) // need proper name resolution :/
 
     // boolean : bool = value;
 }

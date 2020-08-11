@@ -1,7 +1,6 @@
 i := 10
 
 proc main() {
-    //get_message()
     message := get_message() // look up name in symbol table (and local scope but we'll worry about local procs later)
                                     // if it's not there, undeclared error,
                                     // if it is, and it's not resolved, resolve it and change the symbol in the table of key "get_message" to Symbol_RESOLVED
