@@ -13,7 +13,6 @@ Type *resolve_var(Symbol *varsym, Context *ctx);
 Type *resolve_accessor(Context *ctx, AstBinary *accessor);
 
 static AstProcedure **scope_stack = NULL; // stbds array
-static bool inside_decl = false;
 
 AstProcedure *resolve_call(AstNode *callnode, Context *ctx) {
     AstCall *call = (AstCall *)callnode;
@@ -69,7 +68,7 @@ Type *resolve_expression(AstNode *expr, Context *ctx) {
             Type *resolved_type = resolve_var(var, ctx);
             return resolved_type;
         }
-        if (var->status == Sym_RESOLVING && inside_decl) {
+        if (var->status == Sym_RESOLVING) {
             compile_error(ctx, expr->token, "Initial instantiation of variable \"%s\" mentions itself", name->text);
             return NULL;
         }
@@ -176,9 +175,7 @@ Type *resolve_var(Symbol *varsym, Context *ctx) {
     }
 
     varsym->status = Sym_RESOLVING;
-    inside_decl = true;
     Type *inferred_type = resolve_expression(var->value, ctx);
-    inside_decl = false;
     varsym->status = Sym_RESOLVED;
 
     if (!inferred_type) return NULL;
