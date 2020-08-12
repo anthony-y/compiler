@@ -94,7 +94,8 @@ static bool check_call(Context *ctx, AstNode *callnode, Type **out_return_type) 
     char *name = call->name->as.ident->text;
 
     AstProcedure *proc = call->calling;
-    int proc_arg_count = (proc->params ? proc->params->len : 0);
+    int real_len = shlenu(proc->params);
+    int proc_arg_count = (proc->params ? real_len : 0);
     if (!call->params) {
         if (proc_arg_count != 0) {
             compile_error(ctx, callnode->token, "Call to \"%s\" specifies no arguments, but it's defined to expect %d of them", name, proc_arg_count);
@@ -112,7 +113,7 @@ static bool check_call(Context *ctx, AstNode *callnode, Type **out_return_type) 
         return false;
     }
 
-    if (call_arg_count < proc->params->len) {
+    if (call_arg_count < real_len) {
         int diff = proc_arg_count - call_arg_count;
         compile_error(ctx, callnode->token, "%d too few arguments in call to \"%s\"", diff, name);
         return false;
@@ -123,7 +124,7 @@ static bool check_call(Context *ctx, AstNode *callnode, Type **out_return_type) 
     for (int i = 0; i < call_arg_count; i++) {
         Type *caller_type = type_from_expr(ctx, call->params->nodes[i]);
         if (caller_type == ctx->error_type) return false;
-        Type *defn_type = proc->params->nodes[i]->as.var.typename->as.type;
+        Type *defn_type = proc->params[i].value.decl->as.var.typename->as.type;
         if (!do_types_match(ctx, caller_type, defn_type)) {
             compile_error_start(ctx, callnode->token, "type mismatch: argument %d of procedure \"%s\" is defined as type ", i+1, name);
             print_type(defn_type, stderr);

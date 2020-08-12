@@ -36,21 +36,19 @@ void dump_deferred_names(const Context *p) {
     }
 }
 
-int main(int arg_count, char *args[]) {
-    if (arg_count < 2) {
-        fprintf(stderr, "Error: expected a root compilation target (a file path).\n");
-        return 1;
-    }
-    char *file_data = read_file(args[1]); // read the file into a zero-terminated buffer.
+// THINK: for imports, just lex, parse and resolve all the files and then merge their scopes into one scope, then generate code for the symbols, symbols that are Sym_UNRESOLVED, can be ignored.
+
+bool process_file(const char *file_path) {
+    char *file_data = read_file(file_path); // read the file into a zero-terminated buffer.
 
     SourceStats stats = (SourceStats){10}; // set all values to 10 to start with.
     TokenList tokens;
     Context context;
     Ast ast;
 
-    init_context(&context, args[1]);
+    init_context(&context, file_path);
     token_list_init(&tokens);
-    lexer_init(&context.lexer, args[1], file_data);
+    lexer_init(&context.lexer, file_path, file_data);
 
     u64 lex_delta = 0;
     #if perfstats
@@ -102,12 +100,6 @@ int main(int arg_count, char *args[]) {
     #endif
 
     resolve_top_level(&context);
-
-    // TODO maybe merge these idk
-    // if (check_types_were_declared(&context)) { // potentially could still error, and is likely to
-    //     resolve_and_infer_types(&context, &ast); // and this relies on the last call not failing
-    // } else goto end;
-
     //check_ast(&context, &ast); // type and semantic checking
 
     #if perfstats
@@ -116,7 +108,9 @@ int main(int arg_count, char *args[]) {
         check_delta = (cend.tv_sec - cstart.tv_sec) * 1000000 + cend.tv_usec - cstart.tv_usec;
     #endif
 
-    if (context.error_count > 0) {
+    bool ret = (context.error_count > 0);
+
+    if (ret) {
         printf("\n");
     }
 
@@ -132,7 +126,18 @@ end:
     lexer_free(&context.lexer);
     free(file_data);
 
-    return 0;
+    return ret;
+}
+
+// TODO disallow duplicate symbols
+
+int main(int arg_count, char *args[]) {
+    if (arg_count < 2) {
+        fprintf(stderr, "Error: expected a root compilation target (a file path).\n");
+        return 1;
+    }
+
+    return !process_file(args[1]); // 0 (good) is false in this case
 }
 
 static char *read_file(const char *path) {

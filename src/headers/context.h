@@ -3,19 +3,21 @@
 
 #include "lexer.h"
 #include "parser.h"
-#include "ast.h"
 #include "type.h"
 #include "common.h"
 #include "token.h"
 #include "arena.h"
+#include "ast.h"
 
 #include <stdarg.h>
 
 #define CONTEXT_SCRATCH_SIZE 1024
 
+struct AstNode;
+
 #if 1
 typedef struct Symbol {
-    AstNode *decl;
+    struct AstNode *decl;
     enum {
         Sym_UNRESOLVED,
         Sym_RESOLVED,
@@ -87,7 +89,10 @@ void free_types(Context *);
 bool check_types_were_declared(Context *);
 
 Name *make_name(Context *, Token from);
-Symbol *lookup_local(AstNode *in, Name *);
+
+Symbol *lookup_local(AstProcedure *, Name *);
+Symbol *lookup_struct_field(AstStruct *, Name *);
+Symbol *lookup_in_block(AstBlock *, Name *);
 
 void add_symbol(Context *, AstNode *decl, char *name);
 

@@ -39,12 +39,12 @@ AstProcedure *resolve_call(AstNode *callnode, Context *ctx) {
 Type *resolve_expression(AstNode *expr, Context *ctx) {
     if (expr->tag == Node_CALL) {
         AstProcedure *resolved = resolve_call(expr, ctx);
-        if (!resolved) return ctx->error_type;
+        if (!resolved) return NULL;
         return resolved->return_type->as.type;
     }
     if (expr->tag == Node_IDENT) {
         Name *name = expr->as.ident;
-        Symbol *var = lookup_local(stbds_arrlast(scope_stack)->block, name);
+        Symbol *var = lookup_local(stbds_arrlast(scope_stack), name);
         if (!var) {
             compile_error(ctx, expr->token, "Undeclared identifier \"%s\"", name->text);
             return NULL;
@@ -70,33 +70,33 @@ Type *resolve_expression(AstNode *expr, Context *ctx) {
             return resolve_accessor(ctx, bin);
         }
         Type *lhs = resolve_expression(bin->left, ctx);
-        Type *rhs = resolve_expression(bin->right, ctx);
+        resolve_expression(bin->right, ctx);
         return lhs;
     }
     if (expr->tag == Node_ENCLOSED) {
         return resolve_expression(((AstEnclosed *)expr)->sub_expr, ctx);
     }
-    
+
     return NULL;
 }
 
 Type *resolve_accessor(Context *ctx, AstBinary *accessor) {
     assert(accessor->op == Token_DOT);
     assert(accessor->right->tag == Node_IDENT);
+    assert(accessor->left->tag == Node_IDENT || accessor->left->tag == Node_BINARY);
 
     Name *rhs = accessor->right->as.ident;
-    Type *lhs_type = NULL;
+    Type *lhs_type = resolve_expression(accessor->left, ctx);
 
-    if (accessor->left->tag == Node_BINARY) {
-        lhs_type = resolve_accessor(ctx, &accessor->left->as.binary);
-        if (!lhs_type) return NULL;
-    } else {
-        lhs_type = resolve_expression(accessor->left, ctx);
+    if (!lhs_type) return NULL;
+
+    if (lhs_type->kind != Type_STRUCT) {
+        compile_error(ctx, accessor->left->token, "Attempt to access member in non-struct value");
+        return NULL;
     }
-    assert(lhs_type);
 
     AstStruct *struct_def = &lhs_type->data.user->as.struct_;
-    Symbol *field = lookup_local(struct_def->members, rhs);
+    Symbol *field = lookup_struct_field(struct_def, rhs);
     if (!field) {
         compile_error(ctx, accessor->right->token, "No such field as \"%s\" in struct field access", rhs->text);
         return NULL;
@@ -121,11 +121,19 @@ Type *resolve_var(Symbol *varsym, Context *ctx) {
     Type *inferred_type = resolve_expression(var->value, ctx);
     inside_decl = false;
     varsym->status = Sym_RESOLVED;
-    if (inferred_type == ctx->error_type) return ctx->error_type;
+    if (!inferred_type) return NULL;
     if (var->flags & VAR_IS_INFERRED) {
         var->typename->as.type = inferred_type;
     }
     return inferred_type;
+}
+
+void resolve_assignment(AstNode *ass, Context *ctx) {
+    assert(ass->tag == Node_BINARY);
+    AstBinary *bin = (AstBinary *)ass;
+    assert(is_assignment(*bin));
+    resolve_expression(bin->left, ctx);
+    resolve_expression(bin->right, ctx);
 }
 
 void resolve_procedure(Symbol *procsym, Context *ctx) {
@@ -146,12 +154,15 @@ void resolve_procedure(Symbol *procsym, Context *ctx) {
     }
     for (int i = 0; i < block->statements->len; i++) {
         AstNode *stmt = block->statements->nodes[i];
-        if (stmt->tag > Node_DECLS_START && stmt->tag < Node_DECLS_END) {
+        if (is_decl(stmt)) {
             continue;
         }
         switch (stmt->tag) {
         case Node_CALL:
             resolve_call(stmt, ctx);
+            break;
+        case Node_BINARY:
+            resolve_assignment(stmt, ctx);
             break;
         }
     }

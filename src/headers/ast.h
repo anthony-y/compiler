@@ -84,7 +84,7 @@ typedef struct {
 } AstVar;
 
 typedef struct {
-    struct Ast *params;
+    struct SymbolTable *params;
     struct AstNode *block;
     struct AstNode *name;
     struct AstNode *return_type;
@@ -192,12 +192,15 @@ typedef struct {
     struct AstNode *statement;
 } AstDefer;
 
-typedef struct {
+struct SymbolTable;
+
+typedef struct AstBlock {
     // These overlap, meaning, declarations that are also 
     // statements will be added to statements and decls.
     // Initialized AstBlocks can be casted to an Ast.
     struct Ast *statements;
     struct SymbolTable *symbols;
+    struct AstBlock *parent;
 } AstBlock;
 
 typedef struct AstNode {
@@ -245,6 +248,9 @@ AstNode *ast_node(struct Parser *p, AstNodeType tag, Token t);
 
 AstNode *make_error_node(struct Parser *p, Token tok, const char *msg);
 AstNode *make_ident_node(struct Context *c, Token tok);
+
+struct Name *get_decl_name(AstNode *);
+bool is_decl(AstNode *);
 
 bool is_assignment(AstBinary);
 bool is_binary_comparison(AstBinary);

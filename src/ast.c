@@ -23,7 +23,9 @@ inline AstNode *ast_node(Parser *p, AstNodeType tag, Token t) {
 }
 
 AstNode *make_error_node(Parser *p, Token tok, const char *msg) {
-    AstNode *n = ast_node(p, Node_ERROR, tok);
+    AstNode *n = malloc(sizeof(AstNode));
+    n->token = tok;
+    n->tag = Node_ERROR;
     n->as.error.line = tok.line;
     n->as.error.column = tok.column;
     n->as.error.msg = arena_alloc(&p->error_msg_allocator, strlen(msg)+1);
@@ -58,6 +60,21 @@ inline bool is_assignment(AstBinary b) {
 
 inline bool is_binary_comparison(AstBinary b) {
     return (b.op > Token_BINARY_COMPARE_START && b.op < Token_BINARY_COMPARE_END);
+}
+
+Name *get_decl_name(AstNode *node) {
+    // Not actually a decl
+    if (!is_decl(node)) return NULL;
+    Name *name = NULL;
+    if (node->tag == Node_VAR) name = ((AstVar *)node)->name->as.ident;
+    if (node->tag == Node_PROCEDURE) name = ((AstProcedure *)node)->name->as.ident;
+    if (node->tag == Node_TYPEDEF) name = ((AstTypedef *)node)->name->as.ident;
+    assert(name);
+    return name;
+}
+
+inline bool is_decl(AstNode *n) {
+    return (n->tag > Node_DECLS_START && n->tag < Node_DECLS_END);
 }
 
 /* These functions allocate and return AST nodes */

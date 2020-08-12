@@ -40,14 +40,30 @@ void compile_error_end() {
     fprintf(stderr, ".\n");
 }
 
-// TODO make it a hash table
-// TODO ascend through the blocks until file scope
-Symbol *lookup_local(AstNode *nodein, Name *name) {
-    assert(nodein->tag == Node_BLOCK);
-    AstBlock *in = (AstBlock *)nodein;
-    u64 index = shgeti(in->symbols, name->text);
+Symbol *lookup_in_block(AstBlock *block, Name *name) {
+    u64 index = shgeti(block->symbols, name->text);
     if (index == -1) return NULL;
-    return &in->symbols[index].value;
+    return &block->symbols[index].value;
+}
+
+Symbol *lookup_local(AstProcedure *proc, Name *name) {
+    AstBlock *block = (AstBlock *)proc->block;
+    Symbol *s = lookup_in_block(block, name);
+    if (!s) {
+        AstBlock *parent = block->parent;
+        while (parent) {
+            Symbol *sym = lookup_in_block(parent, name);
+            if (sym) return sym;
+            parent = parent->parent;
+        }
+        return NULL;
+    }
+    return s;
+}
+
+Symbol *lookup_struct_field(AstStruct *def, Name *name) {
+    assert(def->members->tag == Node_BLOCK);
+    return lookup_in_block(&def->members->as.block, name);
 }
 
 Name *make_name(Context *ctx, Token token) {

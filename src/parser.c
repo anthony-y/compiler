@@ -301,19 +301,16 @@ static AstNode *parse_block(Context *c) {
 
     while (!consume(p, Token_CLOSE_BRACE)) {
         AstNode *statement = parse_statement(c);
+        consume(p, Token_SEMI_COLON);
         if (p->curr->type == Token_EOF) {
             return make_error_node(p, open, "Unclosed block (missing a '}').");
         }
-        if (statement->tag > Node_DECLS_START && statement->tag < Node_DECLS_END) {
-            Name *name = NULL;
-            if (statement->tag == Node_VAR) name = ((AstVar *)statement)->name->as.ident;
-            if (statement->tag == Node_PROCEDURE) name = ((AstProcedure *)statement)->name->as.ident;
-            if (statement->tag == Node_TYPEDEF) name = ((AstTypedef *)statement)->name->as.ident;
-            assert(name);
+        Name *name = get_decl_name(statement);
+        if (name) {
             shput(block->as.block.symbols, name->text, ((Symbol){.decl=statement, .status=Sym_UNRESOLVED}));
+            ast_add(stmts, statement);
+            consume(p, Token_SEMI_COLON);
         }
-        ast_add(stmts, statement);
-        consume(p, Token_SEMI_COLON);
     }
 
     block->as.block.statements = stmts;
@@ -333,6 +330,16 @@ static AstNode *parse_return(Context *c) {
 
     node->as.return_.expr = parse_expression(c, 1);
     return node;
+}
+
+static AstNode *parse_defer(Context *c) {
+    Parser *p = &c->parser;
+    AstNode *defer = ast_node(p, Node_DEFER, *p->curr);
+    parser_next(p);
+    defer->as.defer.statement = parse_statement(c);
+    if (defer->as.defer.statement->tag == Node_DEFER)
+        return make_error_node(p, *p->prev, "You can't defer a defer statement.");
+    return defer;
 }
 
 static AstNode *parse_struct(Context *c) {
@@ -420,6 +427,7 @@ static AstNode *parse_typename(Context *c) {
         parser_next(p);
         u64 i = shgeti(c->type_table, t.text);
         type_node->as.type = c->type_table[i].value;
+        assert(type_node->as.type);
         return type_node;
     } break;
     case Token_STRUCT: {
@@ -485,7 +493,7 @@ static AstNode *parse_if(Context *c) {
     parser_next(p); // skip keyword
 
     AstNode *ast_if = ast_node(p, Node_IF, start);
-    ast_if->as.if_.condition = parse_expression(c, 1);;
+    ast_if->as.if_.condition = parse_expression(c, 1);
 
     if (consume(p, Token_THEN)) {
         AstNode *stmt = parse_statement(c);
@@ -603,16 +611,6 @@ static AstNode *parse_var(Context *c, bool top_level) {
     return node;
 }
 
-static AstNode *parse_defer(Context *c) {
-    Parser *p = &c->parser;
-    AstNode *defer = ast_node(p, Node_DEFER, *p->curr);
-    parser_next(p);
-    defer->as.defer.statement = parse_statement(c);
-    if (defer->as.defer.statement->tag == Node_DEFER)
-        return make_error_node(p, *p->prev, "You can't defer a defer statement.");
-    return defer;
-}
-
 // Parse a procuedure declaration.
 static AstNode *parse_proc(Context *c, bool in_typedef) {
     Parser *p = &c->parser;
@@ -629,7 +627,8 @@ static AstNode *parse_proc(Context *c, bool in_typedef) {
     Token name = *p->prev;
 
     AstNode *name_node = make_ident_node(c, *p->prev);
-    Ast *params = NULL;
+    SymbolTable *params = NULL;
+    sh_new_arena(params);
 
     if (!consume(p, Token_OPEN_PAREN)) {
         return make_error_node(p, *p->curr, "Expected parameter list (even if it's empty) after procedure name.");
@@ -637,9 +636,6 @@ static AstNode *parse_proc(Context *c, bool in_typedef) {
 
     // If the argument list isn't empty.
     if (!consume(p, Token_CLOSE_PAREN)) {
-        // Initialize the subtree that will store the statement nodes.
-        params = make_subtree(p);
-
         while (!consume(p, Token_CLOSE_PAREN)) {
             if (p->curr->type == Token_OPEN_BRACE || 
                 p->curr->type == Token_SEMI_COLON ||
@@ -667,7 +663,8 @@ static AstNode *parse_proc(Context *c, bool in_typedef) {
                 parser_recover(p, Token_CLOSE_PAREN);
             }
 
-            ast_add(params, arg);
+            Symbol sym = (Symbol){.decl=arg, .status=Sym_UNRESOLVED};
+            shput(params, ((AstVar *)arg)->name, sym);
 
             consume(p, Token_COMMA);
         }
@@ -769,7 +766,7 @@ static AstNode *parse_statement(Context *c) {
     }
     }
     AstNode *err = make_error_node(p, *p->curr, "Failed to parse statement.");
-    parser_recover(p, Token_SEMI_COLON);
+    parser_recover_to_declaration(p);
     return err;
 }
 
@@ -832,10 +829,10 @@ void parser_init(Parser *p, const TokenList *l, const SourceStats *stats) {
     arena_init(&p->node_allocator, n, sizeof(AstNode), 8);
 
     /* Initialize the persistent storage for subtrees */
-    // (Each block stores 2 Ast*'s)
-    arena_init(&p->tree_allocator, (stats->blocks * 2) + stats->argument_lists, sizeof(Ast), 8);
+    u64 num_trees = (stats->blocks) + stats->argument_lists;
+    arena_init(&p->tree_allocator, num_trees, sizeof(Ast), 8);
 
-    arena_init(&p->error_msg_allocator, 1024, sizeof(char), 1);
+    arena_init(&p->error_msg_allocator, 10240, sizeof(char), 1);
 
     p->curr = l->tokens;
     p->prev = l->tokens;
@@ -847,10 +844,10 @@ void parser_free(Parser *p, Ast *a) {
     //
     // TODO LEAK FOR SOME REASON
     //
-    u8 *end = p->tree_allocator.block+p->tree_allocator.pos;
-    for (u8 *data = p->tree_allocator.block; data != end; data++) {
-        ast_free((Ast *)data);
-    }
+    // u8 *end = p->tree_allocator.block+p->tree_allocator.pos;
+    // for (u8 *data = p->tree_allocator.block; data != end; data++) {
+    //     ast_free((Ast *)data);
+    // }
 
     arena_free(&p->tree_allocator);
     arena_free(&p->node_allocator);
