@@ -89,6 +89,20 @@ void init_types(Context *ctx, SourceStats *stats) {
     ctx->decoy_ptr->data.base = NULL;
 }
 
+// Utility function to unwrap a pointer to it's ultimate base type.
+// Returns the unwrapped pointer, and return the depth to `out_depth`.
+// Does not print errors.
+inline Type *unwrap_pointer_type(Type *ptr, int *out_depth) {
+    assert(ptr->kind == Type_POINTER);
+    int depth = 0;
+    while (ptr->kind == Type_POINTER) {
+        ptr = ptr->data.base;
+        depth++;
+    }
+    if (out_depth) *out_depth = depth;
+    return ptr;
+}
+
 // During parse-time, names of types which were as of yet undeclared, were accumulated.
 // This code runs after parse-time and prints an error if a type still isn't in the type table.
 bool check_types_were_declared(Context *ctx) {

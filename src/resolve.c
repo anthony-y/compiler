@@ -37,14 +37,30 @@ AstProcedure *resolve_call(AstNode *callnode, Context *ctx) {
 }
 
 Type *resolve_expression(AstNode *expr, Context *ctx) {
-    if (expr->tag == Node_CALL) {
+    if (is_literal(expr)) {
+        switch (expr->tag) {
+        case Node_STRING_LIT: return ctx->type_string;
+        case Node_INT_LIT: return ctx->type_int;
+        case Node_BOOL_LIT: return ctx->type_bool;
+        case Node_NIL: return make_pointer_type(NULL);
+        // TODO array and float
+        }
+    }
+    switch (expr->tag) {
+    case Node_CALL: {
         AstProcedure *resolved = resolve_call(expr, ctx);
         if (!resolved) return NULL;
         return resolved->return_type->as.type;
-    }
-    if (expr->tag == Node_IDENT) {
+    } break;
+    case Node_UNARY: {
+        AstUnary *unary = (AstUnary *)expr;
+        Type *expr_type = resolve_expression(unary->expr, ctx);
+        return expr_type;
+    } break;
+    case Node_IDENT: {
         Name *name = expr->as.ident;
-        Symbol *var = lookup_local(stbds_arrlast(scope_stack), name);
+        AstProcedure *in = stbds_arrlast(scope_stack);
+        Symbol *var = lookup_local(ctx, in, name);
         if (!var) {
             compile_error(ctx, expr->token, "Undeclared identifier \"%s\"", name->text);
             return NULL;
@@ -63,8 +79,17 @@ Type *resolve_expression(AstNode *expr, Context *ctx) {
         }
         AstVar *vardecl = (AstVar *)var->decl;
         return vardecl->typename->as.type;
-    }
-    if (expr->tag == Node_BINARY) {
+    } break;
+    case Node_CAST: {
+        return ((AstCast *)expr)->typename->as.type;
+    } break;
+    case Node_INDEX: {
+        AstArrayIndex *index = (AstArrayIndex *)expr;
+        Type *resolved_name = resolve_expression(index->name, ctx);
+        // TODO expr
+        return resolved_name;
+    } break;
+    case Node_BINARY: {
         AstBinary *bin = (AstBinary *)expr;
         if (bin->op == Token_DOT) {
             return resolve_accessor(ctx, bin);
@@ -72,12 +97,35 @@ Type *resolve_expression(AstNode *expr, Context *ctx) {
         Type *lhs = resolve_expression(bin->left, ctx);
         resolve_expression(bin->right, ctx);
         return lhs;
-    }
-    if (expr->tag == Node_ENCLOSED) {
+    } break;
+    case Node_ENCLOSED: {
         return resolve_expression(((AstEnclosed *)expr)->sub_expr, ctx);
+    } break;
+    }
+    assert(false);
+    return NULL;
+}
+
+// TODO somehow make types symbols lmao
+Type *resolve_type(Context *ctx, Type *type, Token t) {
+    assert(type->kind == Type_DEFERRED_NAMED);
+
+    u64 i = shgeti(ctx->type_table, type->name);
+    if (i == -1) {
+        compile_error(ctx, t, "Undeclared type \"%s\"", type->name);
+        return NULL;
     }
 
-    return NULL;
+    Type *real_type = ctx->type_table[i].value;
+
+    u64 type_i = shgeti(ctx->symbol_table, type->name);
+    Symbol *sym = &ctx->symbol_table[type_i].value;
+    if (sym->decl->tag != Node_TYPEDEF) {
+        compile_error(ctx, t, "\"%s\" is not a type", type->name);
+        return NULL;
+    }
+    sym->status = Sym_RESOLVED;
+    return real_type;
 }
 
 Type *resolve_accessor(Context *ctx, AstBinary *accessor) {
@@ -88,7 +136,15 @@ Type *resolve_accessor(Context *ctx, AstBinary *accessor) {
     Name *rhs = accessor->right->as.ident;
     Type *lhs_type = resolve_expression(accessor->left, ctx);
 
-    if (!lhs_type) return NULL;
+    if (!lhs_type) return NULL; // we already errored
+
+    if (lhs_type->kind == Type_DEFERRED_NAMED) {
+        lhs_type = resolve_type(ctx, lhs_type, accessor->left->token);
+        assert(lhs_type);
+    }
+
+    if (lhs_type->kind == Type_POINTER)
+        lhs_type = unwrap_pointer_type(lhs_type, NULL);
 
     if (lhs_type->kind != Type_STRUCT) {
         compile_error(ctx, accessor->left->token, "Attempt to access member in non-struct value");
@@ -107,27 +163,32 @@ Type *resolve_accessor(Context *ctx, AstBinary *accessor) {
     return field->decl->as.var.typename->as.type;
 }
 
+// Resolves the dependencies and type of a variable declaration,
+// and apply type inference if needed.
 Type *resolve_var(Symbol *varsym, Context *ctx) {
     AstVar *var = (AstVar *)varsym->decl;
-    if (varsym->status == Sym_RESOLVED) {
+    if (varsym->status == Sym_RESOLVED)
         return var->typename->as.type;
-    }
+
     if (!(var->flags & VAR_IS_INITED)) {
         varsym->status = Sym_RESOLVED;
         return var->typename->as.type;
     }
+
     varsym->status = Sym_RESOLVING;
     inside_decl = true;
     Type *inferred_type = resolve_expression(var->value, ctx);
     inside_decl = false;
     varsym->status = Sym_RESOLVED;
+
     if (!inferred_type) return NULL;
     if (var->flags & VAR_IS_INFERRED) {
-        var->typename->as.type = inferred_type;
+        var->typename->as.type = inferred_type; // type inference!
     }
     return inferred_type;
 }
 
+// Resolves the dependencies of an assignment statement,
 void resolve_assignment(AstNode *ass, Context *ctx) {
     assert(ass->tag == Node_BINARY);
     AstBinary *bin = (AstBinary *)ass;
@@ -139,8 +200,20 @@ void resolve_assignment(AstNode *ass, Context *ctx) {
 void resolve_procedure(Symbol *procsym, Context *ctx) {
     if (procsym->status == Sym_RESOLVED) return;
     procsym->status = Sym_RESOLVING;
+
     AstProcedure *proc = (AstProcedure *)procsym->decl;
-    stbds_arrpush(scope_stack, proc);
+
+    u64 num_params = shlenu(proc->params);
+    for (int i = 0; i < num_params; i++) {
+        resolve_var(&proc->params[i].value, ctx);
+    }
+
+    Type *return_type = proc->return_type->as.type;
+    if (return_type->kind == Type_DEFERRED_NAMED)
+        resolve_type(ctx, return_type, procsym->decl->token);
+
+    stbds_arrpush(scope_stack, proc); // push the new scope
+
     AstBlock *block = (AstBlock *)proc->block;
     u64 decls_len = shlenu(block->symbols);
     for (int i = 0; i < decls_len; i++) {
@@ -152,11 +225,10 @@ void resolve_procedure(Symbol *procsym, Context *ctx) {
         // TODO
         }
     }
+
     for (int i = 0; i < block->statements->len; i++) {
         AstNode *stmt = block->statements->nodes[i];
-        if (is_decl(stmt)) {
-            continue;
-        }
+        if (is_decl(stmt)) continue;
         switch (stmt->tag) {
         case Node_CALL:
             resolve_call(stmt, ctx);
@@ -164,10 +236,13 @@ void resolve_procedure(Symbol *procsym, Context *ctx) {
         case Node_BINARY:
             resolve_assignment(stmt, ctx);
             break;
+        case Node_RETURN:
+            resolve_expression(((AstReturn *)stmt)->expr, ctx);
+            break;
         }
     }
     procsym->status = Sym_RESOLVED;
-    stbds_arrpop(scope_stack);
+    stbds_arrpop(scope_stack); // pop the scope
 }
 
 void resolve_top_level(Context *ctx) {

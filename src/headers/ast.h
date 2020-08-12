@@ -250,9 +250,10 @@ AstNode *make_error_node(struct Parser *p, Token tok, const char *msg);
 AstNode *make_ident_node(struct Context *c, Token tok);
 
 struct Name *get_decl_name(AstNode *);
-bool is_decl(AstNode *);
 
+bool is_decl(AstNode *);
 bool is_assignment(AstBinary);
 bool is_binary_comparison(AstBinary);
+bool is_literal(AstNode *n);
 
 #endif

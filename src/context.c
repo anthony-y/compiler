@@ -46,7 +46,12 @@ Symbol *lookup_in_block(AstBlock *block, Name *name) {
     return &block->symbols[index].value;
 }
 
-Symbol *lookup_local(AstProcedure *proc, Name *name) {
+Symbol *lookup_local(Context *ctx, AstProcedure *proc, Name *name) {
+    u64 param_i = shgeti(proc->params, name->text);
+    if (param_i != -1) {
+        return &proc->params[param_i].value;
+    }
+
     AstBlock *block = (AstBlock *)proc->block;
     Symbol *s = lookup_in_block(block, name);
     if (!s) {
@@ -56,6 +61,8 @@ Symbol *lookup_local(AstProcedure *proc, Name *name) {
             if (sym) return sym;
             parent = parent->parent;
         }
+        u64 global_i = shgeti(ctx->symbol_table, name->text);
+        if (global_i != -1) return &ctx->symbol_table[global_i].value;
         return NULL;
     }
     return s;
@@ -80,6 +87,10 @@ Name *make_name(Context *ctx, Token token) {
 
 inline void add_symbol(Context *c, AstNode *n, char *name) {
     Symbol s = (Symbol){.decl=n, .status=Sym_UNRESOLVED};
+    if (shgeti(c->symbol_table, name) != -1) {
+        compile_error(c, n->token, "Redefinition of symbol \"%s\" at global scope", name);
+        return;
+    }
     shput(c->symbol_table, name, s);
 }
 

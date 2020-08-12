@@ -41,11 +41,9 @@ type Lexer: struct {
     //string_allocator: mem.Pool
 }
 
-Token_EOF := 0
-
-proc lexer_init(l: ^Lexer, file_data: string): bool {
-    l.curr = s.data
-    l.start = s.data
+proc lexer_init(l: ^Lexer, ss: String): bool {
+    l.curr = ss.data
+    l.start = ss.data
     l.line = 1
     l.column = 1
     l.last = Token_EOF
@@ -55,7 +53,7 @@ proc lexer_init(l: ^Lexer, file_data: string): bool {
 //
 // Entry point
 //
-proc main(): int {
+proc main_(): int {
     i := "aaaaaaaaaaaaa"
     if true {
         printf("Incorrect number of arguments.\n")
@@ -90,7 +88,12 @@ type L: struct {
 
 Token_EOF := 0
 
-proc lexer_init(l: ^Lexer, file_data: string): bool {
+type String: struct {
+    data: ^u8;
+    length: u64;
+}
+
+proc make_lexer(l: ^Lexer, s: String): bool {
     l.curr = s.data
     l.start = s.data
     l.line = 1

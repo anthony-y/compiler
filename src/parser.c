@@ -292,10 +292,14 @@ static AstNode *parse_call(Context *c, AstNode *name) {
 static AstNode *parse_block(Context *c) {
     Parser *p = &c->parser;
 
+    AstBlock *parent = p->current_scope;
+
     Token open = *p->prev;
 
     AstNode *block = ast_node(p, Node_BLOCK, open);
     sh_new_arena(block->as.block.symbols); // TODO leak
+
+    p->current_scope = &block->as.block;
 
     Ast *stmts = make_subtree(p);
 
@@ -311,9 +315,11 @@ static AstNode *parse_block(Context *c) {
             ast_add(stmts, statement);
             consume(p, Token_SEMI_COLON);
         }
+        ast_add(stmts, statement);
     }
 
     block->as.block.statements = stmts;
+    block->as.block.parent = parent;
 
     return block;
 }
@@ -412,6 +418,8 @@ static AstNode *parse_typedef(Context *c) {
 
     shput(c->type_table, name.text, type);
     n->as.typedef_.of = decl;
+
+    add_symbol(c, n, name.text);
 
     return n;
 }
@@ -628,7 +636,6 @@ static AstNode *parse_proc(Context *c, bool in_typedef) {
 
     AstNode *name_node = make_ident_node(c, *p->prev);
     SymbolTable *params = NULL;
-    sh_new_arena(params);
 
     if (!consume(p, Token_OPEN_PAREN)) {
         return make_error_node(p, *p->curr, "Expected parameter list (even if it's empty) after procedure name.");
@@ -636,6 +643,7 @@ static AstNode *parse_proc(Context *c, bool in_typedef) {
 
     // If the argument list isn't empty.
     if (!consume(p, Token_CLOSE_PAREN)) {
+        sh_new_arena(params);
         while (!consume(p, Token_CLOSE_PAREN)) {
             if (p->curr->type == Token_OPEN_BRACE || 
                 p->curr->type == Token_SEMI_COLON ||
@@ -664,7 +672,8 @@ static AstNode *parse_proc(Context *c, bool in_typedef) {
             }
 
             Symbol sym = (Symbol){.decl=arg, .status=Sym_UNRESOLVED};
-            shput(params, ((AstVar *)arg)->name, sym);
+            char *name = ((AstVar *)arg)->name->as.ident->text;
+            shput(params, name, sym);
 
             consume(p, Token_COMMA);
         }
@@ -837,6 +846,7 @@ void parser_init(Parser *p, const TokenList *l, const SourceStats *stats) {
     p->curr = l->tokens;
     p->prev = l->tokens;
     p->node_count = 0;
+    p->current_scope = NULL;
 }
 
 // Free all resources held by the parser.

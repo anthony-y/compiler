@@ -64,20 +64,6 @@ static bool do_types_match(Context *ctx, Type *a, Type *b) {
     return true;
 }
 
-// Utility function to unwrap a pointer to it's ultimate base type.
-// Returns the unwrapped pointer, and return the depth to `out_depth`.
-// Does not print errors.
-static inline Type *unwrap_pointer_type(Type *ptr, int *out_depth) {
-    assert(ptr->kind == Type_POINTER);
-    int depth = 0;
-    while (ptr->kind == Type_POINTER) {
-        ptr = ptr->data.base;
-        depth++;
-    }
-    if (out_depth) *out_depth = depth;
-    return ptr;
-}
-
 static Type *maybe_unwrap_type_alias(Type *alias) {
     if (alias->kind != Type_ALIAS) return alias;
     return alias->data.alias_of;

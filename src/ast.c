@@ -77,6 +77,10 @@ inline bool is_decl(AstNode *n) {
     return (n->tag > Node_DECLS_START && n->tag < Node_DECLS_END);
 }
 
+inline bool is_literal(AstNode *n) {
+    return (n->tag > Node_LITERALS_START && n->tag < Node_LITERALS_END);
+}
+
 /* These functions allocate and return AST nodes */
 /* --------------------------------------------- */
 void ast_init(Ast *list, int cap) {

@@ -90,7 +90,7 @@ bool check_types_were_declared(Context *);
 
 Name *make_name(Context *, Token from);
 
-Symbol *lookup_local(AstProcedure *, Name *);
+Symbol *lookup_local(Context *ctx, AstProcedure *proc, Name *name);
 Symbol *lookup_struct_field(AstStruct *, Name *);
 Symbol *lookup_in_block(AstBlock *, Name *);
 

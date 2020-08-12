@@ -14,6 +14,8 @@ typedef struct Parser {
     Arena tree_allocator;
     Arena error_msg_allocator;
 
+    AstBlock *current_scope;
+
     u64 node_count;
     u64 error_count;
 } Parser;
