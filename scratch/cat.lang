@@ -1,0 +1,18 @@
+proc read_file(path: string): string {
+    // Get the data
+    data := magic_os_proc(path)
+    return data
+}
+
+proc main() {
+    ms: struct {a: int; b: string};
+    ms.a = 10
+    data := read_file()
+    print(data) // cat
+    test := test() // TODO this shouldnt work
+}
+
+proc test(): void {}
+
+proc print(){}
+proc magic_os_proc(_: string): string{}

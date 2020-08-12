@@ -841,7 +841,7 @@ void parser_init(Parser *p, const TokenList *l, const SourceStats *stats) {
     u64 num_trees = (stats->blocks) + stats->argument_lists;
     arena_init(&p->tree_allocator, num_trees, sizeof(Ast), 8);
 
-    arena_init(&p->error_msg_allocator, 10240, sizeof(char), 1);
+    arena_init(&p->error_msg_allocator, 1024, sizeof(char), 1);
 
     p->curr = l->tokens;
     p->prev = l->tokens;

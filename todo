@@ -2,7 +2,6 @@ Check array index assignments
 Call modifiers e.g: a := inline some_call()
     inline is added to lexer
 
-Do proper symbol checking lol
 Check binary maths
 Dereference
 Check if the casts expression can even be casted to the requested type
@@ -13,16 +12,7 @@ Check while loops
 //
 // AST
 //
-AstBlocks should have have hashtables instead of linear arrays for declarations.
-    Fix the subtree allocator leak.
-
-Maybe add AstNode flags and NODE_CHECKED back in, and use a table to lookup any values that need to be returned.
-
-//
-// Name resolution
-//
-
-IF the checker becomes cluttered with repeated error handling for symbol table lookups, we will need a different approach. I'm thinking: do the same as for unknown types; add a placeholder and then go back and swap them out for the real thing at the end.
+Fix the subtree allocator leak.
 
 //
 // Checker
