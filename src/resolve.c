@@ -107,7 +107,7 @@ Type *resolve_expression(AstNode *expr, Context *ctx) {
 
 // TODO somehow make types symbols lmao
 Type *resolve_type(Context *ctx, Type *type, Token t) {
-    assert(type->kind == Type_DEFERRED_NAMED);
+    if (type->kind != Type_DEFERRED_NAMED) return type;
 
     u64 i = shgeti(ctx->type_table, type->name);
     if (i == -1) {
@@ -166,12 +166,16 @@ Type *resolve_accessor(Context *ctx, AstBinary *accessor) {
 // and apply type inference if needed.
 Type *resolve_var(Symbol *varsym, Context *ctx) {
     AstVar *var = (AstVar *)varsym->decl;
+    Type **specified_type = &var->typename->as.type;
     if (varsym->status == Sym_RESOLVED)
-        return var->typename->as.type;
+        return *specified_type;
+
+    if (!(var->flags & VAR_TYPE_IS_ANON_STRUCT) && !(var->flags & VAR_IS_INFERRED))
+        *specified_type = resolve_type(ctx, *specified_type, var->typename->token);
 
     if (!(var->flags & VAR_IS_INITED)) {
         varsym->status = Sym_RESOLVED;
-        return var->typename->as.type;
+        return *specified_type;
     }
 
     varsym->status = Sym_RESOLVING;
@@ -180,7 +184,7 @@ Type *resolve_var(Symbol *varsym, Context *ctx) {
 
     if (!inferred_type) return NULL;
     if (var->flags & VAR_IS_INFERRED) {
-        var->typename->as.type = inferred_type; // type inference!
+        *specified_type = inferred_type; // type inference!
     }
     return inferred_type;
 }

@@ -27,21 +27,12 @@ void dump_parser_errors(const Parser *p) {
     }
 }
 
-void dump_deferred_names(const Context *p) {
-    if (!p->deferred_names) return;
-    u64 len = sb_len(p->deferred_names);
-    if (len == 0) return;
-    for (int i = 0; i < len; i++) {
-        printf("%s\n", p->deferred_names[i].text);
-    }
-}
-
 // THINK: for imports, just lex, parse and resolve all the files and then merge their scopes into one scope, then generate code for the symbols, symbols that are Sym_UNRESOLVED, can be ignored.
 
 bool process_file(const char *file_path) {
     char *file_data = read_file(file_path); // read the file into a zero-terminated buffer.
 
-    SourceStats stats = (SourceStats){10}; // set all values to 10 to start with.
+    SourceStats stats = (SourceStats){0};
     TokenList tokens;
     Context context;
     Ast ast;

@@ -1,6 +1,10 @@
 proc read_file(path: string): string {
     // Get the data
     data := magic_os_proc(path)
+
+    k: i;
+    k.j = ""
+
     return data
 }
 
@@ -16,3 +20,7 @@ proc test(): void {}
 
 proc print(){}
 proc magic_os_proc(_: string): string{}
+
+type i: struct {
+    j := 10
+}

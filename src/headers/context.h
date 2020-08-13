@@ -46,8 +46,6 @@ typedef struct Context {
 
     AstProcedure *curr_checker_proc;
 
-    Token *deferred_names; // stb stretchy buffer
-
     // stb hash tables
                        SymbolTable      *symbol_table;
     struct {char *key; Type    *value;} *type_table;

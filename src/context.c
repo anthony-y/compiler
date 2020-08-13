@@ -97,7 +97,6 @@ inline void add_symbol(Context *c, AstNode *n, char *name) {
 void init_context(Context *c, const char *file_path) {
     *c = (Context){0};
     c->current_file_path = file_path;
-    c->deferred_names = NULL; // stb stretchy buffer
     arena_init(&c->scratch, CONTEXT_SCRATCH_SIZE, sizeof(u8), 1);
 }
 

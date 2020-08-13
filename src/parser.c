@@ -33,11 +33,6 @@ static inline AstNode *false_literal(Parser *);
 static inline AstNode *true_literal(Parser *);
 static inline AstNode *null_literal(Parser *);
 
-// TODO disallow duplication
-static inline void remember_unknown_typename(Context *c, Token t) {
-    sb_push(c->deferred_names, t);
-}
-
 static inline void parser_next(Parser *p) {
     p->prev = p->curr++;
 }
@@ -447,7 +442,6 @@ static AstNode *parse_typename(Context *c) {
         parser_next(p);
 
         if (shgeti(c->type_table, t.text) == -1) { // type doesn't exist (or not appeared in program text yet)
-            remember_unknown_typename(c, t);
             type_node->as.type = make_type(
                 Type_DEFERRED_NAMED,
                 t.text,

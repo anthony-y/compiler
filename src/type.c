@@ -44,7 +44,6 @@ static inline Type *make_and_insert_primitive(Context *ctx, char *name, u64 size
 void free_types(Context *ctx) {
     arena_free(&type_arena);
     shfree(ctx->type_table);
-    sb_free(ctx->deferred_names);
 }
 
 // Initialize the type table and add the primitive types to it.
@@ -58,7 +57,7 @@ void init_types(Context *ctx, SourceStats *stats) {
     // if it is used before its declaration.
     stats->declared_types *= 2;
 
-    u64 total_types = (num_builtins + stats->pointer_types + stats->declared_types);
+    u64 total_types = (num_builtins + stats->pointer_types + (stats->declared_types * 2));
     arena_init(&type_arena, total_types, sizeof(Type), 8);
 
     sh_new_arena(ctx->type_table); // initialize the type table as a string hash map
