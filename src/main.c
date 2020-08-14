@@ -32,7 +32,7 @@ void dump_parser_errors(const Parser *p) {
 bool process_file(const char *file_path) {
     char *file_data = read_file(file_path); // read the file into a zero-terminated buffer.
 
-    SourceStats stats = (SourceStats){0};
+    SourceStats stats = (SourceStats){10}; // initialize all the fields to 10
     TokenList tokens;
     Context context;
     Ast ast;

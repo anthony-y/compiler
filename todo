@@ -9,6 +9,8 @@ Foreign function decorator
 Check if branches
 Check while loops
 
+Change AstBinary stmt to AstAssignment
+
 //
 // AST
 //
@@ -25,9 +27,6 @@ Check in typedef'd structs that they don't mention their own names unless it's a
 Check that procs with return types have return statements.
 
 When local procedures are implemented, proc calls will need to be checked using lookup_local or something else.
-
-Should does_type_describe_expr even need to account for missing symbols? Maybe they should have already been resolved.
-    //// Sort of already fixed this with just subfunctions that return necessary info back after doing common checking.
 
 //
 // Syntax

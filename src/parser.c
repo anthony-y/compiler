@@ -98,10 +98,10 @@ static AstNode *parse_simple_expr(Context *c) {
         }
         consume(p, Token_CLOSE_PAREN);
 
-        AstNode *enclosing = ast_node(p, Node_ENCLOSED, start);
-        enclosing->as.enclosed.sub_expr = sub_expr;
+        AstParen paren;
+        paren.sub_expr = sub_expr;
 
-        return enclosing;
+        return ast_paren(p, start, &paren);
 
         #if 0
         // This will account for if excess parentheses were given BEFORE the expression but not after
@@ -125,10 +125,11 @@ static AstNode *parse_simple_expr(Context *c) {
         Token start = *p->curr;
         parser_next(p);
 
-        AstNode *unary = ast_node(p, Node_UNARY, start);
-        unary->as.unary.expr = parse_expression(c, 1);
-        unary->as.unary.op = start.type;
-        return unary;
+        AstUnary unary;
+        unary.expr = parse_expression(c, 1);
+        unary.op = start.type;
+
+        return ast_unary(p, start, &unary);
     }
 
     case Token_CAST: {
@@ -140,18 +141,17 @@ static AstNode *parse_simple_expr(Context *c) {
             return make_error_node(p, start, "Incorrect cast syntax (missing an opening parenthese)");
         }
 
-        AstNode *cast = ast_node(p, Node_CAST, start);
-        cast->as.cast.typename = parse_typename(c);
+        AstCast cast;
+        cast.typename = parse_typename(c);
 
         if (!consume(p, Token_CLOSE_PAREN)) {
             parser_recover(p, Token_SEMI_COLON);
             return make_error_node(p, start, "Incorrect cast syntax (missing a closing parenthese)");
         }
 
-        AstNode *expr = parse_expression(c, 1);
-        cast->as.cast.expr = expr;
+        cast.expr = parse_expression(c, 1);
 
-        return cast;
+        return ast_cast(p, start, &cast);
     }
 
     case Token_INT_LIT: return int_literal(p);
@@ -175,17 +175,19 @@ static AstNode *parse_simple_expr(Context *c) {
 
 static AstNode *parse_postfix_expr(Context *c, AstNode *left) {
     Parser *p = &c->parser;
+    Token start = *p->curr;
+
     switch (p->curr->type) {
     case Token_OPEN_PAREN: return parse_call(c, left);
     case Token_OPEN_BRACKET: {
         parser_next(p);
-        AstNode *index = ast_node(p, Node_INDEX, *p->prev);
-        index->as.array_index.name = left;
-        index->as.array_index.index = parse_expression(c, 1);
+        AstArrayIndex index;
+        index.name = left;
+        index.index = parse_expression(c, 1);
         if (!consume(p, Token_CLOSE_BRACKET)) {
             return make_error_node(p, *p->curr, "Uneven brackets on array index.");
         }
-        return index;
+        return ast_index(p, start, &index);
     }
     }
     return NULL;
@@ -201,12 +203,12 @@ static AstNode *maybe_parse_array_assignment(Context *c, AstNode *index) {
     Token op = *p->curr;
     parser_next(p);
 
-    AstNode *value = parse_expression(c, 1);
-    AstNode *assign = ast_node(p, Node_BINARY, op);
-    assign->as.binary.left = index;
-    assign->as.binary.op = op.type;
-    assign->as.binary.right = value;
-    return assign;
+    AstBinary binary;
+
+    binary.right = parse_expression(c, 1);
+    binary.left = index;
+    binary.op = op.type;
+    return ast_assignment(p, op, &binary);
 }
 
 static AstNode *parse_expression(Context *c, int min_prec) {
@@ -232,10 +234,12 @@ static AstNode *parse_expression(Context *c, int min_prec) {
 
         parser_next(p);
 
-        AstNode *new_left = ast_node(p, Node_BINARY, start);
-        new_left->as.binary.left = left;
-        new_left->as.binary.op = op;
-        new_left->as.binary.right = parse_expression(c, next_min_prec);;
+        AstBinary binary;
+        binary.left = left;
+        binary.op = op;
+        binary.right = parse_expression(c, next_min_prec);
+
+        AstNode *new_left = ast_binary(p, start, &binary);
 
         left = new_left;
     }
@@ -246,11 +250,13 @@ static AstNode *parse_call(Context *c, AstNode *name) {
     Parser *p = &c->parser;
     parser_next(p); // (
 
-    AstNode *call = ast_node(p, Node_CALL, *p->prev);
-    call->as.function_call.name = name;
+    Token start = *p->curr;
+
+    AstCall call;
+    call.name = name;
 
     if (consume(p, Token_CLOSE_PAREN)) {
-        return call;
+        return ast_call(p, start, &call);
     }
 
     Ast *params = make_subtree(p);
@@ -278,8 +284,8 @@ static AstNode *parse_call(Context *c, AstNode *name) {
 
         ast_add(params, arg);
     }
-    call->as.function_call.params = params;
-    return call;
+    call.params = params;
+    return ast_call(p, start, &call);
 }
 
 // You need to consume the opening token of the brace
@@ -291,10 +297,11 @@ static AstNode *parse_block(Context *c) {
 
     Token open = *p->prev;
 
-    AstNode *block = ast_node(p, Node_BLOCK, open);
-    sh_new_arena(block->as.block.symbols); // TODO leak
+    AstNode *blocknode = ast_node(p, Node_BLOCK, open);
+    AstBlock *block = &blocknode->as.stmt.as.block;
+    sh_new_arena(block->symbols); // TODO leak
 
-    p->current_scope = &block->as.block;
+    p->current_scope = block;
 
     Ast *stmts = make_subtree(p);
 
@@ -304,60 +311,67 @@ static AstNode *parse_block(Context *c) {
         if (p->curr->type == Token_EOF) {
             return make_error_node(p, open, "Unclosed block (missing a '}').");
         }
-        Name *name = get_decl_name(statement);
-        if (name) {
-            shput(block->as.block.symbols, name->text, ((Symbol){.decl=statement, .status=Sym_UNRESOLVED}));
-            ast_add(stmts, statement);
+        if (is_decl(statement)) {
+            Name *name = ((AstDecl *)statement)->name;
+            shput(block->symbols, name->text, ((Symbol){.decl=statement, .status=Sym_UNRESOLVED}));
             consume(p, Token_SEMI_COLON);
         }
         ast_add(stmts, statement);
     }
 
-    block->as.block.statements = stmts;
-    block->as.block.parent = parent;
+    block->statements = stmts;
+    block->parent = parent;
 
-    return block;
+    return blocknode;
 }
 
 static AstNode *parse_return(Context *c) {
     Parser *p = &c->parser;
     parser_next(p);
 
-    AstNode *node = ast_node(p, Node_RETURN, *p->curr);
+    Token start = *p->curr;
+    AstReturn ret;
+
     if (p->curr->type == Token_SEMI_COLON) {
-        node->as.return_.expr = NULL;    
-        return node;
+        ret.expr = NULL;
+    } else {
+        ret.expr = parse_expression(c, 1);
     }
 
-    node->as.return_.expr = parse_expression(c, 1);
-    return node;
+    return ast_return(p, start, &ret);
 }
 
 static AstNode *parse_defer(Context *c) {
     Parser *p = &c->parser;
-    AstNode *defer = ast_node(p, Node_DEFER, *p->curr);
     parser_next(p);
-    defer->as.defer.statement = parse_statement(c);
-    if (defer->as.defer.statement->tag == Node_DEFER)
+
+    Token start = *p->curr;
+    AstDefer defer;
+
+    AstNode *sub_stmt = parse_statement(c);
+    if (sub_stmt->tag == Node_DEFER)
         return make_error_node(p, *p->prev, "You can't defer a defer statement.");
-    return defer;
+
+    defer.statement = sub_stmt;
+    return ast_defer(p, start, &defer);
 }
 
-static AstNode *parse_struct(Context *c) {
+static AstNode *parse_struct(Context *c) { // TODO SHOULD STRUCTS BE STATEMENTS?
     Parser *p = &c->parser;
     if (!consume(p, Token_STRUCT)) {
         return make_error_node(p, *p->curr, "Expected a struct declaration.");
     }
 
-    AstNode *n = ast_node(p, Node_STRUCT, *p->prev);
+    Token start = *p->curr;
+    AstStruct s;
 
     if (!consume(p, Token_OPEN_BRACE)) {
         return make_error_node(p, *p->curr, "Expected a struct body.");
     }
 
-    n->as.struct_.members = parse_block(c);
+    s.members = parse_block(c);
 
-    return n;
+    return ast_struct(p, start, &s);
 }
 
 static AstNode *parse_typedef(Context *c) {
@@ -370,8 +384,9 @@ static AstNode *parse_typedef(Context *c) {
         return make_error_node(p, name, "Typedefs must be given a name.");
     }
 
-    AstNode *n = ast_node(p, Node_TYPEDEF, name);
-    n->as.typedef_.name = make_ident_node(c, name);
+    AstTypedef td;
+
+    AstNode *namenode = make_ident_node(c, name);
 
     if (!consume(p, Token_COLON)) {
         return make_error_node(p, *p->curr, "Expected a ':' in type definition.");
@@ -412,7 +427,10 @@ static AstNode *parse_typedef(Context *c) {
     }
 
     shput(c->type_table, name.text, type);
-    n->as.typedef_.of = decl;
+    td.of = decl;
+    td.name = namenode;
+
+    AstNode *n = ast_typedefi(p, name, namenode->as.ident, &td);
 
     add_symbol(c, n, name.text);
 
@@ -494,8 +512,9 @@ static AstNode *parse_if(Context *c) {
     Token start = *p->curr;
     parser_next(p); // skip keyword
 
-    AstNode *ast_if = ast_node(p, Node_IF, start);
-    ast_if->as.if_.condition = parse_expression(c, 1);
+    AstIf _if;
+
+    _if.condition = parse_expression(c, 1);
 
     if (consume(p, Token_THEN)) {
         AstNode *stmt = parse_statement(c);
@@ -503,9 +522,9 @@ static AstNode *parse_if(Context *c) {
             parser_recover_to_declaration(p);
             return stmt;
         }
-        ast_if->as.if_.block_or_stmt = stmt;
+        _if.block_or_stmt = stmt;
     } else if (consume(p, Token_OPEN_BRACE)) {
-        ast_if->as.if_.block_or_stmt = parse_block(c);
+        _if.block_or_stmt = parse_block(c);
     } else {
         return make_error_node(p, start, "Expected an open brace or 'then' on 'if' statement.");
     }
@@ -513,11 +532,9 @@ static AstNode *parse_if(Context *c) {
     // Skip the inserted semi-colon after close braces
     consume(p, Token_SEMI_COLON);
 
-    AstNode *other_branch = NULL;
-
     if (consume(p, Token_ELSE)) {
-        if (p->curr->type == Token_IF)         other_branch = parse_if(c);
-        else if (consume(p, Token_OPEN_BRACE)) other_branch = parse_block(c);
+        if (p->curr->type == Token_IF)         _if.other_branch = parse_if(c);
+        else if (consume(p, Token_OPEN_BRACE)) _if.other_branch = parse_block(c);
         else {
             AstNode *err = make_error_node(p, *p->prev, "Expected either: body of else statement ,, or, else-if.");
             parser_recover(p, Token_CLOSE_BRACE);
@@ -525,9 +542,7 @@ static AstNode *parse_if(Context *c) {
         }
     }
 
-    ast_if->as.if_.other_branch = other_branch;
-
-    return ast_if;
+    return ast_if(p, start, &_if);
 }
 
 static AstNode *parse_while(Context *c) {
@@ -535,17 +550,18 @@ static AstNode *parse_while(Context *c) {
     Token start = *p->curr;
     parser_next(p);
 
-    AstNode *node = ast_node(p, Node_WHILE, start);
-    node->as.while_.condition = parse_expression(c, 1);
+    AstWhile w;
+
+    w.condition = parse_expression(c, 1);
 
     if (!consume(p, Token_OPEN_BRACE)) {
         parser_recover(p, Token_SEMI_COLON);
         return make_error_node(p, start, "Expected a block on while loop.");
     }
 
-    node->as.while_.block = parse_block(c);
+    w.block = parse_block(c);
 
-    return node;
+    return ast_while(p, start, &w);
 }
 
 static AstNode *parse_var(Context *c, bool top_level) {
@@ -559,10 +575,12 @@ static AstNode *parse_var(Context *c, bool top_level) {
     Token name = *p->curr;
     parser_next(p);
 
-    AstNode *node = ast_node(p, Node_VAR, name);
-    node->as.var.name = make_ident_node(c, name);
-    node->as.var.flags = 0;
-    node->as.var.typename = ast_node(p, Node_TYPENAME, *p->curr);
+    Name *ident = make_name(c, name);
+
+    AstVar var;
+    var.flags    = 0;
+    var.name     = make_ident_node(c, name); // probs remove AstDecl names from their actual nodes
+    var.typename = ast_node(p, Node_TYPENAME, *p->curr);
 
     if (!consume(p, Token_COLON)) {
         parser_recover(p, Token_SEMI_COLON);
@@ -573,44 +591,54 @@ static AstNode *parse_var(Context *c, bool top_level) {
     //     name := value
     if (consume(p, Token_EQUAL)) {
         AstNode *value = parse_expression(c, 1);
-        node->as.var.flags |= VAR_IS_INITED;
+        var.flags |= VAR_IS_INITED;
         if (value->tag == Node_ERROR) {
             parser_recover_to_declaration(p);
             return value;
         }
-        node->as.var.flags |= VAR_IS_INFERRED;
-        node->as.var.value = value;
-
-        if (top_level) add_symbol(c, node, name.text); // TODO IMPORTANT ensure no redeclarations
-        return node;
-    }
-
-    AstNode *typename = parse_typename(c);
-    if (typename->tag == Node_ERROR) {
-        return typename;
-    }
-    
-    if (typename->as.type->kind == Type_STRUCT) {
-        node->as.var.flags |= VAR_TYPE_IS_ANON_STRUCT;
-    }
-
-    node->as.var.typename = typename;
-
-    // Assignment on explicitly-typed decls:
-    //     name: Type = value
-    if (consume(p, Token_EQUAL)) {
-        AstNode *value = parse_expression(c, 1);
-        node->as.var.flags |= VAR_IS_INITED;
-        if (value->tag == Node_ERROR) {
-            parser_recover_to_declaration(p);
-            return value;
+        var.flags |= VAR_IS_INFERRED;
+        var.value = value;
+    } else { // explicit type
+        AstNode *typename = parse_typename(c);
+        if (typename->tag == Node_ERROR) {
+            return typename;
         }
-        node->as.var.value = value;
+        
+        if (typename->as.type->kind == Type_STRUCT) {
+            var.flags |= VAR_TYPE_IS_ANON_STRUCT;
+        }
+
+        var.typename = typename;
+
+        // Assignment on explicitly-typed decls:
+        //     name: Type = value
+        if (consume(p, Token_EQUAL)) {
+            AstNode *value = parse_expression(c, 1);
+            var.flags |= VAR_IS_INITED;
+            if (value->tag == Node_ERROR) {
+                parser_recover_to_declaration(p);
+                return value;
+            }
+            var.value = value;
+        }
     }
 
-    if (top_level) add_symbol(c, node, name.text);
+    AstNode *node = ast_var(p, name, ident, &var);
+
+    if (top_level)
+        add_symbol(c, node, name.text);
 
     return node;
+}
+
+static int parse_proc_mod(Context *c) {
+    Parser *p = &c->parser;
+    if (!consume(p, Token_HASH)) return -1;
+    if (strcmp(p->curr->text, "foreign")==0) {
+        parser_next(p);
+        return PROC_MOD_FOREIGN;
+    }
+    return -2; // TODO make this an actual node
 }
 
 // Parse a procuedure declaration.
@@ -618,18 +646,22 @@ static AstNode *parse_proc(Context *c, bool in_typedef) {
     Parser *p = &c->parser;
     Token start = *p->curr;
 
+    AstProcedure proc;
+
     // Skip the "proc" keyword.
     if (!consume(p, Token_PROC)) {
         return make_error_node(p, *p->curr, "Expected procedure declaration.");
     }
 
+    Token name = *p->curr;
     if (!consume(p, Token_IDENT) && !in_typedef) {
         return make_error_node(p, *p->curr, "Expected name on procedure declaration.");
     }
-    Token name = *p->prev;
 
     AstNode *name_node = make_ident_node(c, *p->prev);
-    SymbolTable *params = NULL;
+    proc.name = name_node;
+
+    Name *ident = make_name(c, *p->prev);
 
     if (!consume(p, Token_OPEN_PAREN)) {
         return make_error_node(p, *p->curr, "Expected parameter list (even if it's empty) after procedure name.");
@@ -637,7 +669,7 @@ static AstNode *parse_proc(Context *c, bool in_typedef) {
 
     // If the argument list isn't empty.
     if (!consume(p, Token_CLOSE_PAREN)) {
-        sh_new_arena(params);
+        sh_new_arena(proc.params);
         while (!consume(p, Token_CLOSE_PAREN)) {
             if (p->curr->type == Token_OPEN_BRACE || 
                 p->curr->type == Token_SEMI_COLON ||
@@ -660,23 +692,22 @@ static AstNode *parse_proc(Context *c, bool in_typedef) {
                 parser_recover(p, Token_CLOSE_PAREN);
                 return arg;
             }
-            if (arg->as.var.flags & VAR_IS_INITED) {
+            AstDecl *decl = &arg->as.decl;
+            if (decl->as.var.flags & VAR_IS_INITED) {
                 arg = make_error_node(p, arg->token, "This language does not (yet) have default call values; procedure parameters must be uninitialized.");
                 parser_recover(p, Token_CLOSE_PAREN);
             }
 
             Symbol sym = (Symbol){.decl=arg, .status=Sym_UNRESOLVED};
-            char *name = ((AstVar *)arg)->name->as.ident->text;
-            shput(params, name, sym);
+            shput(proc.params, decl->name->text, sym);
 
             consume(p, Token_COMMA);
         }
     }
 
-    AstNode *node = ast_node(p, Node_PROCEDURE, start);
-    node->as.procedure.block = NULL;
-    node->as.procedure.name = name_node;
-    node->as.procedure.params = params;
+    proc.flags = 0;
+    proc.block = NULL;
+    proc.params = proc.params;
 
     AstNode *return_type = ast_node(p, Node_TYPENAME, *p->curr);
     return_type->as.type = c->type_void;
@@ -687,27 +718,40 @@ static AstNode *parse_proc(Context *c, bool in_typedef) {
             return return_type;
         }
     }
-    node->as.procedure.return_type = return_type;
+    proc.return_type = return_type;
 
     if (in_typedef) {
         if (p->curr->type == Token_OPEN_BRACE) {
             parser_recover_to_declaration(p);
             return make_error_node(p, *p->prev, "A typedef'd procedure must not have body.");
         }
-        return node;
+        return ast_proc(p, start, ident, &proc);
     }
 
-    if (!consume(p, Token_OPEN_BRACE)) {
+    int modifier = parse_proc_mod(c);
+    if (modifier == -2) { // TODO cleanup
+        return make_error_node(p, *p->curr, "Unknown procedure modifier.");
+    }
+
+    if (modifier == PROC_MOD_FOREIGN) {
+        if (consume(p, Token_OPEN_BRACE)) {
+            AstNode *err = make_error_node(p, *p->curr, "Procedure marked as foreign should not have a body.");
+            parser_recover_to_declaration(p);
+            return err;
+        }
+        proc.flags |= modifier;
+    } else if (!consume(p, Token_OPEN_BRACE)) {
         AstNode *err = make_error_node(p, *p->curr, "Expected a block on procedure declaration.");
         parser_recover_to_declaration(p);
         return err;
+    } else {
+        proc.block = parse_block(c);
     }
 
-    node->as.procedure.block = parse_block(c);
+    AstNode *procnode = ast_proc(p, start, ident, &proc);
+    add_symbol(c, procnode, name.text);
 
-    add_symbol(c, node, name.text);
-
-    return node;
+    return procnode;
 }
 
 static AstNode *parse_top_level(Context *c) {
@@ -759,7 +803,7 @@ static AstNode *parse_statement(Context *c) {
         }
 
         // Basically: if it's not some sort of assignment
-        if (expr->tag != Node_BINARY || !is_assignment(expr->as.binary)) {
+        if (expr->tag != Node_BINARY || !is_assignment(expr->as.expr.as.binary)) {
             AstNode *err = make_error_node(p, *p->curr, "Only assignments are allowed as statements.");
             parser_recover(p, Token_SEMI_COLON);
             return err;
@@ -862,35 +906,35 @@ void parser_free(Parser *p, Ast *a) {
 static inline AstNode *int_literal(Parser *p) {
     parser_next(p);
     AstNode *l = ast_node(p, Node_INT_LIT, *p->prev);
-    l->as.literal.data.integer = atoi(p->prev->text);
+    l->as.expr.as.literal.data.integer = atoi(p->prev->text);
     return l;
 }
 
 static inline AstNode *string_literal(Parser *p) {
     parser_next(p);
     AstNode *l = ast_node(p, Node_STRING_LIT, *p->prev);
-    l->as.literal.data.string = p->prev->text;
+    l->as.expr.as.literal.data.string = p->prev->text;
     return l;
 }
 
 static inline AstNode *float_literal(Parser *p) {
     parser_next(p);
     AstNode *l = ast_node(p, Node_FLOAT_LIT, *p->prev);
-    l->as.literal.data.floating = strtod(p->prev->text, NULL);
+    l->as.expr.as.literal.data.floating = strtod(p->prev->text, NULL);
     return l;
 }
 
 static inline AstNode *false_literal(Parser *p) {
     parser_next(p);
     AstNode *l = ast_node(p, Node_BOOL_LIT, *p->prev);
-    l->as.literal.data.boolean = false;
+    l->as.expr.as.literal.data.boolean = false;
     return l;
 }
 
 static inline AstNode *true_literal(Parser *p) {
     parser_next(p);
     AstNode *l = ast_node(p, Node_BOOL_LIT, *p->prev);
-    l->as.literal.data.boolean = true;
+    l->as.expr.as.literal.data.boolean = true;
     return l;
 }
 

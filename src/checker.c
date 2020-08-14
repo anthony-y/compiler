@@ -11,17 +11,17 @@
 #include "headers/stb/stretchy_buffer.h"
 #include "headers/stb/stb_ds.h"
 
-void check_statement(Context *ctx, AstNode *node);
-void check_block(Context *ctx, AstBlock *block, AstNodeType restriction);
-Type *type_from_expr(Context *ctx, AstNode *expr);
-void check_struct(Context *ctx, AstNode *structdef);
-bool check_assignment(Context *ctx, AstBinary *binary);
-Type *resolve_accessor(Context *ctx, AstBinary *accessor);
-
+void check_statement  (Context *, AstNode *);
+void check_block      (Context *, AstBlock *, AstNodeType);
+Type *type_from_expr  (Context *, AstNode *);
+void check_struct     (Context *, AstNode *);
+bool check_assignment (Context *, AstBinary *);
 
 // TODO consider
-    // const values -> type
-    // lookup the const value -> type
+//   const values -> type
+//   lookup the const value -> type
+
+#if 0
 
 // Returns true if `a` and `b` point to the same Type, false otherwise.
 // Does not print errors.
@@ -67,6 +67,14 @@ static bool do_types_match(Context *ctx, Type *a, Type *b) {
 static Type *maybe_unwrap_type_alias(Type *alias) {
     if (alias->kind != Type_ALIAS) return alias;
     return alias->data.alias_of;
+}
+
+static Type *get_decl_type(AstNode *node) {
+    assert(is_decl(node));
+    switch (node->tag) {
+    case Node_VAR: return (Type *)((AstVar *)node)->typename;
+    case Node_PROCEDURE: return (Type *)((AstProcedure *)node)->return_type;
+    }
 }
 
 // Performs semantic analysis on a function call.
@@ -137,6 +145,7 @@ static bool check_ident(Context *ctx, AstNode *node, AstNode **out_decl_site) {
     // }
     // *out_decl_site = hopefully_var;
     // return true;
+    return true;
 }
 
 //
@@ -609,3 +618,4 @@ void check_ast(Context *ctx, Ast *ast) {
         }
     }
 }
+#endif

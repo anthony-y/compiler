@@ -29,27 +29,27 @@ static void print_expression_errors(Context *c, AstNode *node) {
     case Node_ERROR:
         print_error_node(c, node);
         break;
-    case Node_ENCLOSED:
-        print_expression_errors(c, node->as.enclosed.sub_expr);
+    case Node_PAREN:
+        print_expression_errors(c, node->as.expr.as.paren.sub_expr);
         break;
     case Node_BINARY:
-        print_expression_errors(c, node->as.binary.left);
-        print_expression_errors(c, node->as.binary.right);
+        print_expression_errors(c, node->as.expr.as.binary.left);
+        print_expression_errors(c, node->as.expr.as.binary.right);
         break;
     case Node_UNARY:
-        print_expression_errors(c, node->as.unary.expr);
+        print_expression_errors(c, node->as.expr.as.unary.expr);
         break;
     case Node_CALL:
-        print_ast_errors(c, node->as.function_call.params);
-        print_expression_errors(c, node->as.function_call.name);
+        print_ast_errors(c, node->as.expr.as.call.params);
+        print_expression_errors(c, node->as.expr.as.call.name);
         break;
     case Node_INDEX:
-        print_expression_errors(c, node->as.array_index.name);
-        print_expression_errors(c, node->as.array_index.index);
+        print_expression_errors(c, node->as.expr.as.index.name);
+        print_expression_errors(c, node->as.expr.as.index.index);
         break;
     case Node_CAST:
-        print_error_node(c, node->as.cast.typename);
-        print_expression_errors(c, node->as.cast.expr);
+        print_error_node(c, node->as.expr.as.cast.typename);
+        print_expression_errors(c, node->as.expr.as.cast.expr);
         break;
 
     default:
@@ -67,7 +67,7 @@ static void print_statement_errors(Context *c, AstNode *node) {
     }
 
     else if (node->tag == Node_PROCEDURE) {
-        const AstProcedure *proc = &node->as.procedure;
+        const AstProcedure *proc = &node->as.decl.as.proc;
         int param_len = shlenu(proc->params);
         for (int i = 0; i < param_len; i++) {
             print_statement_errors(c, proc->params[i].value.decl);
@@ -77,17 +77,17 @@ static void print_statement_errors(Context *c, AstNode *node) {
     }
 
     else if (node->tag == Node_BLOCK) {
-        const AstBlock *block = &node->as.block;
+        const AstBlock *block = &node->as.stmt.as.block;
         print_ast_errors(c, block->statements);
     }
 
     else if (node->tag == Node_STRUCT) {
-        const AstStruct *def = &node->as.struct_;
+        const AstStruct *def = &node->as.stmt.as._struct;
         print_statement_errors(c, def->members);
     }
 
     else if (node->tag == Node_TYPEDEF) {
-        const AstTypedef *def = &node->as.typedef_;
+        const AstTypedef *def = &node->as.decl.as.typedefi;
         if (def->of->tag == Node_STRUCT) {
             print_statement_errors(c, def->of);
             return;
@@ -96,28 +96,28 @@ static void print_statement_errors(Context *c, AstNode *node) {
     }
 
     else if (node->tag == Node_VAR) {
-        const AstVar *def = &node->as.var;
+        const AstVar *def = &node->as.decl.as.var;
         print_error_node(c, def->typename);
         if (def->flags & VAR_TYPE_IS_ANON_STRUCT) print_statement_errors(c, def->typename);
         if (def->flags & VAR_IS_INITED) print_error_node(c, def->value);
     }
 
     else if (node->tag == Node_DEFER) {
-        print_statement_errors(c, node->as.defer.statement);
+        print_statement_errors(c, node->as.stmt.as.defer.statement);
     }
 
     else if (node->tag == Node_RETURN) {
-        print_error_node(c, node->as.return_.expr);
+        print_error_node(c, node->as.stmt.as._return.expr);
     }
 
     else if (node->tag == Node_WHILE) {
-        print_expression_errors(c, node->as.while_.condition);
-        print_statement_errors(c, node->as.while_.block);
+        print_expression_errors(c, node->as.stmt.as._while.condition);
+        print_statement_errors(c, node->as.stmt.as._while.block);
     }
 
     else if (node->tag == Node_IF) {
-        print_expression_errors(c, node->as.if_.condition);
-        print_statement_errors(c, node->as.if_.block_or_stmt);
+        print_expression_errors(c, node->as.stmt.as._if.condition);
+        print_statement_errors(c, node->as.stmt.as._if.block_or_stmt);
     }
 
     else if (node->tag == Node_TYPENAME) {

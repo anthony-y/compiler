@@ -70,7 +70,7 @@ Symbol *lookup_local(Context *ctx, AstProcedure *proc, Name *name) {
 
 Symbol *lookup_struct_field(AstStruct *def, Name *name) {
     assert(def->members->tag == Node_BLOCK);
-    return lookup_in_block(&def->members->as.block, name);
+    return lookup_in_block(&def->members->as.stmt.as.block, name);
 }
 
 Name *make_name(Context *ctx, Token token) {

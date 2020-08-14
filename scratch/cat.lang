@@ -1,15 +1,15 @@
 proc read_file(path: string): string {
     // Get the data
     data := magic_os_proc(path)
-
+    
     k: i;
     k.j = ""
-
+    
     return data
 }
 
 proc main() {
-    ms: struct {a: int; b: string};
+    ms: struct {a: int; b: string}
     ms.a = 10
     data := read_file()
     print(data) // cat
@@ -18,9 +18,7 @@ proc main() {
 
 proc test(): void {}
 
-proc print(){}
-proc magic_os_proc(_: string): string{}
+proc print()                  #foreign // TODO store extra info like name and whatever
+proc magic_os_proc(_: string) #foreign
 
-type i: struct {
-    j := 10
-}
+type i: struct {j: ^i}

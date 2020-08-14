@@ -11,8 +11,18 @@
 void resolve_procedure(Symbol *procsym, Context *ctx);
 Type *resolve_var(Symbol *varsym, Context *ctx);
 Type *resolve_accessor(Context *ctx, AstBinary *accessor);
+Type *resolve_expression(AstNode *expr, Context *ctx);
 
 static AstProcedure **scope_stack = NULL; // stbds array
+
+// Resolves the dependencies of an assignment statement,
+void resolve_assignment(AstNode *ass, Context *ctx) {
+    assert(ass->tag == Node_BINARY);
+    AstBinary *bin = (AstBinary *)ass;
+    assert(is_assignment(*bin));
+    resolve_expression(bin->left, ctx);
+    resolve_expression(bin->right, ctx);
+}
 
 AstProcedure *resolve_call(AstNode *callnode, Context *ctx) {
     AstCall *call = (AstCall *)callnode;
@@ -97,16 +107,31 @@ Type *resolve_expression(AstNode *expr, Context *ctx) {
         resolve_expression(bin->right, ctx);
         return lhs;
     } break;
-    case Node_ENCLOSED: {
-        return resolve_expression(((AstEnclosed *)expr)->sub_expr, ctx);
+    case Node_PAREN: {
+        return resolve_expression(((AstParen *)expr)->sub_expr, ctx);
     } break;
     }
     assert(false);
     return NULL;
 }
 
+void resolve_struct(AstStruct *def, Context *ctx) {
+    SymbolTable *table = def->members->as.stmt.as.block.symbols;
+    u64 len = shlenu(table);
+    for (int i = 0; i < len; i++) {
+        Symbol *fieldsym = &table[i].value;
+        if (fieldsym->decl->tag != Node_VAR) {
+            compile_error(ctx, fieldsym->decl->token, "Only variable declarations are valid inside a struct body"); // this is semantic checking but we have to do it here otherwise it's a nightmare
+        }
+        resolve_var(fieldsym, ctx);
+    }
+}
+
 // TODO somehow make types symbols lmao
 Type *resolve_type(Context *ctx, Type *type, Token t) {
+    // if (type->kind == Type_POINTER) {
+    //     type = unwrap_pointer_type(type, NULL);
+    // }
     if (type->kind != Type_DEFERRED_NAMED) return type;
 
     u64 i = shgeti(ctx->type_table, type->name);
@@ -119,10 +144,24 @@ Type *resolve_type(Context *ctx, Type *type, Token t) {
 
     u64 type_i = shgeti(ctx->symbol_table, type->name);
     Symbol *sym = &ctx->symbol_table[type_i].value;
+
+    if (sym->status == Sym_RESOLVING) {
+        // TODO this shouldn't happen for pointers and the only reason it doesn't right now
+        // is cus of the code commented out at the start of this function
+        compile_error(ctx, sym->decl->token, "Type definition for \"%s\" directly mentions itself", type->name);
+        return NULL;
+    }
+
+    sym->status = Sym_RESOLVING;
     if (sym->decl->tag != Node_TYPEDEF) {
         compile_error(ctx, t, "\"%s\" is not a type", type->name);
         return NULL;
     }
+
+    AstTypedef *my_typedef = (AstTypedef *)sym->decl;
+    if (my_typedef->of->tag == Node_STRUCT)
+        resolve_struct(&my_typedef->of->as.stmt.as._struct, ctx);
+
     sym->status = Sym_RESOLVED;
     return real_type;
 }
@@ -150,7 +189,7 @@ Type *resolve_accessor(Context *ctx, AstBinary *accessor) {
         return NULL;
     }
 
-    AstStruct *struct_def = &lhs_type->data.user->as.struct_;
+    AstStruct *struct_def = &lhs_type->data.user->as.stmt.as._struct;
     Symbol *field = lookup_struct_field(struct_def, rhs);
     if (!field) {
         compile_error(ctx, accessor->right->token, "No such field as \"%s\" in struct field access", rhs->text);
@@ -159,7 +198,7 @@ Type *resolve_accessor(Context *ctx, AstBinary *accessor) {
     if (field->decl->tag != Node_VAR) {
         assert(false); // should have been checked by now, ill see if i can make this go off
     }
-    return field->decl->as.var.typename->as.type;
+    return field->decl->as.decl.as.var.typename->as.type;
 }
 
 // Resolves the dependencies and type of a variable declaration,
@@ -169,6 +208,10 @@ Type *resolve_var(Symbol *varsym, Context *ctx) {
     Type **specified_type = &var->typename->as.type;
     if (varsym->status == Sym_RESOLVED)
         return *specified_type;
+
+    if (var->flags & VAR_TYPE_IS_ANON_STRUCT) {
+        resolve_struct(&var->typename->as.stmt.as._struct, ctx);
+    }
 
     if (!(var->flags & VAR_TYPE_IS_ANON_STRUCT) && !(var->flags & VAR_IS_INFERRED))
         *specified_type = resolve_type(ctx, *specified_type, var->typename->token);
@@ -189,15 +232,6 @@ Type *resolve_var(Symbol *varsym, Context *ctx) {
     return inferred_type;
 }
 
-// Resolves the dependencies of an assignment statement,
-void resolve_assignment(AstNode *ass, Context *ctx) {
-    assert(ass->tag == Node_BINARY);
-    AstBinary *bin = (AstBinary *)ass;
-    assert(is_assignment(*bin));
-    resolve_expression(bin->left, ctx);
-    resolve_expression(bin->right, ctx);
-}
-
 void resolve_procedure(Symbol *procsym, Context *ctx) {
     if (procsym->status == Sym_RESOLVED) return;
     procsym->status = Sym_RESOLVING;
@@ -212,6 +246,11 @@ void resolve_procedure(Symbol *procsym, Context *ctx) {
     Type *return_type = proc->return_type->as.type;
     if (return_type->kind == Type_DEFERRED_NAMED)
         resolve_type(ctx, return_type, procsym->decl->token);
+
+    if (proc->flags & PROC_MOD_FOREIGN) {
+        procsym->status = Sym_RESOLVED;
+        return;
+    }
 
     stbds_arrpush(scope_stack, proc); // push the new scope
 
@@ -247,7 +286,6 @@ void resolve_procedure(Symbol *procsym, Context *ctx) {
 }
 
 void resolve_top_level(Context *ctx) {
-    // TODO proc stack
     u64 len = shlenu(ctx->symbol_table);
     for (int i = 0; i < len; i++) {
         Symbol *sym = &ctx->symbol_table[i].value;
