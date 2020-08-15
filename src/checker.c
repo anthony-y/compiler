@@ -11,17 +11,15 @@
 #include "headers/stb/stretchy_buffer.h"
 #include "headers/stb/stb_ds.h"
 
-void check_statement  (Context *, AstNode *);
+void check_statement  (Context *, AstStmt *);
 void check_block      (Context *, AstBlock *, AstNodeType);
 Type *type_from_expr  (Context *, AstNode *);
-void check_struct     (Context *, AstNode *);
+void check_struct     (Context *, AstStruct *);
 bool check_assignment (Context *, AstBinary *);
 
 // TODO consider
 //   const values -> type
 //   lookup the const value -> type
-
-#if 0
 
 // Returns true if `a` and `b` point to the same Type, false otherwise.
 // Does not print errors.
@@ -69,12 +67,12 @@ static Type *maybe_unwrap_type_alias(Type *alias) {
     return alias->data.alias_of;
 }
 
-static Type *get_decl_type(AstNode *node) {
-    assert(is_decl(node));
+static Type *get_decl_type(AstDecl *node) {
     switch (node->tag) {
-    case Node_VAR: return (Type *)((AstVar *)node)->typename;
-    case Node_PROCEDURE: return (Type *)((AstProcedure *)node)->return_type;
+    case Decl_VAR: return (Type *)((AstVar *)node)->typename;
+    case Decl_PROC: return (Type *)((AstProcedure *)node)->return_type;
     }
+    assert(false);
 }
 
 // Performs semantic analysis on a function call.
@@ -82,10 +80,10 @@ static Type *get_decl_type(AstNode *node) {
 // Writes the return type to `out_return_type` ONLY if it is SUCCEEDS.
 // Prints its own errors.
 // You may pass `out_return_type` as NULL.
-static bool check_call(Context *ctx, AstNode *callnode, Type **out_return_type) {
-    AstCall *call = &callnode->as.function_call;
+static bool check_call(Context *ctx, AstNode *callnode) {
+    AstCall *call = (AstCall *)callnode;
 
-    char *name = call->name->as.ident->text;
+    char *name = call->name->as.name->text;
 
     AstProcedure *proc = call->calling;
     int real_len = shlenu(proc->params);
@@ -95,7 +93,6 @@ static bool check_call(Context *ctx, AstNode *callnode, Type **out_return_type) 
             compile_error(ctx, callnode->token, "Call to \"%s\" specifies no arguments, but it's defined to expect %d of them", name, proc_arg_count);
             return false;
         }
-        if (out_return_type) *out_return_type = proc->return_type->as.type;
         return true;
     }
 
@@ -116,9 +113,8 @@ static bool check_call(Context *ctx, AstNode *callnode, Type **out_return_type) 
     assert(call_arg_count == proc_arg_count);
 
     for (int i = 0; i < call_arg_count; i++) {
-        Type *caller_type = type_from_expr(ctx, call->params->nodes[i]);
-        if (caller_type == ctx->error_type) return false;
-        Type *defn_type = proc->params[i].value.decl->as.var.typename->as.type;
+        Type *caller_type = call->params->nodes[i]->as.expr.resolved_type;
+        Type *defn_type = proc->params[i].value->as.var.typename->as.type;
         if (!do_types_match(ctx, caller_type, defn_type)) {
             compile_error_start(ctx, callnode->token, "type mismatch: argument %d of procedure \"%s\" is defined as type ", i+1, name);
             print_type(defn_type, stderr);
@@ -127,24 +123,6 @@ static bool check_call(Context *ctx, AstNode *callnode, Type **out_return_type) 
             compile_error_end();
         }
     }
-
-    if (out_return_type) *out_return_type = proc->return_type->as.type;
-    return true;
-}
-
-// Performs semantic analysis on an identifier.
-// Returns true if it points to a declaration, otherwise false.
-// However, it may not point to a Node_VAR, callers need to check for this.
-// Writes said declaration to `out_decl_site` ONLY if it succeeds.
-static bool check_ident(Context *ctx, AstNode *node, AstNode **out_decl_site) {
-    // Name *name = node->as.ident;
-    // Symbol *hopefully_var = lookup_local(ctx->curr_checker_proc->block, name); // TODO when lookup_local scoures outer scopes, this will return nodes that could be procedures, etc. which will fix the poor error message I get right now if `name` is actually the name of a procedure.
-    // if (!hopefully_var) {
-    //     compile_error(ctx, node->token, "Undeclared identifier \"%s\"", name->text);
-    //     return false;
-    // }
-    // *out_decl_site = hopefully_var;
-    // return true;
     return true;
 }
 
@@ -154,7 +132,17 @@ static bool check_ident(Context *ctx, AstNode *node, AstNode **out_decl_site) {
 // `out_actual_type` is a return variable, in which the actual type of `expr` will be written,
 // regardless of whether true or false is returned.
 //
-bool does_type_describe_expr(Context *ctx, Type *type, AstNode *expr, Type **out_actual_type) {
+bool does_type_describe_expr(Context *ctx, Type *type, AstExpr *expr) {
+    switch (expr->tag) {
+    case Expr_CALL: {
+        check_call(ctx, (AstNode *)expr);
+        return do_types_match(ctx, type, expr->resolved_type);
+    } break;
+    
+    default: assert(false);
+    }
+    return false;
+    #if 0
     if (expr->tag == Node_CALL) {
         Type *return_type = NULL;
         if (!check_call(ctx, expr, &return_type)) {
@@ -356,44 +344,32 @@ bool does_type_describe_expr(Context *ctx, Type *type, AstNode *expr, Type **out
         assert(false);
     }
     return false;
-}
-
-// Wrapper around `does_type_describe_expr` which discards the boolean value
-// of said function and just returns the actual type of `expr`.
-// Callers of this function must check that the type is not ctx->error_type.
-Type *type_from_expr(Context *ctx, AstNode *expr) {
-    Type *ret = NULL;
-    does_type_describe_expr(ctx, ctx->type_void, expr, &ret);
-    if (ret == ctx->error_type) return ctx->error_type;
-    assert(ret);
-    return ret;
+    #endif
 }
 
 // Ensure a return statement is compatible with the procedure declaration
 // that it resides inside. Uses `ctx->curr_checker_proc` to compare against.
-bool check_proc_return_value(Context *ctx, AstNode *retnode) {
+bool check_proc_return_value(Context *ctx, AstStmt *retnode) {
     Type *return_type = ctx->curr_checker_proc->return_type->as.type;
 
-    AstReturn *r = &retnode->as.return_;
+    Token tok = stmt_tok(retnode);
+    AstReturn *r = &retnode->as._return;
 
     if (!r->expr) {
         return_type = maybe_unwrap_type_alias(return_type); // this allows type aliases of 'void' to work here.
         if (return_type != ctx->type_void) { // procedure return type is not void
-            compile_error(ctx, retnode->token, "Only procedures declared as void can have value-less return statements");
+            compile_error(ctx, tok, "Only procedures declared as void can have value-less return statements");
             return false;
         }
         return true;
     }
 
-    Type *ret_expr_type = NULL;
-
     // Return value was provided, type was just wrong.
-    if (!does_type_describe_expr(ctx, return_type, r->expr, /*out=*/&ret_expr_type)) {
-        if (ret_expr_type == ctx->error_type) return false;
-        compile_error_start(ctx, retnode->token, "type mismatch: procedure has return type ");
+    if (!does_type_describe_expr(ctx, return_type, r->expr)) {
+        compile_error_start(ctx, tok, "type mismatch: procedure has return type ");
         print_type(return_type, stderr);
         compile_error_add_line(ctx, ", but return value is of type ");
-        print_type(ret_expr_type, stderr);
+        print_type(r->expr->resolved_type, stderr);
         compile_error_end();
 
         return false;
@@ -402,7 +378,8 @@ bool check_proc_return_value(Context *ctx, AstNode *retnode) {
     return true;
 }
 
-bool check_var(Context *ctx, AstNode *node) {
+bool check_var(Context *ctx, AstDecl *node) {
+    Token   tok = decl_tok(node);
     AstVar *var = &node->as.var;
 
     if (var->flags & VAR_IS_INFERRED) return true;
@@ -410,16 +387,16 @@ bool check_var(Context *ctx, AstNode *node) {
     Type *type = var->typename->as.type;
 
     if (var->flags & VAR_TYPE_IS_ANON_STRUCT) {
-        check_struct(ctx, type->data.user);
+        check_struct(ctx, (AstStruct *)type->data.user);
     }
 
     else if (type == ctx->type_void) {
-        compile_error(ctx, var->typename->token, "Only procedures may use the \"void\" type");
+        compile_error(ctx, tok, "Only procedures may use the \"void\" type");
         return false;
     }
 
     else if (type->kind == Type_ALIAS && maybe_unwrap_type_alias(type) == ctx->type_void) {
-        compile_error_start(ctx, var->typename->token, "Variable is declared to have type \"%s\" ", type->name);
+        compile_error_start(ctx, tok, "Variable is declared to have type \"%s\" ", type->name);
         compile_error_add_line(ctx, "which is an alias of void; only procedures may use the \"void\" type");
         compile_error_end();
         return false;
@@ -427,11 +404,11 @@ bool check_var(Context *ctx, AstNode *node) {
 
     if (!(var->flags & VAR_IS_INITED)) return true;
 
-    Type *value_type = NULL;
+    Type *value_type = var->value->resolved_type;
+    assert(value_type);
 
-    if (!does_type_describe_expr(ctx, type, var->value, &value_type)) {
-        if (value_type == ctx->error_type) return false;
-        compile_error_start(ctx, node->token, "type mismatch: variable declared as type ");
+    if (!does_type_describe_expr(ctx, type, var->value)) {
+        compile_error_start(ctx, tok, "type mismatch: variable declared as type ");
         print_type(type, stderr);
         compile_error_add_line(ctx, ", but value was of type ");
         print_type(value_type, stderr);
@@ -443,17 +420,15 @@ bool check_var(Context *ctx, AstNode *node) {
     return true;
 }
 
-void check_if(Context *ctx, AstNode *node) {
-    AstIf *iff = &node->as.if_;
-    Type *expr_type = type_from_expr(ctx, iff->condition);
-    if (expr_type == ctx->error_type) return;
-    if (expr_type != ctx->type_bool) {
-        compile_error_start(ctx, node->token, "'If' statement requires a condition which evaluates to a boolean, this one evaluates to ");
-        print_type(expr_type, stderr);
+void check_if(Context *ctx, AstStmt *node) {
+    AstIf *iff = &node->as._if;
+    if (iff->condition->resolved_type != ctx->type_bool) {
+        compile_error_start(ctx, stmt_tok(node), "'If' statement requires a condition which evaluates to a boolean, this one evaluates to ");
+        print_type(iff->condition->resolved_type, stderr);
         compile_error_end();
         return;
     }
-    if (iff->block_or_stmt->tag == Node_BLOCK) {
+    if (iff->block_or_stmt->tag == Stmt_BLOCK) {
         check_block(ctx, &iff->block_or_stmt->as.block, Node_ZERO);
     } else check_statement(ctx, iff->block_or_stmt);
 }
@@ -461,66 +436,18 @@ void check_if(Context *ctx, AstNode *node) {
 bool check_assignment(Context *ctx, AstBinary *binary) {
     assert(is_assignment(*binary));
 
+    Token tok = ((AstNode *)binary)->token;
+
     bool is_math_assign = binary->op != Token_EQUAL; // is it a normal assignment? or *=, etc.
-    AstNode *left = binary->left; // the name or member access
-    AstNode *right = binary->right; // the value
 
-    Type *left_type  = NULL; // needs to be discovered depending on what left->tag is
-    Type *right_type = NULL; // filled in later by does_type_describe_expr
-
-    if (left->tag == Node_IDENT) {
-        Name *assigning_to = left->as.ident;
-        AstNode *left_decl;
-        if (!check_ident(ctx, left, &left_decl)) {
-            return false;
-        }
-        if (left_decl->tag != Node_VAR) {
-            compile_error(ctx, left->token, "Cannot assign to \"%s\" as it is not a variable", assigning_to->text);
-            return false;
-        }
-        left_type = left_decl->as.var.typename->as.type;
-    }
-
-    else if (left->tag == Node_INDEX) {
-        AstArrayIndex *indexer = &left->as.array_index;
-        if (indexer->name->tag == Node_IDENT) {
-            AstNode *arrdecl;
-            if (!check_ident(ctx, indexer->name, &arrdecl)) {
-                return false;
-            }
-            if (arrdecl->tag != Node_VAR) {
-                compile_error(ctx, indexer->name->token, "Cannot index into \"%s\" because it is not a variable", indexer->name->as.ident->text);
-                return false;
-            }
-            Type *arrtype = arrdecl->as.var.typename->as.type;
-            if (arrtype->kind != Type_ARRAY && arrtype->kind != Type_POINTER) {
-                compile_error(ctx, indexer->name->token, "Cannot index into \"%s\" because it is not an array or pointer", indexer->name->as.ident->text);
-                return false;
-            }
-            left_type = arrtype->data.base;
-        }
-        else if (indexer->name->tag == Node_BINARY) {
-            AstBinary *bin = &indexer->name->as.binary;
-            if (bin->op != Token_DOT) {
-                compile_error(ctx, indexer->name->token, "Name of array index must be identifier or struct member access");
-                return false;
-            }
-            left_type = resolve_accessor(ctx, bin);
-        }
-    }
-
-    else if (left->tag == Node_BINARY) {
-        AstBinary *accessor = &left->as.binary;
-        assert(accessor->op == Token_DOT); // TODO probs replace with real error
-        Type *hopefully_left_type = resolve_accessor(ctx, accessor);
-        if (!hopefully_left_type) return false;
-        left_type = hopefully_left_type;
-    }
+    Type *left_type  = binary->left->resolved_type; // needs to be discovered depending on what left->tag is
+    Type *right_type = binary->right->resolved_type; // filled in later by does_type_describe_expr
 
     assert(left_type);
+    assert(right_type);
 
-    if (!does_type_describe_expr(ctx, left_type, right, &right_type)) {
-        compile_error_start(ctx, left->token, "type mismatch: cannot assign value of type ");
+    if (!does_type_describe_expr(ctx, left_type, binary->right)) {
+        compile_error_start(ctx, tok, "type mismatch: cannot assign value of type ");
         print_type(right_type, stderr);
         compile_error_add_line(ctx, " to variable of type ");
         print_type(left_type, stderr);
@@ -531,62 +458,58 @@ bool check_assignment(Context *ctx, AstBinary *binary) {
 }
 
 void check_block(Context *ctx, AstBlock *block, AstNodeType restriction) {
+    u64 num_decls = shlenu(block->symbols);
+    for (int i = 0; i < num_decls; i++) {
+        check_var(ctx, block->symbols[i].value); // TODO local procs
+    }
     for (int i = 0; i < block->statements->len; i++) {
         AstNode *stmt = block->statements->nodes[i];
         if (restriction != Node_ZERO && restriction != stmt->tag) {
             compile_error(ctx, stmt->token, "This statement is not allowed at this scope");
             return;
         }
-        check_statement(ctx, stmt);
+        check_statement(ctx, (AstStmt *)stmt);
     }
 }
 
 // Check a block-level statement.
-void check_statement(Context *ctx, AstNode *node) {
+void check_statement(Context *ctx, AstStmt *node) {
     switch (node->tag) {
-    case Node_PROCEDURE:
-        ctx->curr_checker_proc = (AstProcedure*)node;
-        check_block(ctx, (AstBlock *)((AstProcedure *)node)->block, Node_ZERO);
-        break;
-    case Node_VAR:
-        check_var(ctx, node);
-        break;
-    case Node_IF:
+    case Stmt_IF:
         check_if(ctx, node);
         break;
-    case Node_CALL:
-        check_call(ctx, node, NULL);
+    case Stmt_CALL:
+        check_call(ctx, (AstNode *)node);
         break;
-    case Node_BINARY: {
+    case Stmt_ASSIGN: {
         // Guaranteed to be an assignment by parser
         AstBinary *bin = &node->as.binary;
         check_assignment(ctx, bin);
     } break;
-    case Node_RETURN: {
-        check_proc_return_value(ctx, node);
+    case Stmt_RETURN: {
+        //check_proc_return_value(ctx, node);
     } break;
     }
 }
 
-void check_struct(Context *ctx, AstNode *structdef) {
-    assert(structdef->tag == Node_STRUCT);
-    AstBlock *fields = &structdef->as.struct_.members->as.block;
+void check_struct(Context *ctx, AstStruct *structdef) {
+    AstBlock *fields = &structdef->members->as.block;
     check_block(ctx, fields, Node_VAR);
 }
 
-void check_typedef(Context *ctx, AstNode *node) {
-    AstTypedef *td = &node->as.typedef_;
+void check_typedef(Context *ctx, AstDecl *node) {
+    AstTypedef *td = &node->as.typedefi;
     if (td->of->tag == Node_STRUCT) {
-        check_struct(ctx, td->of);
+        check_struct(ctx, (AstStruct *)td->of);
         return;
     }
     if (td->of->tag == Node_TYPENAME) {
         if (td->of->as.type->kind == Type_ALIAS) {
             compile_error(ctx, td->of->token, "You cannot create a type alias from another type alias");
         }
-        if (td->of->as.type == ctx->type_void) {
-            //compile_error(ctx, td->of->token, "You cannot create a type alias from \"void\"");
-        }
+        // if (td->of->as.type == ctx->type_void) {
+        //     compile_error(ctx, td->of->token, "You cannot create a type alias from \"void\"");
+        // }
         return;
     }
     assert(false);
@@ -609,13 +532,12 @@ void check_ast(Context *ctx, Ast *ast) {
             break;
 
         case Node_VAR:
-            check_var(ctx, node);
+            check_var(ctx, (AstDecl *)node);
             break;
 
         case Node_TYPEDEF:
-            check_typedef(ctx, node);
+            check_typedef(ctx, (AstDecl *)node);
             break;
         }
     }
 }
-#endif

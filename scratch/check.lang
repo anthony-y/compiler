@@ -1,0 +1,7 @@
+proc main() {
+    msg : int = hi()
+}
+
+proc hi(): string {
+    return "Hi"
+}

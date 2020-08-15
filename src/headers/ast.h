@@ -375,4 +375,8 @@ bool is_assignment(AstBinary);
 bool is_binary_comparison(AstBinary);
 bool is_literal(AstNode *);
 
+Token decl_tok(AstDecl *);
+Token expr_tok(AstExpr *);
+Token stmt_tok(AstStmt *);
+
 #endif

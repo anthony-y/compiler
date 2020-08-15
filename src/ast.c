@@ -11,6 +11,10 @@
 #include <string.h>
 #include <assert.h>
 
+inline Token decl_tok(AstDecl *d) {return ((AstNode *)d)->token;}
+inline Token expr_tok(AstExpr *e) {return ((AstNode *)e)->token;}
+inline Token stmt_tok(AstStmt *s) {return ((AstNode *)s)->token;}
+
 inline AstNode *ast_node(Parser *p, AstNodeType tag, Token t) {
     AstNode *node = arena_alloc(&p->node_allocator, sizeof(AstNode));
 

@@ -15,10 +15,6 @@ Type *resolve_expression(AstExpr *expr, Context *ctx);
 
 static AstProcedure **scope_stack = NULL; // stbds array
 
-static inline Token decl_tok(AstDecl *d) {return ((AstNode *)d)->token;}
-static inline Token expr_tok(AstExpr *e) {return ((AstNode *)e)->token;}
-static inline Token stmt_tok(AstStmt *s) {return ((AstNode *)s)->token;}
-
 // Resolves the dependencies of an assignment statement,
 void resolve_assignment(AstNode *ass, Context *ctx) {
     assert(ass->tag == Node_ASSIGN);
@@ -139,7 +135,6 @@ void resolve_struct(AstStruct *def, Context *ctx) {
     }
 }
 
-// TODO somehow make types symbols lmao
 Type *resolve_type(Context *ctx, Type *type) {
     Token t = ((AstNode *)type)->token; // TODO doesnt work lol
 
