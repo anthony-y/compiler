@@ -1,13 +1,3 @@
-AstCall needs to be able to be parsed as an expression OR statement
-
-Embed AstError into AstDecl, AstExpr, AstStmt.
-    Write decl_error_node(), expr_error_node(), stmt_error_node()
-    Change AstNode*'s to be more specific, e.g:
-        struct AstVar {
-            ...
-            AstExpr *value;
-        }
-
 Check array index assignments
 Call modifiers e.g: a := inline some_call()
     inline is added to lexer

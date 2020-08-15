@@ -41,8 +41,6 @@ typedef enum {
 typedef enum {
     Stmt_ERROR,
 
-    Stmt_VAR, // TODO consider
-
     Stmt_ASSIGN,
     Stmt_IMPORT,
     Stmt_BLOCK,
@@ -257,7 +255,6 @@ typedef struct AstStmt {
         AstError error;
 
         //AstAssignment assign;
-        AstVar var; // todo consider
         AstBinary binary; // TODO replace with real assignment
         AstImport _import;
         AstBlock block;

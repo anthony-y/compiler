@@ -23,7 +23,6 @@ static AstNode *parse_statement(Context *);
 static AstNode *parse_proc(Context *c, bool in_typedef);
 static AstVar   parse_var(Context *, bool top_level, AstNode **out_err);
 static AstNode *parse_var_as_decl(Context *c, bool top_level);
-static AstStmt *parse_var_as_stmt(Context *c);
 static AstNode *parse_typename(Context *);
 static AstNode *parse_top_level(Context *);
 
@@ -590,21 +589,6 @@ static AstNode *parse_var_as_decl(Context *c, bool top_level) {
         add_symbol(c, decl, decl->name->text);
     }
     return (AstNode *)decl;
-}
-
-static AstStmt *parse_var_as_stmt(Context *c) {
-    Parser *p = &c->parser;
-    Token start = *p->curr;
-
-    AstNode *err;
-    AstVar var = parse_var(c, false, &err);
-    if (err) {
-        return make_stmt_error(p, err->as.error.msg);
-    }
-    AstNode *n = ast_node(p, Node_VAR, start);
-    n->as.stmt.tag = Stmt_VAR;
-    n->as.stmt.as.var = var;
-    return (AstStmt *)n;
 }
 
 static AstVar parse_var(Context *c, bool top_level, AstNode **out_err) {
