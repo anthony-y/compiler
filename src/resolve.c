@@ -24,8 +24,8 @@ void resolve_assignment(AstNode *ass, Context *ctx) {
     assert(ass->tag == Node_ASSIGN);
     AstBinary *bin = (AstBinary *)ass;
     assert(is_assignment(*bin));
-    resolve_expression((AstExpr *)bin->left, ctx);
-    resolve_expression((AstExpr *)bin->right, ctx);
+    resolve_expression(bin->left, ctx);
+    resolve_expression(bin->right, ctx);
 }
 
 AstProcedure *resolve_call(AstNode *callnode, Context *ctx) {
@@ -91,6 +91,7 @@ Type *resolve_expression_1(AstExpr *expr, Context *ctx) {
             compile_error(ctx, t, "\"%s\" used like a variable, but it isn't one");
             return NULL;
         }
+        name->resolved_decl = var;
         return var->as.var.typename->as.type;
     } break;
     case Expr_CAST: {

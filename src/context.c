@@ -43,6 +43,7 @@ Name *make_name(Context *ctx, Token token) {
     Name *n = malloc(sizeof(Name));
     char *txt = token.text;
     n->text = txt;
+    n->resolved_decl = NULL;
     u64 i = shgeti(ctx->name_table, txt);
     if (i == -1) { // not in the table yet
         shput(ctx->name_table, txt, n);

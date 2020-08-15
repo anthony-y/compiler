@@ -15,7 +15,8 @@
 
 // An entry in the name table.
 typedef struct Name {
-    char *text;
+    char    *text;
+    AstDecl *resolved_decl;
 } Name;
 
 typedef struct SymbolTable {char *key; AstDecl *value;} SymbolTable;
