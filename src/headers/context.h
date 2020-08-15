@@ -13,25 +13,12 @@
 
 #define CONTEXT_SCRATCH_SIZE 1024
 
-struct AstNode;
-
-#if 1
-typedef struct Symbol {
-    struct AstNode *decl;
-    enum {
-        Sym_UNRESOLVED,
-        Sym_RESOLVED,
-        Sym_RESOLVING,
-    } status;
-} Symbol;
-#endif
-
 // An entry in the name table.
 typedef struct Name {
     char *text;
 } Name;
 
-typedef struct SymbolTable {char *key; Symbol value;} SymbolTable;
+typedef struct SymbolTable {char *key; AstDecl *value;} SymbolTable;
 
 // Central compiler context, a reference to an instance of this struct is
 // passed to most functions in the compiler.
@@ -88,10 +75,10 @@ bool check_types_were_declared(Context *);
 
 Name *make_name(Context *, Token from);
 
-Symbol *lookup_local(Context *ctx, AstProcedure *proc, Name *name);
-Symbol *lookup_struct_field(AstStruct *, Name *);
-Symbol *lookup_in_block(AstBlock *, Name *);
+AstDecl *lookup_local(Context *ctx, AstProcedure *proc, Name *name);
+AstDecl *lookup_struct_field(AstStruct *, Name *);
+AstDecl *lookup_in_block(AstBlock *, Name *);
 
-void add_symbol(Context *, AstNode *decl, char *name);
+void add_symbol(Context *, AstDecl *decl, char *name);
 
 #endif

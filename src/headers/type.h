@@ -41,7 +41,7 @@ typedef struct Type {
     union {
         /* TODO decide on Type array or struct body pointer for this */
         // struct Type *user;
-        struct AstNode *user; // array of types for enums and structs
+        struct AstStmt *user; // array of types for enums and structs
 
         struct Type *alias_of; // for typedef aliases
         struct Type *base; // arrays and pointers

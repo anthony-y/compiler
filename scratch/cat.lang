@@ -5,7 +5,7 @@ proc read_file(path: string): string {
     k: i;
     k.j = ""
     
-    return data
+    return path
 }
 
 proc main() {
@@ -21,4 +21,6 @@ proc test(): void {}
 proc print()                  #foreign // TODO store extra info like name and whatever
 proc magic_os_proc(_: string) #foreign
 
-type i: struct {j: ^i}
+type i: struct {
+    j: ^i;
+}

@@ -325,6 +325,12 @@ Token next_token(Lexer *tz) {
 bool lexer_lex(Context *ctx, TokenList *list, SourceStats *stats) {
     Lexer *l = &ctx->lexer;
     TokenType last;
+
+    u64 pointers = 0;
+    u64 args = 0;
+    u64 blocks = 0;
+    u64 types = 0;
+
     while (true) {
         last = l->last;
         Token t = next_token(l);
@@ -334,25 +340,28 @@ bool lexer_lex(Context *ctx, TokenList *list, SourceStats *stats) {
         case Token_ERROR:
             return false;
         case Token_TYPEDEF:
-            stats->declared_types++;
+            types++;
             break;
         case Token_IDENT:
             
         case Token_RESERVED_TYPE:
         case Token_CARAT:
-            if (last == Token_CARAT) stats->pointer_types++;
+            if (last == Token_CARAT) pointers++;
             break;
         case Token_OPEN_PAREN:
-            if (last == Token_IDENT) stats->argument_lists++;
+            if (last == Token_IDENT) args++;
             break;
         case Token_OPEN_BRACE:
-            stats->blocks++;
+            blocks++;
             break;
         }
 
         token_list_add(list, t);
         if (t.type == Token_EOF) break;
     }
-
+    stats->blocks += blocks;
+    stats->pointer_types += pointers;
+    stats->argument_lists += args;
+    stats->declared_types += types;
     return true;
 }

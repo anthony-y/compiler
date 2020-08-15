@@ -11,6 +11,51 @@ struct Name; // context.h
 struct Context;
 
 typedef enum {
+    Decl_ERROR,
+
+    Decl_PROC,
+    Decl_VAR,
+    Decl_TYPEDEF,
+} DeclType;
+
+typedef enum {
+    Expr_ERROR,
+
+    Expr_INT,
+    Expr_FLOAT,
+    Expr_STRING,
+    Expr_BOOL,
+    Expr_NULL,
+    Expr_ARRAY,
+
+    Expr_NAME,
+    Expr_BINARY,
+    Expr_UNARY,
+    Expr_SELECTOR,
+    Expr_PAREN,
+    Expr_CAST,
+    Expr_CALL,
+    Expr_INDEX,
+} ExprType;
+
+typedef enum {
+    Stmt_ERROR,
+
+    Stmt_VAR, // TODO consider
+
+    Stmt_ASSIGN,
+    Stmt_IMPORT,
+    Stmt_BLOCK,
+    Stmt_IF,
+    Stmt_FOR,
+    Stmt_WHILE,
+    Stmt_STRUCT,
+    Stmt_RETURN,
+    Stmt_DEFER,
+    Stmt_CALL,
+} StmtType;
+
+typedef enum {
     Node_ZERO, // nothing, just a sentinal value
 
     Node_ERROR,
@@ -71,9 +116,13 @@ enum {
     VAR_IS_INITED           = 1 << 2,
 };
 
+struct AstExpr;
+struct AstStmt;
+struct AstDecl;
+
 typedef struct {
     struct AstNode *name;
-    struct AstNode *value;
+    struct AstExpr *value;
     struct AstNode *typename;
     int flags;
 } AstVar;
@@ -83,33 +132,33 @@ enum {
 };
 typedef struct {
     struct SymbolTable *params;
-    struct AstNode *block;
+    struct AstStmt *block;
     struct AstNode *name;
     struct AstNode *return_type;
     int flags;
 } AstProcedure;
 
 typedef struct {
-    struct AstNode *members;
+    struct AstStmt *members;
 } AstStruct;
 
 typedef struct {
-    struct AstNode *name;
-    struct AstNode *value;
+    struct AstExpr *name;
+    struct AstExpr *value;
 } AstAssignment;
 
 typedef struct {
-    struct AstNode *condition;
-    struct AstNode *block_or_stmt;
+    struct AstExpr *condition;
+    struct AstStmt *block_or_stmt;
 
     // This will be an AstBlock for 'else' or
     // AstIf for an else if.
-    struct AstNode *other_branch;
+    struct AstStmt *other_branch;
 } AstIf;
 
 typedef struct {
     struct AstNode *of;
-    struct AstNode *name;
+    struct AstExpr *name;
 } AstTypedef;
 
 typedef struct {
@@ -122,12 +171,12 @@ typedef struct {
 } AstFor;
 
 typedef struct {
-    struct AstNode *condition;
-    struct AstNode *block;
+    struct AstExpr *condition;
+    struct AstStmt *block;
 } AstWhile;
 
 typedef struct {
-    struct AstNode *expr;
+    struct AstExpr *expr;
 } AstReturn;
 
 typedef struct {
@@ -146,26 +195,26 @@ enum {
 };
 
 typedef struct {
-    struct AstNode *name;
+    struct AstExpr *name;
     struct Ast *params;
     AstProcedure *calling; // filled out in resolve.c
     int flags;
 } AstCall;
 
 typedef struct {
-    struct AstNode *left;
-    struct AstNode *right;
+    struct AstExpr *left;
+    struct AstExpr *right;
     TokenType op;
 } AstBinary;
 
 typedef struct {
     TokenType op;
-    struct AstNode *expr;
+    struct AstExpr *expr;
 } AstUnary;
 
 typedef struct {
-    struct AstNode *left;
-    struct AstNode *right;
+    struct AstExpr *left;
+    struct AstExpr *right;
 } AstSelector;
 
 // typedef struct {
@@ -173,18 +222,18 @@ typedef struct {
 // } AstTypename;
 
 typedef struct {
-    struct AstNode *sub_expr;
+    struct AstExpr *sub_expr;
 } AstParen;
 
 typedef struct {
     //Type *type;
     struct AstNode *typename;
-    struct AstNode *expr;
+    struct AstExpr *expr;
 } AstCast;
 
 typedef struct {
-    struct AstNode *name;
-    struct AstNode *index;
+    struct AstExpr *name;
+    struct AstExpr *index;
 } AstArrayIndex;
 
 typedef struct {
@@ -194,17 +243,21 @@ typedef struct {
 struct SymbolTable;
 
 typedef struct AstBlock {
-    // These overlap, meaning, declarations that are also 
-    // statements will be added to statements and decls.
-    // Initialized AstBlocks can be casted to an Ast.
     struct Ast *statements;
     struct SymbolTable *symbols;
     struct AstBlock *parent;
 } AstBlock;
 
+typedef struct AstError {
+    char *msg;
+} AstError;
+
 typedef struct AstStmt {
     union {
+        AstError error;
+
         //AstAssignment assign;
+        AstVar var; // todo consider
         AstBinary binary; // TODO replace with real assignment
         AstImport _import;
         AstBlock block;
@@ -215,10 +268,13 @@ typedef struct AstStmt {
         AstDefer defer;
         AstCall call;
     } as;
+    StmtType tag;
 } AstStmt;
 
 typedef struct AstExpr {
     union {
+        AstError error;
+
         struct Name *name;
         AstLiteral literal;
         AstCast cast;
@@ -230,31 +286,34 @@ typedef struct AstExpr {
         AstArrayIndex index;
     } as;
     Type *resolved_type;
+    ExprType tag;
 } AstExpr;
 
 typedef struct AstDecl {
     union {
+        AstError error;
+
         AstProcedure proc;
         AstVar var;
         AstTypedef typedefi;
     } as;
     struct Name *name;
+    DeclType tag;
+    enum {
+        Status_RESOLVED,
+        Status_RESOLVING,
+        Status_UNRESOLVED,
+    } status;
 } AstDecl;
-
-typedef struct AstError {
-    char *msg;
-    u64 line;
-    s32 column;
-} AstError;
 
 typedef struct AstNode {
     union {
         AstError error;
+
         AstExpr expr;
         AstDecl decl;
         AstStmt stmt;
-        AstCall call;
-        struct Name *ident;
+
         Type *type;
     } as;
     AstNodeType tag;
@@ -277,28 +336,40 @@ AstNode *ast_decl(struct Parser *, AstNodeType tag, Token, const AstDecl *);
 AstNode *ast_expr(struct Parser *, AstNodeType tag, Token, const AstExpr *);
 AstNode *ast_stmt(struct Parser *, AstNodeType tag, Token, const AstStmt *);
 
-AstNode *ast_name(struct Parser *p, Token t, struct Name *name);
-AstNode *ast_binary(struct Parser *p, Token t, const AstBinary *binary);
-AstNode *ast_unary(struct Parser *p, Token t, const AstUnary *unary);
-AstNode *ast_selector(struct Parser *p, Token t, const AstSelector *sel);
-AstNode *ast_paren(struct Parser *p, Token t, const AstParen *paren);
-AstNode *ast_cast(struct Parser *p, Token t, const AstCast *cast);
-AstNode *ast_index(struct Parser *p, Token t, const AstArrayIndex *index);
-AstNode *ast_proc(struct Parser *p, Token t, struct Name *name, const AstProcedure *proc);
-AstNode *ast_var(struct Parser *p, Token t, struct Name *name, const AstVar *var);
-AstNode *ast_typedefi(struct Parser *p, Token t, struct Name *name, const AstTypedef *td);
-AstNode *ast_assignment(struct Parser *p, Token t, const AstBinary *ass);
-AstNode *ast_import(struct Parser *p, Token t, const AstImport *imp);
-AstNode *ast_block(struct Parser *p, Token t, const AstBlock *blk);
-AstNode *ast_if(struct Parser *p, Token t, const AstIf *i);
-AstNode *ast_while(struct Parser *p, Token t, const AstWhile *w);
-AstNode *ast_struct(struct Parser *p, Token t, const AstStruct *s);
-AstNode *ast_return(struct Parser *p, Token t, const AstReturn *r);
-AstNode *ast_defer(struct Parser *p, Token t, const AstDefer *d);
-AstNode *ast_call(struct Parser *p, Token t, const AstCall *call);
+struct Context;
+
+AstExpr *ast_name(struct Context *, Token t);
+AstExpr *ast_binary(struct Parser *p, Token t, const AstBinary *binary);
+AstExpr *ast_unary(struct Parser *p, Token t, const AstUnary *unary);
+AstExpr *ast_selector(struct Parser *p, Token t, const AstSelector *sel);
+AstExpr *ast_paren(struct Parser *p, Token t, const AstParen *paren);
+AstExpr *ast_cast(struct Parser *p, Token t, const AstCast *cast);
+AstExpr *ast_index(struct Parser *p, Token t, const AstArrayIndex *index);
+
+AstDecl *ast_proc(struct Parser *p, Token t, struct Name *name, const AstProcedure *proc);
+AstDecl *ast_var(struct Parser *p, Token t, struct Name *name, const AstVar *var);
+AstDecl *ast_typedefi(struct Parser *p, Token t, struct Name *name, const AstTypedef *td);
+
+AstStmt *ast_assignment(struct Parser *p, Token t, const AstBinary *ass);
+AstStmt *ast_import(struct Parser *p, Token t, const AstImport *imp);
+AstStmt *ast_block(struct Parser *p, Token t, const AstBlock *blk);
+AstStmt *ast_if(struct Parser *p, Token t, const AstIf *i);
+AstStmt *ast_while(struct Parser *p, Token t, const AstWhile *w);
+AstStmt *ast_struct(struct Parser *p, Token t, const AstStruct *s);
+AstStmt *ast_return(struct Parser *p, Token t, const AstReturn *r);
+AstStmt *ast_defer(struct Parser *p, Token t, const AstDefer *d);
+
+AstExpr *ast_call_expr(struct Parser *p, Token t, const AstCall *call);
+AstStmt *ast_call_stmt(struct Parser *p, Token t, const AstCall *call);
 
 AstNode *make_error_node(struct Parser *, Token, const char *msg);
-AstNode *make_ident_node(struct Context *, Token);
+//AstNode *make_ident_node(struct Context *, Token);
+
+AstStmt *make_stmt_error(struct Parser *p, char *msg);
+AstExpr *make_expr_error(struct Parser *p, char *msg);
+AstStmt *make_err_into_stmt(struct Parser *p, const AstNode *err);
+AstExpr *make_err_into_expr(struct Parser *p, const AstNode *err);
+AstNode *make_expr_err_into_node(struct Parser *p, const AstExpr *err);
 
 struct Name *get_decl_name(AstNode *);
 
