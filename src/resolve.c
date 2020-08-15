@@ -56,16 +56,11 @@ AstProcedure *resolve_call(AstNode *callnode, Context *ctx) {
 
 Type *resolve_expression_1(AstExpr *expr, Context *ctx) {
     Token t = expr_tok(expr);
-    if (is_literal((AstNode *)expr)) { // TODO cleanup
-        switch (expr->tag) {
-        case Expr_STRING: return ctx->type_string;
-        case Expr_INT:    return ctx->type_int;
-        case Expr_BOOL:   return ctx->type_bool;
-        case Expr_NULL:   return make_pointer_type(NULL);
-        // TODO array and float
-        }
-    }
     switch (expr->tag) {
+    case Expr_STRING: return ctx->type_string;
+    case Expr_INT:    return ctx->type_int;
+    case Expr_BOOL:   return ctx->type_bool;
+    case Expr_NULL:   return make_pointer_type(NULL);
     case Expr_CALL: {
         AstProcedure *resolved = resolve_call((AstNode *)expr, ctx);
         if (!resolved) return NULL;
