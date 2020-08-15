@@ -226,7 +226,7 @@ AstDecl *ast_typedefi(Parser *p, Token t, Name *name, const AstTypedef *td) {
 }
 
 AstStmt *ast_assignment(Parser *p, Token t, const AstBinary *ass) {
-    AstNode *n = ast_node(p, Node_BINARY, t);
+    AstNode *n = ast_node(p, Node_ASSIGN, t);
     n->as.stmt.tag = Stmt_ASSIGN;
     n->as.stmt.as.binary = *ass;
     return &n->as.stmt;

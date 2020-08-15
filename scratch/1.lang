@@ -10,7 +10,7 @@ proc whatever(): Field {
 
 proc main(args: []string): int {
     args[10] = ""
-    return;
+    return args[10];
 }
 
 type Field: struct {

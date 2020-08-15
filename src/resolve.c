@@ -21,7 +21,7 @@ static inline Token stmt_tok(AstStmt *s) {return ((AstNode *)s)->token;}
 
 // Resolves the dependencies of an assignment statement,
 void resolve_assignment(AstNode *ass, Context *ctx) {
-    assert(ass->tag == Node_BINARY);
+    assert(ass->tag == Node_ASSIGN);
     AstBinary *bin = (AstBinary *)ass;
     assert(is_assignment(*bin));
     resolve_expression((AstExpr *)bin->left, ctx);
@@ -287,7 +287,7 @@ void resolve_procedure(AstDecl *procsym, Context *ctx) {
         case Node_CALL:
             resolve_call(stmt, ctx);
             break;
-        case Node_BINARY:
+        case Node_ASSIGN:
             resolve_assignment(stmt, ctx);
             break;
         case Node_RETURN:

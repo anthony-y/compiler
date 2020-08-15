@@ -200,7 +200,7 @@ static AstExpr *parse_postfix_expr(Context *c, AstExpr *left) {
 
 static AstExpr *maybe_parse_array_assignment(Context *c, AstExpr *index) {
     Parser *p = &c->parser;
-    if (p->curr->type < Token_ASSIGNMENTS_START && p->curr->type > Token_ASSIGNMENTS_END) {
+    if (!(p->curr->type > Token_ASSIGNMENTS_START && p->curr->type < Token_ASSIGNMENTS_END)) {
         // Not an assignment
         return index;
     }

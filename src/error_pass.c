@@ -123,7 +123,7 @@ static void print_statement_errors(Context *c, AstStmt *node) {
     }
 
     else if (node->tag == Stmt_RETURN) {
-        print_expr_error(c, node->as._return.expr);
+        print_expression_errors(c, node->as._return.expr);
     }
 
     else if (node->tag == Stmt_WHILE) {
