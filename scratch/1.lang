@@ -6,7 +6,7 @@ proc main(args: []string): string {
 proc whatever(): Field {
     f: Field
     f.name = null
-    return f // TODO its void but doesnt complain
+    return f
 }
 
 type Field: struct {
