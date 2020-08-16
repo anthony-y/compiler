@@ -9,8 +9,6 @@ Call modifiers e.g: a := inline some_call()
 
 Change AstBinary stmt to AstAssignment
 
-Alias checking bug on calls
-
 //
 // AST
 //
@@ -22,10 +20,6 @@ Fix the subtree allocator leak.
 
 Anonymous structs
 
-Check in typedef'd structs that they don't mention their own names unless it's a pointer.
-
-Check that procs with return types have return statements.
-
 When local procedures are implemented, proc calls will need to be checked using lookup_local or something else.
 
 //
@@ -35,25 +29,26 @@ When local procedures are implemented, proc calls will need to be checked using 
 Allocate and zero out syntax
 t: *T = alloct(1){0};
 
-    proc mod_i_val_and_ref(const* i: ^int) {
-        // const* means: you cannot modify either the reference itself, or dereference it, obviously only applies for pointer types
-        // should the * indicate the allowance OR disallowance of dereferencing?
+    proc val_and_ref_are_const(const i: ^int) {
+        // const means: you cannot modify either the reference itself, or dereference it on the LHS of an assignment, obviously only applies for pointer types
         *i = 10 // error
         i = null // error
     }
 
-    proc mod_i_val(const i: ^int) {
+    proc ref_is_constant(const* i: ^int) {
+        // const* means you cannot modify the pointer itself, but you can modify the value that the pointer points to.
         *i = 100 // valid
         i = null; // error
     }
 
     proc main() {
-        const i : ^int = null;
-        mod_i3(i)
+        const my_int_ptr : ^int = null;
+        passing_a_const(my_int_ptr) // error "passing_a_const" modifies argument "i" (my_int_ptr), but it was passed as a constant declaration
     }
 
-    proc mod_i3(i: ^int) {
-        i = 10 // error at call site: "mod_i3" modifies argument "i", but it was passed as a constant decl
+    proc passing_a_const(i: ^int) {
+        *i = 10 // if i is passed as a const declaration, error
+        i = null // the pointer itself is copied into the new scope, so this is valid
     }
 
 Enum composition

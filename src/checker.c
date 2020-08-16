@@ -123,10 +123,7 @@ bool does_type_describe_expr(Context *ctx, Type *type, AstExpr *expr) {
         type = type->data.base;
     }
 
-    type = maybe_unwrap_type_alias(type);
-
-    switch (expr->tag) {
-    case Expr_CALL: {
+    if (expr->tag == Expr_CALL) {
         if (!check_call(ctx, (AstNode *)expr))
             return false;
 
@@ -134,16 +131,18 @@ bool does_type_describe_expr(Context *ctx, Type *type, AstExpr *expr) {
 
         // For return types, aliases must match exactly.
         if (return_type->kind == Type_ALIAS) {
-            return (return_type == type); // TODO broken
-            // When I resolve the types, do I allocate a new one?
-            // These pointers should be the same.
+            return (return_type == type);
         }
 
         // In other words, if the type is an int, allow any other integer type to be compatible with it.
         if (type == ctx->type_int) return (return_type->kind == Type_PRIMITIVE && return_type->data.signage != Signage_NaN);
 
         return do_types_match(ctx, type, return_type);
-    } break;
+    }
+
+    type = maybe_unwrap_type_alias(type); // do this after checking calls since calls are more strict about aliases
+
+    switch (expr->tag) {
     case Expr_BINARY: {
         AstBinary *binary = &expr->as.binary;
         if (is_binary_comparison(*binary)) {

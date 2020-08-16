@@ -9,7 +9,7 @@ proc read_file(path: string): string {
 }
 
 proc main() {
-    ms: struct {a: int; b: string}
+    ms: struct {a := 10; b: string}
     ms.a = 10
     data := read_file()
     print(data) // cat
@@ -18,7 +18,7 @@ proc main() {
 
 proc test(): void {}
 
-proc print(s: string)                  #foreign // TODO store extra info like name and whatever
+proc print(s: string)         #foreign // TODO store extra info like name and whatever
 proc magic_os_proc(_: string) #foreign
 
 type i: struct {
