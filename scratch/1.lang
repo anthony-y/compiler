@@ -1,16 +1,16 @@
-// proc main(args: []string): int {
-//     args[10] = ""
-//     return args[10];
-// }
+proc main(args: []string): string {
+    args[10] = ""
+    return args[10]
+}
 
-proc whatever() {
-    f: Field;
-    f.name = null; // TODO fix
+proc whatever(): Field {
+    f: Field
+    f.name = null
     return f // TODO its void but doesnt complain
 }
 
 type Field: struct {
-    name: ^Field;
+    name: ^Field
 }
 
 // TODO
@@ -21,5 +21,5 @@ type Field: struct {
 // i := os.args
 // Behind the scenes
 // type os: struct {
-//   args := 12 // const eval'd value   
+//   args := 12 // const eval'd value
 // }

@@ -150,15 +150,6 @@ bool does_type_describe_expr(Context *ctx, Type *type, AstExpr *expr) {
 
         return do_types_match(ctx, type, return_type);
     } break;
-    case Node_CAST: {
-        AstCast *cast = &expr->as.cast;
-        // TODO check if the casts expression can even be casted to the requested type
-        bool matches = do_types_match(ctx, cast->typename->as.type, type);
-        if (matches) {
-            return true;
-        }
-        return false;
-    } break;
     case Expr_BINARY: {
         AstBinary *binary = &expr->as.binary;
         if (is_binary_comparison(*binary)) {
@@ -238,6 +229,23 @@ bool does_type_describe_expr(Context *ctx, Type *type, AstExpr *expr) {
 
             return do_pointer_types_match(ctx, type, resulting_type);
         }
+    } break;
+    case Node_CAST: {
+        AstCast *cast = &expr->as.cast;
+        // TODO check if the casts expression can even be casted to the requested type
+        bool matches = do_types_match(ctx, cast->typename->as.type, type);
+        if (matches) {
+            return true;
+        }
+        return false;
+    } break;
+    case Expr_INDEX: {
+        Type *array_type = ((AstArrayIndex *)expr)->name->resolved_type;
+        if (array_type->kind != Type_ARRAY) {
+            compile_error(ctx, expr_token, "Attempt to index \"%s\" like it's an array, but it isn't");
+            return false;
+        }
+        return do_types_match(ctx, type, expr->resolved_type);
     } break;
 
     case Expr_PAREN: {
@@ -401,7 +409,7 @@ void check_statement(Context *ctx, AstStmt *node) {
         check_assignment(ctx, bin);
     } break;
     case Stmt_RETURN: {
-        //check_proc_return_value(ctx, node);
+        check_proc_return_value(ctx, node);
     } break;
     }
 }

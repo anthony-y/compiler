@@ -97,8 +97,9 @@ Type *resolve_expression_1(AstExpr *expr, Context *ctx) {
     case Expr_INDEX: {
         AstArrayIndex *index = (AstArrayIndex *)expr;
         Type *resolved_name = resolve_expression(index->name, ctx);
+        assert(resolved_name->data.base);
         // TODO expr
-        return resolved_name;
+        return resolved_name->data.base;
     } break;
     case Expr_BINARY: {
         AstBinary *bin = (AstBinary *)expr;
