@@ -126,31 +126,21 @@ static bool check_call(Context *ctx, AstNode *callnode) {
     return true;
 }
 
-//
 // Returns true if `expr` is compatible with `type`.
-// Type can be passed as NULL, however do not pass `out_actual_type` as NULL.
-// `out_actual_type` is a return variable, in which the actual type of `expr` will be written,
-// regardless of whether true or false is returned.
-//
 bool does_type_describe_expr(Context *ctx, Type *type, AstExpr *expr) {
+    Token expr_token = expr_tok(expr);
+
+    // We want to check against the element type.
+    if (type->kind == Type_ARRAY) {
+        type = type->data.base;
+    }
+
     switch (expr->tag) {
     case Expr_CALL: {
-        check_call(ctx, (AstNode *)expr);
-        return do_types_match(ctx, type, expr->resolved_type);
-    } break;
-    
-    default: assert(false);
-    }
-    return false;
-    #if 0
-    if (expr->tag == Node_CALL) {
-        Type *return_type = NULL;
-        if (!check_call(ctx, expr, &return_type)) {
-            *out_actual_type = ctx->error_type;
+        if (!check_call(ctx, (AstNode *)expr))
             return false;
-        }
-        assert(return_type);
-        *out_actual_type = return_type;
+
+        Type *return_type = expr->resolved_type;
 
         // For return types, aliases must match exactly.
         if (return_type->kind == Type_ALIAS) return (return_type == type);
@@ -158,152 +148,78 @@ bool does_type_describe_expr(Context *ctx, Type *type, AstExpr *expr) {
         // In other words, if the type is an int, allow any other integer type to be compatible with it.
         if (type == ctx->type_int) return (return_type->kind == Type_PRIMITIVE && return_type->data.signage != Signage_NaN);
 
-        return do_types_match(ctx, return_type, type);
-    }
-
-    if (expr->tag == Node_IDENT) {
-        AstNode *var_decl = NULL;
-        if (!check_ident(ctx, expr, &var_decl)) {
-            *out_actual_type = ctx->error_type;
-            return false;
-        }
-        assert(var_decl);
-        if (var_decl->tag != Node_VAR) {
-            compile_error(ctx, expr->token, "\"%s\" is not a variable");
-            *out_actual_type = ctx->error_type;
-            return false;
-        }
-        AstVar *var = &var_decl->as.var;
-        if (!(var->flags & VAR_IS_INITED)) {
-            return do_types_match(ctx, var->typename->as.type, type);
-        }
-        return does_type_describe_expr(ctx, type, var_decl->as.var.value, out_actual_type);
-    }
-
-    // If the type we're comparing against is an alias, unwrap it to it's 'base' type.
-    //
-    // We do this before checking literal values because we want to be able to bind them to
-    // variables which have alias types, but only where the alias' base type is a builtin.
-    //
-    if (type->kind == Type_ALIAS) {
-        type = type->data.alias_of;
-    }
-
-    switch (expr->tag) {
+        return do_types_match(ctx, type, return_type);
+    } break;
     case Node_CAST: {
         AstCast *cast = &expr->as.cast;
-        if (type == ctx->type_void) { // we're in type inference, so just allow it
-            *out_actual_type = cast->typename->as.type;
-            return true;
-        }
         // TODO check if the casts expression can even be casted to the requested type
         bool matches = do_types_match(ctx, cast->typename->as.type, type);
         if (matches) {
-            *out_actual_type = cast->typename->as.type;
             return true;
         }
-        *out_actual_type = ctx->error_type;
         return false;
     } break;
-
-    case Node_BINARY: {
+    case Expr_BINARY: {
         AstBinary *binary = &expr->as.binary;
         if (is_binary_comparison(*binary)) {
-            *out_actual_type = ctx->type_bool;
             return (type == ctx->type_bool);
         }
         if (is_assignment(*binary)) {
             return check_assignment(ctx, binary);
         }
         if (binary->op == Token_DOT) {
-            Type *result = resolve_accessor(ctx, binary);
-            if (!result) {
-                *out_actual_type = ctx->error_type;
-                return false;
-            }
-            *out_actual_type = result;
-            return do_types_match(ctx, result, type);
+            return do_types_match(ctx, expr->resolved_type, type);
         }
         // All that's left is +, -, / and *
         // TODO
-        Type *left_type = type_from_expr(ctx, binary->left);
-        Type *right_type = type_from_expr(ctx, binary->right);
+        Type *left_type = binary->left->resolved_type;
+        Type *right_type = binary->right->resolved_type;
         if (left_type->kind != Type_POINTER || (left_type->kind == Type_PRIMITIVE && left_type->data.signage == Signage_NaN)) {
-            compile_error(ctx, binary->left->token, "Left hand side of arithmetic expression must be of one of these types: integer, floating point or pointer");
-            *out_actual_type = ctx->error_type;
+            compile_error(ctx, expr_token, "Left hand side of arithmetic expression must be of one of these types: integer, floating point or pointer");
             return false;
         }
         if (right_type->kind != Type_POINTER || (right_type->kind == Type_PRIMITIVE && right_type->data.signage == Signage_NaN)) {
-            compile_error(ctx, binary->left->token, "Right hand side of arithmetic expression must be of one of these types: integer, floating point or pointer");
-            *out_actual_type = ctx->error_type;
+            compile_error(ctx, expr_token, "Right hand side of arithmetic expression must be of one of these types: integer, floating point or pointer");
             return false;
         }
-        *out_actual_type = ctx->type_int;
         return (type->kind == Type_PRIMITIVE && type->data.signage != Signage_NaN);
     } break;
-
-    case Node_UNARY: {
+    case Expr_UNARY: {
         const AstUnary *unary = &expr->as.unary;
+        Type *sub_expr_type = unary->expr->resolved_type;
         if (unary->op == Token_BANG) {
-            Type *real_expr_type = type_from_expr(ctx, unary->expr);
-            if (real_expr_type == ctx->error_type) {
+            if (sub_expr_type->kind != Type_POINTER && sub_expr_type != ctx->type_bool) {
+                compile_error(ctx, expr_token, "Unary \"not\" expression must have a boolean or pointer operand");
                 return false;
             }
-            if (real_expr_type->kind != Type_POINTER && real_expr_type != ctx->type_bool) {
-                *out_actual_type = ctx->error_type;
-                compile_error(ctx, expr->token, "Unary \"not\" expression must have a boolean or pointer operand");
-                return false;
-            }
-            *out_actual_type = ctx->type_bool;
-            return (type == ctx->type_bool);
+            return (type == ctx->type_bool || type->kind == Type_POINTER);
         }
         if (unary->op == Token_MINUS) { // TODO
 
         }
         // TODO dereference
         if (unary->op == Token_CARAT) { // address-of operator
-            Type *expr_type = NULL;
-
             int addressof_depth = 1; // we'll use this a bit later on to create the real type of the expression.
-            while (unary->expr->tag == Node_UNARY && unary->expr->as.unary.op == Token_CARAT) {
+            while (unary->expr->tag == Expr_UNARY && unary->expr->as.unary.op == Token_CARAT) {
                 unary = &unary->expr->as.unary;
                 addressof_depth++;
             }
 
+            sub_expr_type = unary->expr->resolved_type;
+
             // It's a literal, you can't get a pointer a literal
-            if (unary->expr->tag > Node_LITERALS_START && unary->expr->tag < Node_LITERALS_END) {
-                *out_actual_type = ctx->error_type;
-                compile_error(ctx, expr->token, "Cannot get the address of a literal value");
+            if (unary->expr->tag > Expr_LITERALS_START && unary->expr->tag < Expr_LITERALS_END) {
+                compile_error(ctx, expr_token, "Cannot get the address of a literal value");
                 return false;
             }
 
-            else if (unary->expr->tag == Node_CALL) {
-                if (!check_call(ctx, unary->expr, &expr_type)) {
-                    *out_actual_type = ctx->error_type;
+            else if (unary->expr->tag == Expr_CALL) {
+                if (!check_call(ctx, (AstNode *)unary->expr)) {
                     return false;
                 }
             }
 
-            else if (unary->expr->tag == Node_IDENT) {
-                AstNode *decl = NULL;
-                char *name = unary->expr->as.ident->text;
-                if (!check_ident(ctx, unary->expr, &decl)) {
-                    *out_actual_type = ctx->error_type;
-                    return false;
-                }
-                if (decl->tag != Node_VAR) {
-                    *out_actual_type = ctx->error_type;
-                    compile_error(ctx, expr->token, "Cannot get the address of \"%s\", as it is not a variable", name);
-                    return false;
-                }
-                expr_type = decl->as.var.typename->as.type;
-            }
-
-            // TODO The following code is independent of what the expression was,
-            // it just relies on the expressions resulting type. So, to add checking
-            // for function calls, etc. just evaluate them to a type and then do this.
-
-            assert(expr_type);
+            assert(sub_expr_type);
 
             // Both of these start out as the same value, but by the end
             // resulting_type will still point to the outer pointer type,
@@ -316,8 +232,7 @@ bool does_type_describe_expr(Context *ctx, Type *type, AstExpr *expr) {
                 inner_type->data.base = inner_ptr;
                 inner_type = inner_ptr;
             }
-            inner_type->data.base = expr_type;
-            *out_actual_type = resulting_type;
+            inner_type->data.base = sub_expr_type;
 
             if (type->kind != Type_POINTER) return false;
 
@@ -325,26 +240,25 @@ bool does_type_describe_expr(Context *ctx, Type *type, AstExpr *expr) {
         }
     } break;
 
-    // Literals
-    case Node_NIL:
-        *out_actual_type = ctx->decoy_ptr;
+    case Expr_PAREN: {
+        return does_type_describe_expr(ctx, type, ((AstParen *)expr)->sub_expr);
+    } break;
+    case Expr_NAME: {
+        return do_types_match(ctx, type, expr->resolved_type);
+    } break;
+
+    case Expr_NULL:
         return (type->kind == Type_POINTER);
-    case Node_INT_LIT:
-        *out_actual_type = ctx->type_int;
+    case Expr_INT:
         return (type->kind == Type_PRIMITIVE && type->data.signage != Signage_NaN);
-    case Node_STRING_LIT:
-        *out_actual_type = ctx->type_string;
+    case Expr_STRING:
         return (type == ctx->type_string);
-    case Node_BOOL_LIT:
-        *out_actual_type = ctx->type_bool;
+    case Expr_BOOL:
         return (type == ctx->type_bool);
-    case Node_ENCLOSED:
-        return does_type_describe_expr(ctx, type, expr->as.enclosed.sub_expr, out_actual_type);
-    default:
-        assert(false);
+
+    default: assert(false);
     }
     return false;
-    #endif
 }
 
 // Ensure a return statement is compatible with the procedure declaration
@@ -386,7 +300,7 @@ bool check_var(Context *ctx, AstDecl *node) {
 
     Type *type = var->typename->as.type;
 
-    if (var->flags & VAR_TYPE_IS_ANON_STRUCT) {
+    if (type->kind == Type_ANON_STRUCT) {
         check_struct(ctx, (AstStruct *)type->data.user);
     }
 
@@ -526,10 +440,17 @@ void check_ast(Context *ctx, Ast *ast) {
         // Top levels
         switch (node->tag) {
         default: continue;
-        case Node_PROCEDURE:
-            ctx->curr_checker_proc = (AstProcedure *)node;
+        case Node_PROCEDURE: {
+            AstProcedure *proc = (AstProcedure *)node;
+            if (proc->params) {
+                for (int i = 0; i < shlenu(proc->params); i++) {
+                    check_var(ctx, proc->params[i].value);
+                }
+            }
+            if (proc->flags & PROC_MOD_FOREIGN) continue;
+            ctx->curr_checker_proc = proc;
             check_block(ctx, (AstBlock *)((AstProcedure *)node)->block, Node_ZERO);
-            break;
+        } break;
 
         case Node_VAR:
             check_var(ctx, (AstDecl *)node);

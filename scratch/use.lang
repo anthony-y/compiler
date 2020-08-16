@@ -1,6 +1,6 @@
-proc alloc(_: u64){} // #foreign
-proc free(_: ^void){} // #foreign
-proc mem_copy(dest: ^void, src: ^void, n: int){}
+proc alloc(_: u64)                             #foreign
+proc free(_: ^void)                            #foreign
+proc mem_copy(dest: ^void, src: ^void, n: int) #foreign
 
 proc c_str_length(s: ^u8): int {
 	s := ""
@@ -16,7 +16,7 @@ proc to_c_string(s: string): ^u8 {
 	c_str := cast(^u8)alloc(s.length+1)
 	//mem_copy(c_str, s.data, s.length) // s.data TODO
 	//c_str+s.length = 0 // Todo
-	c_str[s.length] = 0
+	c_str[s.length] = null
 	return c_str
 }
 

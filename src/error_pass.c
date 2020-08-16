@@ -149,7 +149,7 @@ static void print_statement_errors(Context *c, AstStmt *node) {
 
 static void print_type_error(Context *c, AstNode *node) {
     Type *astype = node->as.type;
-    if (astype->kind == Type_STRUCT) {
+    if (astype->kind == Type_STRUCT || astype->kind == Type_ANON_STRUCT) {
         print_statement_errors(c, astype->data.user);
     }
 }
@@ -159,7 +159,6 @@ void print_decl_errors(Context *c, AstDecl *decl) {
     case Decl_VAR: {
         const AstVar *def = &decl->as.var;
         if (!(def->flags & VAR_IS_INFERRED)) print_type_error(c, def->typename);
-        if (def->flags & VAR_TYPE_IS_ANON_STRUCT) print_statement_errors(c, (AstStmt *)def->typename);
         if (def->flags & VAR_IS_INITED) print_expression_errors(c, def->value);
     } break;
     case Decl_PROC: {

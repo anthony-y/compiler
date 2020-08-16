@@ -1,16 +1,12 @@
-type Test: struct {
-    fields: Field;
-}
+// proc main(args: []string): int {
+//     args[10] = ""
+//     return args[10];
+// }
 
-proc whatever(): Field {
-    my_fields: Field;
-    my_fields.name = 10
-    return my_fields
-}
-
-proc main(args: []string): int {
-    args[10] = ""
-    return args[10];
+proc whatever() {
+    f: Field;
+    f.name = null; // TODO fix
+    return f // TODO its void but doesnt complain
 }
 
 type Field: struct {

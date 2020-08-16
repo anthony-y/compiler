@@ -91,7 +91,14 @@ bool process_file(const char *file_path) {
     #endif
 
     resolve_top_level(&context);
+
+    if (context.error_count > 0)
+        goto end;
+
     check_ast(&context, &ast); // type and semantic checking
+
+    if (context.error_count > 0)
+        goto end;
 
     #if perfstats
         gettimeofday(&cend, NULL);

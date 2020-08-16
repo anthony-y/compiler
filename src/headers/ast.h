@@ -21,12 +21,14 @@ typedef enum {
 typedef enum {
     Expr_ERROR,
 
+    Expr_LITERALS_START,
     Expr_INT,
     Expr_FLOAT,
     Expr_STRING,
     Expr_BOOL,
     Expr_NULL,
     Expr_ARRAY,
+    Expr_LITERALS_END,
 
     Expr_NAME,
     Expr_BINARY,
@@ -110,8 +112,7 @@ typedef enum {
 
 enum {
     VAR_IS_INFERRED         = 1 << 0,
-    VAR_TYPE_IS_ANON_STRUCT = 1 << 1,
-    VAR_IS_INITED           = 1 << 2,
+    VAR_IS_INITED           = 1 << 1,
 };
 
 struct AstExpr;

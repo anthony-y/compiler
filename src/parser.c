@@ -458,7 +458,7 @@ static AstNode *parse_typename(Context *c) {
         return type_node;
     } break;
     case Token_STRUCT: {
-        type_node->as.type = make_type(Type_STRUCT, "anonymous struct", 0);
+        type_node->as.type = make_type(Type_ANON_STRUCT, "anonymous struct", 0);
         type_node->as.type->data.user = parse_struct(c);
         return type_node;
     } break;
@@ -467,7 +467,7 @@ static AstNode *parse_typename(Context *c) {
 
         if (shgeti(c->type_table, t.text) == -1) { // type doesn't exist (or not appeared in program text yet)
             type_node->as.type = make_type(
-                Type_DEFERRED_NAMED,
+                Type_UNRESOLVED,
                 t.text,
                 0
             );
@@ -631,10 +631,6 @@ static AstVar parse_var(Context *c, bool top_level, AstNode **out_err) {
         if (typename->tag == Node_ERROR) {
             *out_err = typename;
             return (AstVar){0};
-        }
-        
-        if (typename->as.type->kind == Type_STRUCT) {
-            var.flags |= VAR_TYPE_IS_ANON_STRUCT;
         }
 
         var.typename = typename;

@@ -12,6 +12,7 @@ void resolve_procedure(AstDecl *procsym, Context *ctx);
 Type *resolve_var(AstDecl *varsym, Context *ctx);
 Type *resolve_accessor(Context *ctx, AstBinary *accessor);
 Type *resolve_expression(AstExpr *expr, Context *ctx);
+Type *resolve_type(Context *ctx, Type *type, bool recursing_from_pointer);
 
 static AstProcedure **scope_stack = NULL; // stbds array
 
@@ -135,13 +136,23 @@ void resolve_struct(AstStruct *def, Context *ctx) {
     }
 }
 
-Type *resolve_type(Context *ctx, Type *type) {
+// Resolves an unresolved type to it's "real" type
+Type *resolve_type(Context *ctx, Type *type, bool cyclic_allowed) {
     Token t = ((AstNode *)type)->token; // TODO doesnt work lol
 
-    if (type->kind != Type_DEFERRED_NAMED) return type;
-    // if (type->kind == Type_POINTER) {
-    //     type = unwrap_pointer_type(type, NULL);
-    // }
+    //
+    // Pointers and arrays might have unresolved types in their sub-types.
+    // We resolve those and wrap them back up each time.
+    //
+    if (type->kind == Type_POINTER)
+        return make_pointer_type(resolve_type(ctx, type->data.base, true));
+
+    if (type->kind == Type_ARRAY)
+        return make_array_type(resolve_type(ctx, type->data.base, true));
+
+    // This type was already resolved.
+    if (type->kind != Type_UNRESOLVED)
+        return type;
 
     u64 i = shgeti(ctx->type_table, type->name);
     if (i == -1) {
@@ -155,27 +166,32 @@ Type *resolve_type(Context *ctx, Type *type) {
     AstDecl *sym = ctx->symbol_table[type_i].value;
 
     if (sym->status == Status_RESOLVING) {
-        // TODO this shouldn't happen for pointers and the only reason it doesn't right now
-        // is cus of the code commented out at the start of this function
+        if (cyclic_allowed) {
+            sym->status = Status_RESOLVED;
+            return real_type;
+        }
         compile_error(ctx, decl_tok(sym), "Type definition for \"%s\" directly mentions itself", type->name);
         return NULL;
     }
 
     sym->status = Status_RESOLVING;
+
     if (sym->tag != Decl_TYPEDEF) {
         compile_error(ctx, t, "\"%s\" is not a type", type->name);
         return NULL;
     }
 
     AstTypedef *my_typedef = (AstTypedef *)sym;
-    if (my_typedef->of->tag == Node_STRUCT)
+    if (my_typedef->of->tag == Node_STRUCT) {
         resolve_struct(&my_typedef->of->as.stmt.as._struct, ctx);
-
+    }
     sym->status = Status_RESOLVED;
+
     return real_type;
 }
 
-Type *resolve_accessor(Context *ctx, AstBinary *accessor) {
+// Resolves the dependencies of a selector and returns the type of the field it selects.
+Type *resolve_accessor(Context *ctx, AstBinary *accessor) { // TODO rename to resolve_selector
     assert(accessor->op == Token_DOT);
     assert(accessor->right->tag == Expr_NAME);
     assert(accessor->left->tag == Expr_NAME || accessor->left->tag == Expr_BINARY);
@@ -183,19 +199,26 @@ Type *resolve_accessor(Context *ctx, AstBinary *accessor) {
     Name *rhs = accessor->right->as.name;
     Type *lhs_type = resolve_expression(accessor->left, ctx);
 
-    if (!lhs_type) return NULL; // we already errored
+    if (!lhs_type) return NULL; // resolve_expression will have already errored, so we can just exit
 
-    if (lhs_type->kind == Type_DEFERRED_NAMED) {
-        lhs_type = resolve_type(ctx, lhs_type);
+    if (lhs_type->kind == Type_UNRESOLVED) {
+        lhs_type = resolve_type(ctx, lhs_type, false);
         assert(lhs_type);
     }
 
-    if (lhs_type->kind == Type_POINTER)
-        lhs_type = unwrap_pointer_type(lhs_type, NULL);
-
-    if (lhs_type->kind != Type_STRUCT) {
+    // In English: throw an error if the type of the left hand side is not either:
+    //  - a struct or anonymous struct
+    //  - a pointer, the base type of which is a struct or anonymous struct
+    if (lhs_type->kind != Type_STRUCT && lhs_type->kind != Type_ANON_STRUCT &&
+        (lhs_type->kind != Type_POINTER || (lhs_type->data.base->kind != Type_STRUCT && lhs_type->data.base->kind != Type_ANON_STRUCT))) {
         compile_error(ctx, expr_tok(accessor->left), "Attempt to access member in non-struct value");
         return NULL;
+    }
+
+    // If it was a pointer, unwrap it, but only by one "level",
+    // selectors shouldn't be able to reach into far-down structs in pointers.
+    if (lhs_type->kind == Type_POINTER) {
+        lhs_type = lhs_type->data.base;
     }
 
     AstStruct *struct_def = &lhs_type->data.user->as._struct;
@@ -204,9 +227,7 @@ Type *resolve_accessor(Context *ctx, AstBinary *accessor) {
         compile_error(ctx, expr_tok(accessor->right), "No such field as \"%s\" in struct field access", rhs->text);
         return NULL;
     }
-    if (field->tag != Decl_VAR) {
-        assert(false); // should have been checked by now, ill see if i can make this go off
-    }
+    assert(field->tag == Decl_VAR); // should have been checked by now
     return field->as.var.typename->as.type;
 }
 
@@ -218,12 +239,13 @@ Type *resolve_var(AstDecl *decl, Context *ctx) {
     if (decl->status == Status_RESOLVED)
         return *specified_type;
 
-    if (var->flags & VAR_TYPE_IS_ANON_STRUCT) {
-        resolve_struct(&var->typename->as.stmt.as._struct, ctx);
-    }
-
-    if (!(var->flags & VAR_TYPE_IS_ANON_STRUCT) && !(var->flags & VAR_IS_INFERRED))
-        *specified_type = resolve_type(ctx, *specified_type);
+    if (!(var->flags & VAR_IS_INFERRED)) {
+        if (var->typename->as.type->kind == Type_ANON_STRUCT) {
+            resolve_struct(&var->typename->as.stmt.as._struct, ctx);
+        } else {
+            *specified_type = resolve_type(ctx, *specified_type, false);
+        }
+    } 
 
     if (!(var->flags & VAR_IS_INITED)) {
         decl->status = Status_RESOLVED;
@@ -254,9 +276,8 @@ void resolve_procedure(AstDecl *procsym, Context *ctx) {
         }
     }
 
-    Type *return_type = proc->return_type->as.type;
-    if (return_type->kind == Type_DEFERRED_NAMED)
-        resolve_type(ctx, return_type);
+    Type **return_type = &proc->return_type->as.type;
+    *return_type = resolve_type(ctx, *return_type, false);
 
     if (proc->flags & PROC_MOD_FOREIGN) {
         procsym->status = Status_RESOLVED;
@@ -299,6 +320,7 @@ void resolve_top_level(Context *ctx) {
     u64 len = shlenu(ctx->symbol_table);
     for (int i = 0; i < len; i++) {
         AstDecl *decl = ctx->symbol_table[i].value;
+        decl->status = Status_RESOLVING;
         switch (decl->tag) {
         case Decl_PROC:
             resolve_procedure(decl, ctx);
@@ -306,6 +328,12 @@ void resolve_top_level(Context *ctx) {
         case Decl_VAR:
             resolve_var(decl, ctx);
             break;
+        case Decl_TYPEDEF: {
+            AstTypedef *def = (AstTypedef *)decl;
+            if (def->of->tag == Node_STRUCT) {
+                resolve_struct((AstStruct *)def->of, ctx);
+            }
+        } break;
         }
     }
 }

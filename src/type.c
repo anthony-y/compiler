@@ -33,6 +33,12 @@ Type *make_pointer_type(Type *base) {
     return out;
 }
 
+Type *make_array_type(Type *base) {
+    Type *out = make_type(Type_ARRAY, NULL, sizeof(ArrayType));
+    out->data.base = base;
+    return out;
+}
+
 // Allocates a type, fills out its basic fields, adds it to the type table and returns it.
 static inline Type *make_and_insert_primitive(Context *ctx, char *name, u64 size, Signage signage) {
     Type *t = make_type(Type_PRIMITIVE, name, size);
@@ -127,8 +133,12 @@ void print_type(Type *type, FILE *stream) {
         print_type(type->data.alias_of, stream);
         fprintf(stream, ")");
         return;
-    case Type_DEFERRED_NAMED:
-        fprintf(stderr, "Internal compiler error: Type_DEFERRED_NAMED is not supposed to be printed.\n");
+    case Type_ARRAY:
+        fprintf(stream, "[]");
+        print_type(type->data.base, stream);
+        break;
+    case Type_UNRESOLVED:
+        fprintf(stream, "Internal compiler error: Type_UNRESOLVED is not supposed to be printed.\n");
         return;
     default:
         fprintf(stderr, "Internal compiler error: type not covered in print_type switch; type kind is %d\n", type->kind);

@@ -7,11 +7,12 @@
 typedef enum {
     Type_PRIMITIVE,
     Type_STRUCT,
+    Type_ANON_STRUCT,
     Type_POINTER,
     Type_ARRAY,
     Type_ALIAS,
 
-    Type_DEFERRED_NAMED,
+    Type_UNRESOLVED,
         // deferred checking until end of parsing, when all types have been collected
 } TypeKind;
 
@@ -51,6 +52,7 @@ typedef struct Type {
 
 Type *make_type(TypeKind kind, char *name, u64 size);
 Type *make_pointer_type(Type *base_type);
+Type *make_array_type(Type *base);
 void print_type(Type *, FILE *);
 Type *unwrap_pointer_type(Type *ptr, int *out_depth);
 

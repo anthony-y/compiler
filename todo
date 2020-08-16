@@ -35,4 +35,25 @@ When local procedures are implemented, proc calls will need to be checked using 
 Allocate and zero out syntax
 t: *T = alloct(1){0};
 
+    proc mod_i_val_and_ref(const* i: ^int) {
+        // const* means: you cannot modify either the reference itself, or dereference it, obviously only applies for pointer types
+        // should the * indicate the allowance OR disallowance of dereferencing?
+        *i = 10 // error
+        i = null // error
+    }
+
+    proc mod_i_val(const i: ^int) {
+        *i = 100 // valid
+        i = null; // error
+    }
+
+    proc main() {
+        const i : ^int = null;
+        mod_i3(i)
+    }
+
+    proc mod_i3(i: ^int) {
+        i = 10 // error at call site: "mod_i3" modifies argument "i", but it was passed as a constant decl
+    }
+
 Enum composition

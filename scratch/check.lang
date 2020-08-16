@@ -1,7 +1,20 @@
+// proc main() {
+//     msg := hi()
+// }
+
+// proc hi(): string {
+//     return "Hi"
+// }
+
 proc main() {
-    msg : int = hi()
+    my_s: S;
+    my_s.s[0] = null // TODO fix in checker
 }
 
-proc hi(): string {
-    return "Hi"
+type S: struct {
+    s: []D;
+}
+
+type D: struct {
+    d: ^string;
 }
