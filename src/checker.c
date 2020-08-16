@@ -17,10 +17,6 @@ Type *type_from_expr  (Context *, AstNode *);
 void check_struct     (Context *, AstStruct *);
 bool check_assignment (Context *, AstBinary *);
 
-// TODO consider
-//   const values -> type
-//   lookup the const value -> type
-
 // Returns true if `a` and `b` point to the same Type, false otherwise.
 // Does not print errors.
 static bool do_pointer_types_match(Context *ctx, Type *a, Type *b) {
@@ -65,14 +61,6 @@ static bool do_types_match(Context *ctx, Type *a, Type *b) {
 static Type *maybe_unwrap_type_alias(Type *alias) {
     if (alias->kind != Type_ALIAS) return alias;
     return alias->data.alias_of;
-}
-
-static Type *get_decl_type(AstDecl *node) {
-    switch (node->tag) {
-    case Decl_VAR: return (Type *)((AstVar *)node)->typename;
-    case Decl_PROC: return (Type *)((AstProcedure *)node)->return_type;
-    }
-    assert(false);
 }
 
 // Performs semantic analysis on a function call.
@@ -135,6 +123,8 @@ bool does_type_describe_expr(Context *ctx, Type *type, AstExpr *expr) {
         type = type->data.base;
     }
 
+    type = maybe_unwrap_type_alias(type);
+
     switch (expr->tag) {
     case Expr_CALL: {
         if (!check_call(ctx, (AstNode *)expr))
@@ -143,7 +133,11 @@ bool does_type_describe_expr(Context *ctx, Type *type, AstExpr *expr) {
         Type *return_type = expr->resolved_type;
 
         // For return types, aliases must match exactly.
-        if (return_type->kind == Type_ALIAS) return (return_type == type);
+        if (return_type->kind == Type_ALIAS) {
+            return (return_type == type); // TODO broken
+            // When I resolve the types, do I allocate a new one?
+            // These pointers should be the same.
+        }
 
         // In other words, if the type is an int, allow any other integer type to be compatible with it.
         if (type == ctx->type_int) return (return_type->kind == Type_PRIMITIVE && return_type->data.signage != Signage_NaN);
@@ -190,6 +184,8 @@ bool does_type_describe_expr(Context *ctx, Type *type, AstExpr *expr) {
         }
         // TODO dereference
         if (unary->op == Token_CARAT) { // address-of operator
+            if (type->kind != Type_POINTER) return false;
+
             int addressof_depth = 1; // we'll use this a bit later on to create the real type of the expression.
             while (unary->expr->tag == Expr_UNARY && unary->expr->as.unary.op == Token_CARAT) {
                 unary = &unary->expr->as.unary;
@@ -224,8 +220,6 @@ bool does_type_describe_expr(Context *ctx, Type *type, AstExpr *expr) {
                 inner_type = inner_ptr;
             }
             inner_type->data.base = sub_expr_type;
-
-            if (type->kind != Type_POINTER) return false;
 
             return do_pointer_types_match(ctx, type, resulting_type);
         }

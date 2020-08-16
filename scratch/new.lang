@@ -36,7 +36,7 @@ proc main() {
     a := true;
     b := false;
     c := true;
-    c = (a) && (b) || (c) // need proper name resolution :/
+    c = (a) && (b) || (c)
 
     // boolean : bool = value;
 }

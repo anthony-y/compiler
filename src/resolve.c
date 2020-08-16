@@ -85,7 +85,7 @@ Type *resolve_expression_1(AstExpr *expr, Context *ctx) {
             return NULL;
         }
         if (var->tag != Decl_VAR) {
-            compile_error(ctx, t, "\"%s\" used like a variable, but it isn't one");
+            compile_error(ctx, t, "\"%s\" was used like a variable, but it isn't one", name->text);
             return NULL;
         }
         name->resolved_decl = var;
@@ -140,6 +140,8 @@ void resolve_struct(AstStruct *def, Context *ctx) {
 // Resolves an unresolved type to it's "real" type
 Type *resolve_type(Context *ctx, Type *type, bool cyclic_allowed) {
     Token t = ((AstNode *)type)->token; // TODO doesnt work lol
+
+    if (type->kind == Type_PRIMITIVE) return type;
 
     //
     // Pointers and arrays might have unresolved types in their sub-types.
