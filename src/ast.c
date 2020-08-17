@@ -11,9 +11,63 @@
 #include <string.h>
 #include <assert.h>
 
+#include "headers/stb/stb_ds.h"
+
 inline Token decl_tok(AstDecl *d) {return ((AstNode *)d)->token;}
 inline Token expr_tok(AstExpr *e) {return ((AstNode *)e)->token;}
 inline Token stmt_tok(AstStmt *s) {return ((AstNode *)s)->token;}
+
+void free_block(AstStmt *stmt) {
+    if (!stmt || stmt->tag != Stmt_BLOCK) return;
+    AstBlock *b = (AstBlock *)stmt;
+
+    u64 sym_len = shlenu(b->symbols);
+    for (int i = 0; i < sym_len; i++) {
+        AstDecl *d = b->symbols[i].value;
+        if (d->tag == Decl_VAR) {
+            AstVar *var = (AstVar *)d;
+            if (var->typename->as.type->kind == Type_ANON_STRUCT) {
+                free_block(((AstStruct *)var->typename->as.type->data.user)->members);
+            }
+        }
+    }
+
+    for (int i = 0; i < b->statements->len; i++) {
+        AstNode *n = b->statements->nodes[i];
+        switch (n->tag) {
+        case Node_IF: {
+            AstIf *iff = (AstIf *)n;
+            if (iff->block_or_stmt) free_block(iff->block_or_stmt);
+            if (iff->other_branch) free_block(iff->other_branch);
+        } break;
+        case Node_WHILE: {
+            AstWhile *w = (AstWhile *)n;
+            free_block(w->block);
+        } break;
+        case Node_CALL: {
+            AstCall *call = (AstCall *)n;
+            ast_free(call->params);
+        } break;
+        }
+    }
+
+    ast_free(b->statements);
+    shfree(b->symbols);
+    b->parent = NULL;
+}
+
+void free_subtrees_and_blocks(Ast *ast) {
+    for (int i = 0; i < ast->len; i++) {
+        AstNode *node = ast->nodes[i];
+        switch (node->tag) {
+        case Node_PROCEDURE: {
+            AstProcedure *proc = (AstProcedure *)node;
+            shfree(proc->params);
+            free_block(proc->block);
+        } break;
+        }
+    }
+}
 
 inline AstNode *ast_node(Parser *p, AstNodeType tag, Token t) {
     AstNode *node = arena_alloc(&p->node_allocator, sizeof(AstNode));

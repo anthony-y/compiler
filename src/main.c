@@ -122,6 +122,7 @@ end:
 
         free_types(&context);
         parser_free(&context.parser, &ast);
+        free_subtrees_and_blocks(&ast);
         lexer_free(&context.lexer);
         free(file_data);
 

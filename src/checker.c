@@ -339,12 +339,29 @@ bool check_var(Context *ctx, AstDecl *node) {
     Token   tok = decl_tok(node);
     AstVar *var = &node->as.var;
 
-    if (var->flags & VAR_IS_INFERRED) return true;
+    if (var->flags & VAR_IS_INFERRED) {
+        Type *unwrapped = maybe_unwrap_type_alias(var->value->resolved_type);
+        if (var->value->tag == Expr_CALL && unwrapped == ctx->type_void) {
+            compile_error(ctx, tok, "cannot assign void value (in the form of call to \"%s\") to variable \"%s\"", var->value->as.call.name->as.name->text, node->name->text);
+            return false;
+        }
+        return true;
+    }
 
     Type *type = var->typename->as.type;
 
-    if (type->kind == Type_ANON_STRUCT) {
-        check_struct(ctx, (AstStruct *)type->data.user);
+    if (type->kind == Type_ANON_STRUCT) { // TODO default struct values
+        //check_struct(ctx, (AstStruct *)type->data.user);
+        AstStruct *s = &type->data.user->as._struct;
+        u64 struct_len = shlenu(s->members->as.block.symbols);
+        for (int i = 0; i < struct_len; i++) {
+            AstDecl *d = s->members->as.block.symbols[i].value;
+            AstVar *v = (AstVar *)d;
+            if (v->flags & VAR_IS_INITED) {
+                compile_error(ctx, decl_tok(d), "struct fields cannot yet have default values");
+                return false;
+            }
+        }
     }
 
     else if (type == ctx->type_void) {
