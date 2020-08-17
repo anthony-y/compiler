@@ -44,6 +44,7 @@ typedef enum {
     Stmt_ERROR,
 
     Stmt_ASSIGN,
+    Stmt_DEREF_ASSIGN, // *i = 10 (where i is a pointer)
     Stmt_IMPORT,
     Stmt_BLOCK,
     Stmt_IF,
@@ -128,6 +129,7 @@ typedef struct {
 
 enum {
     PROC_MOD_FOREIGN = 1 << 0,
+    PROC_RET_VALUE_CHECKED = 1 << 1,
 };
 typedef struct {
     struct SymbolTable *params;
@@ -256,6 +258,7 @@ typedef struct AstStmt {
         AstError error;
 
         //AstAssignment assign;
+        AstUnary deref_assign;
         AstBinary binary; // TODO replace with real assignment
         AstImport _import;
         AstBlock block;
@@ -349,6 +352,7 @@ AstDecl *ast_var(struct Parser *p, Token t, struct Name *name, const AstVar *var
 AstDecl *ast_typedefi(struct Parser *p, Token t, struct Name *name, const AstTypedef *td);
 
 AstStmt *ast_assignment(struct Parser *p, Token t, const AstBinary *ass);
+AstStmt *ast_deref_assignment(struct Parser *p, Token t, const AstUnary *);
 AstStmt *ast_import(struct Parser *p, Token t, const AstImport *imp);
 AstStmt *ast_block(struct Parser *p, Token t, const AstBlock *blk);
 AstStmt *ast_if(struct Parser *p, Token t, const AstIf *i);

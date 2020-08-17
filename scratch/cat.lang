@@ -10,7 +10,7 @@ proc read_file(path: string): string {
 
 proc main() {
     ms: struct {a := 10; b: string}
-    ms.a = 10
+    ms.a = 10 // TODO this should work
     data := read_file()
     print(data) // cat
     test := test() // TODO this shouldnt work

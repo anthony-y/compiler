@@ -11,11 +11,13 @@
 #include "headers/stb/stretchy_buffer.h"
 #include "headers/stb/stb_ds.h"
 
+#define FAILED_BUT_DONT_ERROR_AT_CALL_SITE true
+
 void check_statement  (Context *, AstStmt *);
 void check_block      (Context *, AstBlock *, AstNodeType);
-Type *type_from_expr  (Context *, AstNode *);
 void check_struct     (Context *, AstStruct *);
 bool check_assignment (Context *, AstBinary *);
+bool does_type_describe_expr(Context *ctx, Type *type, AstExpr *expr);
 
 // Returns true if `a` and `b` point to the same Type, false otherwise.
 // Does not print errors.
@@ -24,7 +26,7 @@ static bool do_pointer_types_match(Context *ctx, Type *a, Type *b) {
         return true; // ^void is compatible with all pointer types
     } else if (a->data.base == b->data.base) {
         return true; // both types point to the same thing
-    } else if (a == ctx->decoy_ptr || b == ctx->decoy_ptr) { // TODO add Context* to this func, to check directly for Context.decoy_ptr, atm this will suffice since decoy_ptr is the only pointer type without a base type.
+    } else if (a == ctx->decoy_ptr || b == ctx->decoy_ptr) {
         return true; // one of them is the decoy pointer type, which can be assigned to any pointer type.
     } else if (a->data.base->kind != b->data.base->kind) {
         return false; // they don't point to the same type
@@ -78,7 +80,7 @@ static bool check_call(Context *ctx, AstNode *callnode) {
     int proc_arg_count = (proc->params ? real_len : 0);
     if (!call->params) {
         if (proc_arg_count != 0) {
-            compile_error(ctx, callnode->token, "Call to \"%s\" specifies no arguments, but it's defined to expect %d of them", name, proc_arg_count);
+            compile_error(ctx, callnode->token, "call to \"%s\" specifies no arguments, but it's defined to expect %d of them", name, proc_arg_count);
             return false;
         }
         return true;
@@ -110,6 +112,35 @@ static bool check_call(Context *ctx, AstNode *callnode) {
             print_type(caller_type, stderr);
             compile_error_end();
         }
+    }
+    return true;
+}
+
+static bool check_deref_assign(Context *ctx, const AstUnary *unary) {
+    Token expr_token = ((AstNode *)unary)->token;
+    AstBinary *assignment = NULL;
+    if (unary->expr->tag == Expr_BINARY) {
+        if (!is_assignment(unary->expr->as.binary)) {
+            compile_error(ctx, expr_token, "expected pointer dereference to be the LHS of an assignment statement");
+            return FAILED_BUT_DONT_ERROR_AT_CALL_SITE;
+        }
+        assignment = (AstBinary *)unary->expr;
+    }
+    Type *lhs_type = assignment->left->resolved_type;
+    if (lhs_type->kind != Type_POINTER) {
+        compile_error_start(ctx, expr_token, "pointer dereference expects it's operand to be of type pointer, given ");
+        print_type(lhs_type, stderr);
+        compile_error_end();
+        return FAILED_BUT_DONT_ERROR_AT_CALL_SITE;
+    }
+    lhs_type = lhs_type->data.base;
+    if (!does_type_describe_expr(ctx, lhs_type, assignment->right)) {
+        compile_error_start(ctx, expr_token, "type mismatch: cannot assign value of type ");
+        print_type(assignment->right->resolved_type, stderr);
+        compile_error_add_line(ctx, " to dereference of type ");
+        print_type(lhs_type, stderr);
+        compile_error_end();
+        return false;
     }
     return true;
 }
@@ -154,34 +185,45 @@ bool does_type_describe_expr(Context *ctx, Type *type, AstExpr *expr) {
         if (binary->op == Token_DOT) {
             return do_types_match(ctx, expr->resolved_type, type);
         }
-        // All that's left is +, -, / and *
-        // TODO
+
         Type *left_type = binary->left->resolved_type;
         Type *right_type = binary->right->resolved_type;
         if (left_type->kind != Type_POINTER || (left_type->kind == Type_PRIMITIVE && left_type->data.signage == Signage_NaN)) {
-            compile_error(ctx, expr_token, "Left hand side of arithmetic expression must be of one of these types: integer, floating point or pointer");
-            return false;
+            compile_error(ctx, expr_token, "left hand side of arithmetic expression must be of one of these types: integer, floating point or pointer");
+            return true; // We don't want more errors after this, so return true
         }
         if (right_type->kind != Type_POINTER || (right_type->kind == Type_PRIMITIVE && right_type->data.signage == Signage_NaN)) {
-            compile_error(ctx, expr_token, "Right hand side of arithmetic expression must be of one of these types: integer, floating point or pointer");
-            return false;
+            compile_error(ctx, expr_token, "right hand side of arithmetic expression must be of one of these types: integer, floating point or pointer");
+            return true; // We don't want more errors after this, so return true
         }
         return (type->kind == Type_PRIMITIVE && type->data.signage != Signage_NaN);
     } break;
     case Expr_UNARY: {
         const AstUnary *unary = &expr->as.unary;
         Type *sub_expr_type = unary->expr->resolved_type;
+
         if (unary->op == Token_BANG) {
             if (sub_expr_type->kind != Type_POINTER && sub_expr_type != ctx->type_bool) {
-                compile_error(ctx, expr_token, "Unary \"not\" expression must have a boolean or pointer operand");
+                compile_error(ctx, expr_token, "unary \"not\" expression must have a boolean or pointer operand");
                 return false;
             }
             return (type == ctx->type_bool || type->kind == Type_POINTER);
         }
-        if (unary->op == Token_MINUS) { // TODO
 
+        if (unary->op == Token_MINUS) {
+            if (sub_expr_type->kind != Type_PRIMITIVE && sub_expr_type->data.signage != Signage_NaN) {
+                compile_error_start(ctx, expr_token, "unary negating expression expects integer or float operand, given ");
+                print_type(unary->expr->resolved_type, stderr);
+                compile_error_end();
+                return FAILED_BUT_DONT_ERROR_AT_CALL_SITE;
+            }
+            return true;
         }
-        // TODO dereference
+
+        if (unary->op == Token_STAR) { // dereference
+            return check_deref_assign(ctx, unary);
+        }
+
         if (unary->op == Token_CARAT) { // address-of operator
             if (type->kind != Type_POINTER) return false;
 
@@ -195,7 +237,7 @@ bool does_type_describe_expr(Context *ctx, Type *type, AstExpr *expr) {
 
             // It's a literal, you can't get a pointer a literal
             if (unary->expr->tag > Expr_LITERALS_START && unary->expr->tag < Expr_LITERALS_END) {
-                compile_error(ctx, expr_token, "Cannot get the address of a literal value");
+                compile_error(ctx, expr_token, "cannot get the address of a literal value");
                 return false;
             }
 
@@ -223,7 +265,7 @@ bool does_type_describe_expr(Context *ctx, Type *type, AstExpr *expr) {
             return do_pointer_types_match(ctx, type, resulting_type);
         }
     } break;
-    case Node_CAST: {
+    case Expr_CAST: {
         AstCast *cast = &expr->as.cast;
         // TODO check if the casts expression can even be casted to the requested type
         bool matches = do_types_match(ctx, cast->typename->as.type, type);
@@ -235,7 +277,7 @@ bool does_type_describe_expr(Context *ctx, Type *type, AstExpr *expr) {
     case Expr_INDEX: {
         Type *array_type = ((AstArrayIndex *)expr)->name->resolved_type;
         if (array_type->kind != Type_ARRAY) {
-            compile_error(ctx, expr_token, "Attempt to index \"%s\" like it's an array, but it isn't");
+            compile_error(ctx, expr_token, "attempt to index \"%s\" like it's an array, but it isn't");
             return false;
         }
         return do_types_match(ctx, type, expr->resolved_type);
@@ -273,8 +315,8 @@ bool check_proc_return_value(Context *ctx, AstStmt *retnode) {
     if (!r->expr) {
         return_type = maybe_unwrap_type_alias(return_type); // this allows type aliases of 'void' to work here.
         if (return_type != ctx->type_void) { // procedure return type is not void
-            compile_error(ctx, tok, "Only procedures declared as void can have value-less return statements");
-            return false;
+            compile_error(ctx, tok, "only procedures declared as void can have value-less return statements");
+            return FAILED_BUT_DONT_ERROR_AT_CALL_SITE;
         }
         return true;
     }
@@ -306,12 +348,12 @@ bool check_var(Context *ctx, AstDecl *node) {
     }
 
     else if (type == ctx->type_void) {
-        compile_error(ctx, tok, "Only procedures may use the \"void\" type");
+        compile_error(ctx, tok, "only procedures may use the \"void\" type");
         return false;
     }
 
     else if (type->kind == Type_ALIAS && maybe_unwrap_type_alias(type) == ctx->type_void) {
-        compile_error_start(ctx, tok, "Variable is declared to have type \"%s\" ", type->name);
+        compile_error_start(ctx, tok, "variable is declared to have type \"%s\" ", type->name);
         compile_error_add_line(ctx, "which is an alias of void; only procedures may use the \"void\" type");
         compile_error_end();
         return false;
@@ -355,8 +397,8 @@ bool check_assignment(Context *ctx, AstBinary *binary) {
 
     bool is_math_assign = binary->op != Token_EQUAL; // is it a normal assignment? or *=, etc.
 
-    Type *left_type  = binary->left->resolved_type; // needs to be discovered depending on what left->tag is
-    Type *right_type = binary->right->resolved_type; // filled in later by does_type_describe_expr
+    Type *left_type  = binary->left->resolved_type;
+    Type *right_type = binary->right->resolved_type;
 
     assert(left_type);
     assert(right_type);
@@ -380,7 +422,7 @@ void check_block(Context *ctx, AstBlock *block, AstNodeType restriction) {
     for (int i = 0; i < block->statements->len; i++) {
         AstNode *stmt = block->statements->nodes[i];
         if (restriction != Node_ZERO && restriction != stmt->tag) {
-            compile_error(ctx, stmt->token, "This statement is not allowed at this scope");
+            compile_error(ctx, stmt->token, "this statement is not allowed at this scope");
             return;
         }
         check_statement(ctx, (AstStmt *)stmt);
@@ -401,8 +443,14 @@ void check_statement(Context *ctx, AstStmt *node) {
         AstBinary *bin = &node->as.binary;
         check_assignment(ctx, bin);
     } break;
+    case Stmt_DEREF_ASSIGN: {
+        AstUnary *un = &node->as.deref_assign;
+        check_deref_assign(ctx, un);
+    } break;
     case Stmt_RETURN: {
-        check_proc_return_value(ctx, node);
+        if (check_proc_return_value(ctx, node)) {
+            ctx->curr_checker_proc->flags |= PROC_RET_VALUE_CHECKED;
+        }
     } break;
     }
 }
@@ -420,11 +468,8 @@ void check_typedef(Context *ctx, AstDecl *node) {
     }
     if (td->of->tag == Node_TYPENAME) {
         if (td->of->as.type->kind == Type_ALIAS) {
-            compile_error(ctx, td->of->token, "You cannot create a type alias from another type alias");
+            compile_error(ctx, td->of->token, "you cannot create a type alias from another type alias");
         }
-        // if (td->of->as.type == ctx->type_void) {
-        //     compile_error(ctx, td->of->token, "You cannot create a type alias from \"void\"");
-        // }
         return;
     }
     assert(false);
@@ -451,6 +496,10 @@ void check_ast(Context *ctx, Ast *ast) {
             if (proc->flags & PROC_MOD_FOREIGN) continue;
             ctx->curr_checker_proc = proc;
             check_block(ctx, (AstBlock *)((AstProcedure *)node)->block, Node_ZERO);
+            if (!(ctx->curr_checker_proc->flags & PROC_RET_VALUE_CHECKED)) {
+                if (ctx->curr_checker_proc->return_type->as.type != ctx->type_void)
+                    compile_error(ctx, node->token, "Non-void procedure has no 'return' statement");
+            }
         } break;
 
         case Node_VAR:

@@ -10,9 +10,9 @@
 
 void resolve_procedure(AstDecl *procsym, Context *ctx);
 Type *resolve_var(AstDecl *varsym, Context *ctx);
-Type *resolve_accessor(Context *ctx, AstBinary *accessor);
+Type *resolve_selector(Context *ctx, AstBinary *accessor);
 Type *resolve_expression(AstExpr *expr, Context *ctx);
-Type *resolve_type(Context *ctx, Type *type, bool recursing_from_pointer);
+Type *resolve_type(Context *ctx, Type *type, bool cyclic_allowed);
 
 static AstProcedure **scope_stack = NULL; // stbds array
 
@@ -25,13 +25,19 @@ void resolve_assignment(AstNode *ass, Context *ctx) {
     resolve_expression(bin->right, ctx);
 }
 
+Type *resolve_deref_assignment(AstStmt *node, Context *ctx) {
+    AstUnary *unary = (AstUnary *)node;
+    Type *ref_type = resolve_expression(unary->expr, ctx);
+    return ref_type->data.base;
+}
+
 AstProcedure *resolve_call(AstNode *callnode, Context *ctx) {
     Token tok = callnode->token;
     AstCall *call = (AstCall *)callnode;
     char *str_name = call->name->as.name->text;
     u64 symbol_index = shgeti(ctx->symbol_table, str_name);
     if (symbol_index == -1) {
-        compile_error(ctx, tok, "Call to undeclared procedure \"%s\"", str_name);
+        compile_error(ctx, tok, "call to undeclared procedure \"%s\"", str_name);
         return NULL;
     }
     if (call->params) for (int i = 0; i < call->params->len; i++) {
@@ -40,7 +46,7 @@ AstProcedure *resolve_call(AstNode *callnode, Context *ctx) {
     }
     AstDecl *hopefully_proc = ctx->symbol_table[symbol_index].value;
     if (hopefully_proc->tag != Decl_PROC) {
-        compile_error(ctx, tok, "Attempted to call \"%s\", but it's not a procedure", str_name);
+        compile_error(ctx, tok, "attempted to call \"%s\", but it's not a procedure", str_name);
         return NULL;
     }
     if (hopefully_proc->status == Status_UNRESOLVED) {
@@ -74,7 +80,7 @@ Type *resolve_expression_1(AstExpr *expr, Context *ctx) {
         AstProcedure *in = stbds_arrlast(scope_stack);
         AstDecl *var = lookup_local(ctx, in, name);
         if (!var) {
-            compile_error(ctx, t, "Undeclared identifier \"%s\"", name->text);
+            compile_error(ctx, t, "undeclared identifier \"%s\"", name->text);
             return NULL;
         }
         if (var->status == Status_UNRESOLVED) {
@@ -82,7 +88,7 @@ Type *resolve_expression_1(AstExpr *expr, Context *ctx) {
             return resolved_type;
         }
         if (var->status == Status_RESOLVING) {
-            compile_error(ctx, t, "Initial instantiation of variable \"%s\" mentions itself", name->text);
+            compile_error(ctx, t, "initial instantiation of variable \"%s\" mentions itself", name->text);
             return NULL;
         }
         if (var->tag != Decl_VAR) {
@@ -107,7 +113,7 @@ Type *resolve_expression_1(AstExpr *expr, Context *ctx) {
     case Expr_BINARY: {
         AstBinary *bin = (AstBinary *)expr;
         if (bin->op == Token_DOT) {
-            return resolve_accessor(ctx, bin);
+            return resolve_selector(ctx, bin);
         }
         Type *lhs = resolve_expression(bin->left, ctx);
         resolve_expression(bin->right, ctx);
@@ -156,13 +162,12 @@ Type *resolve_type(Context *ctx, Type *type, bool cyclic_allowed) {
     if (type->kind == Type_ARRAY)
         return make_array_type(resolve_type(ctx, type->data.base, true));
 
-    // This type was already resolved.
     if (type->kind != Type_UNRESOLVED)
         return type;
 
     u64 i = shgeti(ctx->type_table, type->name);
     if (i == -1) {
-        compile_error(ctx, t, "Undeclared type \"%s\"", type->name);
+        compile_error(ctx, t, "undeclared type \"%s\"", type->name);
         return NULL;
     }
 
@@ -176,7 +181,7 @@ Type *resolve_type(Context *ctx, Type *type, bool cyclic_allowed) {
             sym->status = Status_RESOLVED;
             return real_type;
         }
-        compile_error(ctx, decl_tok(sym), "Type definition for \"%s\" directly mentions itself", type->name);
+        compile_error(ctx, decl_tok(sym), "type definition for \"%s\" directly mentions itself", type->name);
         return NULL;
     }
 
@@ -197,7 +202,7 @@ Type *resolve_type(Context *ctx, Type *type, bool cyclic_allowed) {
 }
 
 // Resolves the dependencies of a selector and returns the type of the field it selects.
-Type *resolve_accessor(Context *ctx, AstBinary *accessor) { // TODO rename to resolve_selector
+Type *resolve_selector(Context *ctx, AstBinary *accessor) { // TODO rename to resolve_selector
     assert(accessor->op == Token_DOT);
     assert(accessor->right->tag == Expr_NAME);
     assert(accessor->left->tag == Expr_NAME || accessor->left->tag == Expr_BINARY);
@@ -217,7 +222,7 @@ Type *resolve_accessor(Context *ctx, AstBinary *accessor) { // TODO rename to re
     //  - a pointer, the base type of which is a struct or anonymous struct
     if (lhs_type->kind != Type_STRUCT && lhs_type->kind != Type_ANON_STRUCT &&
         (lhs_type->kind != Type_POINTER || (lhs_type->data.base->kind != Type_STRUCT && lhs_type->data.base->kind != Type_ANON_STRUCT))) {
-        compile_error(ctx, expr_tok(accessor->left), "Attempt to access member in non-struct value");
+        compile_error(ctx, expr_tok(accessor->left), "attempt to access member in non-struct value");
         return NULL;
     }
 
@@ -230,7 +235,7 @@ Type *resolve_accessor(Context *ctx, AstBinary *accessor) { // TODO rename to re
     AstStruct *struct_def = &lhs_type->data.user->as._struct;
     AstDecl *field = lookup_struct_field(struct_def, rhs);
     if (!field) {
-        compile_error(ctx, expr_tok(accessor->right), "No such field as \"%s\" in struct field access", rhs->text);
+        compile_error(ctx, expr_tok(accessor->right), "no such field as \"%s\" in struct field access", rhs->text);
         return NULL;
     }
     assert(field->tag == Decl_VAR); // should have been checked by now
@@ -313,6 +318,10 @@ void resolve_procedure(AstDecl *procsym, Context *ctx) {
         case Node_ASSIGN:
             resolve_assignment(stmt, ctx);
             break;
+        case Node_UNARY: { // deref-assignment (*i = 10, where i is an ^int)
+            AstStmt *real_stmt = (AstStmt *)stmt;
+            resolve_deref_assignment(real_stmt, ctx);
+        } break;
         case Node_RETURN:
             resolve_expression(((AstReturn *)stmt)->expr, ctx);
             break;

@@ -236,6 +236,13 @@ AstStmt *ast_assignment(Parser *p, Token t, const AstBinary *ass) {
     return &n->as.stmt;
 }
 
+AstStmt *ast_deref_assignment(Parser *p, Token t, const AstUnary *ass) {
+    AstNode *n = ast_node(p, Node_UNARY, t);
+    n->as.stmt.tag = Stmt_DEREF_ASSIGN;
+    n->as.stmt.as.deref_assign = *ass;
+    return &n->as.stmt;
+}
+
 AstStmt *ast_import(Parser *p, Token t, const AstImport *imp) {
     AstNode *n = ast_node(p, Node_IMPORT, t);
     n->as.stmt.tag = Stmt_IMPORT;

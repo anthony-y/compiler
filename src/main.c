@@ -106,25 +106,27 @@ bool process_file(const char *file_path) {
         check_delta = (cend.tv_sec - cstart.tv_sec) * 1000000 + cend.tv_usec - cstart.tv_usec;
     #endif
 
-    bool ret = (context.error_count > 0);
-
-    if (ret) {
-        printf("\n");
-    }
-
 end:
-    printf("Lexing took %ldus\n", lex_delta);
-    printf("Parsing took %ldus\n", parse_delta);
-    printf("Inferring, resolving and checking took %ldus\n", check_delta);
-    printf("Parser used %lu nodes out of %lu allocated.\n", context.parser.node_count, context.parser.node_allocator.capacity);
-    printf("Error count: %d\n", context.error_count);
+    {
+        bool ret = (context.error_count > 0);
 
-    free_types(&context);
-    parser_free(&context.parser, &ast);
-    lexer_free(&context.lexer);
-    free(file_data);
+        if (ret) {
+            printf("\n");
+        }
 
-    return ret;
+        printf("Error count: %d\n", context.error_count);
+        printf("Lexing took %ldus\n", lex_delta);
+        printf("Parsing took %ldus\n", parse_delta);
+        printf("Inferring, resolving and checking took %ldus\n", check_delta);
+        printf("Parser used %lu nodes out of %lu allocated.\n", context.parser.node_count, context.parser.node_allocator.capacity);
+
+        free_types(&context);
+        parser_free(&context.parser, &ast);
+        lexer_free(&context.lexer);
+        free(file_data);
+
+        return ret;
+    }
 }
 
 // TODO disallow duplicate symbols

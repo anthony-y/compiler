@@ -8,11 +8,11 @@
 
 proc main() {
     my_s: S;
-    my_s.s[0] = null // TODO fix in checker
+    my_s.s[0] = null
 }
 
 type S: struct {
-    s: []D;
+    s: []^D;
 }
 
 type D: struct {
