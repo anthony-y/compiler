@@ -314,10 +314,15 @@ static AstStmt *parse_block(Context *c) {
         AstNode *statement = parse_statement(c);
         consume(p, Token_SEMI_COLON);
         if (p->curr->type == Token_EOF) {
-            return make_stmt_error(p, "Unclosed block (missing a '}').");
+            return make_stmt_error(p, "unclosed block (missing a '}').");
         }
         if (is_decl(statement)) {
             AstDecl *decl = (AstDecl *)statement;
+            if (shgeti(block->symbols, decl->name->text) != -1) {
+                AstStmt *err = make_stmt_error(p, "redeclaration of local"); // TODO bad error
+                parser_recover_to_declaration(p);
+                return err;
+            }
             shput(block->symbols, decl->name->text, decl);
             consume(p, Token_SEMI_COLON);
             continue;
