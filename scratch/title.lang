@@ -1,0 +1,16 @@
+proc main() {
+    player: Entity;
+    store : ComponentStorage;
+    *(store.positions[0]).x = 0;
+}
+
+type Entity: int;
+
+type ComponentStorage: struct {
+    positions: []struct{x: ^int; y: int};
+    // ...
+}
+
+proc draw() #foreign;
+proc update() #foreign;
+proc get_input() #foreign;

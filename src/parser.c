@@ -804,15 +804,11 @@ static AstNode *parse_statement(Context *c) {
     case Token_OPEN_BRACE: return (AstNode *)parse_block(c);
 
     case Token_STAR: {
-        if (p->curr[1].type != Token_IDENT) {
-            parser_recover(p, Token_SEMI_COLON);
-            return make_error_node(p, start, "expected an identifier: missing or invalid operand in dereference-assignment.");
-        }
         AstExpr *hopefully_binary = parse_expression(c, 1);
-        if (hopefully_binary->tag != Expr_UNARY) {
-            parser_recover(p, Token_SEMI_COLON);
-            return make_error_node(p, start, "expected a pointer dereference-assignment.");
-        }
+        // if (hopefully_binary->tag != Expr_UNARY) {
+        //     parser_recover(p, Token_SEMI_COLON);
+        //     return make_error_node(p, start, "expected a pointer dereference-assignment.");
+        // }
         return (AstNode *)ast_deref_assignment(p, start, (AstUnary *)hopefully_binary);
     }
 

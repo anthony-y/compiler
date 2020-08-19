@@ -120,6 +120,9 @@ void print_type(Type *type, FILE *stream) {
     case Type_STRUCT:
         fprintf(stream, "%s", type->name);
         return;
+    case Type_ANON_STRUCT:
+        fprintf(stream, "anonyous struct");
+        return;
     case Type_POINTER:
         if (!type->data.base) { // it's the decoy_ptr (context.hpp)
             fprintf(stream, "pointer");
@@ -136,12 +139,11 @@ void print_type(Type *type, FILE *stream) {
     case Type_ARRAY:
         fprintf(stream, "[]");
         print_type(type->data.base, stream);
-        break;
+        return;
     case Type_UNRESOLVED:
         fprintf(stream, "Internal compiler error: Type_UNRESOLVED is not supposed to be printed.\n");
         return;
     default:
         fprintf(stderr, "Internal compiler error: type not covered in print_type switch; type kind is %d\n", type->kind);
-        break;
     }
 }

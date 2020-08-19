@@ -119,26 +119,28 @@ static bool check_call(Context *ctx, AstNode *callnode) {
 static bool check_deref_assign(Context *ctx, const AstUnary *unary) {
     Token expr_token = ((AstNode *)unary)->token;
     AstBinary *assignment = NULL;
-    if (unary->expr->tag == Expr_BINARY) {
-        if (!is_assignment(unary->expr->as.binary)) {
-            compile_error(ctx, expr_token, "expected pointer dereference to be the LHS of an assignment statement");
-            return FAILED_BUT_DONT_ERROR_AT_CALL_SITE;
-        }
-        assignment = (AstBinary *)unary->expr;
+    assert(unary->expr->tag == Expr_BINARY);
+    if (!is_assignment(unary->expr->as.binary)) {
+        compile_error(ctx, expr_token, "expected pointer dereference to be the LHS of an assignment statement");
+        return FAILED_BUT_DONT_ERROR_AT_CALL_SITE;
     }
+    assignment = (AstBinary *)unary->expr;
     Type *lhs_type = assignment->left->resolved_type;
     if (lhs_type->kind != Type_POINTER) {
-        compile_error_start(ctx, expr_token, "pointer dereference expects it's operand to be of type pointer, given ");
+        compile_error_start(ctx, expr_token, "pointer dereference expects a pointer operand, but was given type ");
         print_type(lhs_type, stderr);
         compile_error_end();
         return FAILED_BUT_DONT_ERROR_AT_CALL_SITE;
     }
-    lhs_type = lhs_type->data.base;
-    if (!does_type_describe_expr(ctx, lhs_type, assignment->right)) {
+    Type *elem = lhs_type->data.base;
+    if (!does_type_describe_expr(ctx, elem, assignment->right)) {
         compile_error_start(ctx, expr_token, "type mismatch: cannot assign value of type ");
         print_type(assignment->right->resolved_type, stderr);
-        compile_error_add_line(ctx, " to dereference of type ");
+        compile_error_add_line(ctx, " to ");
+        print_type(elem, stderr);
+        compile_error_add_line(ctx, " (derefernced from ");
         print_type(lhs_type, stderr);
+        compile_error_add_line(ctx, ")");
         compile_error_end();
         return false;
     }
@@ -221,7 +223,16 @@ bool does_type_describe_expr(Context *ctx, Type *type, AstExpr *expr) {
         }
 
         if (unary->op == Token_STAR) { // dereference
-            return check_deref_assign(ctx, unary);
+            if (unary->expr->tag == Expr_BINARY) {
+                return check_deref_assign(ctx, unary);
+            }
+            if (sub_expr_type->kind != Type_POINTER) {
+                compile_error_start(ctx, expr_token, "pointer dereference expects a pointer operand, but was given type ");
+                print_type(sub_expr_type, stderr);
+                compile_error_end();
+                return FAILED_BUT_DONT_ERROR_AT_CALL_SITE;
+            }
+            return true;
         }
 
         if (unary->op == Token_CARAT) { // address-of operator
@@ -350,18 +361,9 @@ bool check_var(Context *ctx, AstDecl *node) {
 
     Type *type = var->typename->as.type;
 
-    if (type->kind == Type_ANON_STRUCT) { // TODO default struct values
-        //check_struct(ctx, (AstStruct *)type->data.user);
+    if (type->kind == Type_ANON_STRUCT) {
         AstStruct *s = &type->data.user->as._struct;
-        u64 struct_len = shlenu(s->members->as.block.symbols);
-        for (int i = 0; i < struct_len; i++) {
-            AstDecl *d = s->members->as.block.symbols[i].value;
-            AstVar *v = (AstVar *)d;
-            if (v->flags & VAR_IS_INITED) {
-                compile_error(ctx, decl_tok(d), "struct fields cannot yet have default values");
-                return false;
-            }
-        }
+        check_struct(ctx, s);
     }
 
     else if (type == ctx->type_void) {
@@ -472,9 +474,17 @@ void check_statement(Context *ctx, AstStmt *node) {
     }
 }
 
-void check_struct(Context *ctx, AstStruct *structdef) {
-    AstBlock *fields = &structdef->members->as.block;
-    check_block(ctx, fields, Node_VAR);
+void check_struct(Context *ctx, AstStruct *s) { // TODO default struct values
+    u64 struct_len = shlenu(s->members->as.block.symbols);
+    for (int i = 0; i < struct_len; i++) {
+        AstDecl *d = s->members->as.block.symbols[i].value;
+        AstVar *v = (AstVar *)d;
+        if (v->flags & VAR_IS_INITED) {
+            compile_error(ctx, decl_tok(d), "struct fields cannot yet have default values");
+        }
+    }
+    // AstBlock *fields = &s->members->as.block;
+    // check_block(ctx, fields, Node_VAR);
 }
 
 void check_typedef(Context *ctx, AstDecl *node) {

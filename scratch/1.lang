@@ -1,15 +1,21 @@
 proc main(args: []string): string {
-    // args[10] = ""
-    // i: []int
-    // i[0] = 10
-    // sum : int = -i[0]
-    // return args[10]
-    return ""
+    args[10] = ""
+    i: []int
+    i[0] = 10
+    sum : int = -i[0]
+    return args[10]
 }
 
 proc whatever() {
     f: Field
-    *f.name = "null"
+    i: int
+    ip: ^int = ^i
+    *f.name = "Anthony"
+    f.not_ptr = *ip
+}
+
+proc _1() {
+    i := 10 + "st" // TODO shouldn't work
 }
 
 type Field: struct {

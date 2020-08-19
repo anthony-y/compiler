@@ -3,11 +3,11 @@ Check if the casts expression can even be casted to the requested type
 Check if branches
 Check while loops
 
-Call modifiers e.g: a := inline some_call()
-    inline is added to lexer
 
 Change AstBinary stmt to AstAssignment
 
+Call modifiers e.g: a := inline some_call()
+    inline is added to lexer
 
 //
 // Checker

@@ -205,7 +205,7 @@ Type *resolve_type(Context *ctx, Type *type, bool cyclic_allowed) {
 Type *resolve_selector(Context *ctx, AstBinary *accessor) { // TODO rename to resolve_selector
     assert(accessor->op == Token_DOT);
     assert(accessor->right->tag == Expr_NAME);
-    assert(accessor->left->tag == Expr_NAME || accessor->left->tag == Expr_BINARY);
+    //assert(accessor->left->tag == Expr_NAME || accessor->left->tag == Expr_BINARY);
 
     Name *rhs = accessor->right->as.name;
     Type *lhs_type = resolve_expression(accessor->left, ctx);
