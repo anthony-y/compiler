@@ -283,17 +283,10 @@ AstDecl *ast_typedefi(Parser *p, Token t, Name *name, const AstTypedef *td) {
     return &n->as.decl;
 }
 
-AstStmt *ast_assignment(Parser *p, Token t, const AstBinary *ass) {
+AstStmt *ast_assignment(Parser *p, Token t, const AstExpr *ass) {
     AstNode *n = ast_node(p, Node_ASSIGN, t);
     n->as.stmt.tag = Stmt_ASSIGN;
-    n->as.stmt.as.binary = *ass;
-    return &n->as.stmt;
-}
-
-AstStmt *ast_deref_assignment(Parser *p, Token t, const AstUnary *ass) {
-    AstNode *n = ast_node(p, Node_UNARY, t);
-    n->as.stmt.tag = Stmt_DEREF_ASSIGN;
-    n->as.stmt.as.deref_assign = *ass;
+    n->as.stmt.as.assign = *ass;
     return &n->as.stmt;
 }
 

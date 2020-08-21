@@ -35,6 +35,10 @@ static void print_stmt_error(Context *c, AstStmt *err) {
 }
 
 static void print_node_errors(Context *c, AstNode *n) {
+    if (n->tag == Node_ERROR) {
+        print_error_node(c, n);
+        return;
+    }
     if (is_decl(n)) {
         print_decl_errors(c, (AstDecl *)n);
         return;
@@ -137,9 +141,7 @@ static void print_statement_errors(Context *c, AstStmt *node) {
     }
 
     else if (node->tag == Stmt_ASSIGN) {
-        AstAssignment *ass = (AstAssignment *)node;
-        print_expression_errors(c, ass->name);
-        print_expression_errors(c, ass->value);
+        print_expression_errors(c, (AstExpr *)node);
     }
 
     else {

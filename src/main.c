@@ -100,6 +100,19 @@ bool process_file(const char *file_path) {
     if (context.error_count > 0)
         goto end;
 
+    bool found_main = false;
+    for (int i = 0; i < ast.len; i++) {
+        AstDecl *decl = (AstDecl *)ast.nodes[i];
+        if (decl->name == make_namet(&context, "main")) {
+            found_main = true;
+            break;
+        }
+    }
+    if (!found_main) {
+        compile_error(&context, (Token){0}, "No entry point found. Please declare \"main\"");
+        goto end;
+    }
+
     #if perfstats
         gettimeofday(&cend, NULL);
         /* In microseconds */

@@ -19,15 +19,25 @@ static AstProcedure **scope_stack = NULL; // stbds array
 // Resolves the dependencies of an assignment statement,
 void resolve_assignment(AstNode *ass, Context *ctx) {
     assert(ass->tag == Node_ASSIGN);
-    AstBinary *bin = (AstBinary *)ass;
-    assert(is_assignment(*bin));
-    resolve_expression(bin->left, ctx);
-    resolve_expression(bin->right, ctx);
+    AstExpr *expr = (AstExpr *)ass;
+    switch (expr->tag) {
+    case Expr_UNARY: {
+        AstUnary *unary = (AstUnary *)expr;
+    } break;
+    case Expr_BINARY: {
+        AstBinary *binary = (AstBinary *)expr;
+    } break;
+    case Expr_PAREN: {
+        
+    } break;
+    }
+    // TODO maybe just rearrange the nodes during parsing to make this less complex
 }
 
 Type *resolve_deref_assignment(AstStmt *node, Context *ctx) {
     AstUnary *unary = (AstUnary *)node;
     Type *ref_type = resolve_expression(unary->expr, ctx);
+    if (!ref_type) return NULL;
     return ref_type->data.base;
 }
 
@@ -73,7 +83,13 @@ Type *resolve_expression_1(AstExpr *expr, Context *ctx) {
     case Expr_UNARY: {
         AstUnary *unary = (AstUnary *)expr;
         Type *expr_type = resolve_expression(unary->expr, ctx);
-        return expr_type;
+        if (unary->op == Token_STAR) {
+            if (expr_type->kind != Type_POINTER) {
+                compile_error(ctx, expr_tok((AstExpr *)unary), "expected pointer operand to dereference");
+                return NULL;
+            }
+        }
+        return expr_type->data.base;
     } break;
     case Expr_NAME: {
         Name *name = expr->as.name;
@@ -204,8 +220,6 @@ Type *resolve_type(Context *ctx, Type *type, bool cyclic_allowed) {
 // Resolves the dependencies of a selector and returns the type of the field it selects.
 Type *resolve_selector(Context *ctx, AstBinary *accessor) { // TODO rename to resolve_selector
     assert(accessor->op == Token_DOT);
-    assert(accessor->right->tag == Expr_NAME);
-    //assert(accessor->left->tag == Expr_NAME || accessor->left->tag == Expr_BINARY);
 
     Name *rhs = accessor->right->as.name;
     Type *lhs_type = resolve_expression(accessor->left, ctx);
@@ -318,10 +332,6 @@ void resolve_procedure(AstDecl *procsym, Context *ctx) {
         case Node_ASSIGN:
             resolve_assignment(stmt, ctx);
             break;
-        case Node_UNARY: { // deref-assignment (*i = 10, where i is an ^int)
-            AstStmt *real_stmt = (AstStmt *)stmt;
-            resolve_deref_assignment(real_stmt, ctx);
-        } break;
         case Node_RETURN:
             resolve_expression(((AstReturn *)stmt)->expr, ctx);
             break;

@@ -40,9 +40,12 @@ AstDecl *lookup_struct_field(AstStruct *def, Name *name) {
 }
 
 Name *make_name(Context *ctx, Token token) {
+    return make_namet(ctx, token.text);
+}
+
+Name *make_namet(Context *ctx, const char *txt) {
     Name *n = malloc(sizeof(Name));
-    char *txt = token.text;
-    n->text = txt;
+    n->text = (char *)txt;
     n->resolved_decl = NULL;
     u64 i = shgeti(ctx->name_table, txt);
     if (i == -1) { // not in the table yet
@@ -65,6 +68,7 @@ void init_context(Context *c, const char *file_path) {
     *c = (Context){0};
     c->current_file_path = file_path;
     arena_init(&c->scratch, CONTEXT_SCRATCH_SIZE, sizeof(u8), 1);
+    sh_new_arena(c->string_literal_pool);
 }
 
 void free_context(Context *c) {

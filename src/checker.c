@@ -223,8 +223,8 @@ bool does_type_describe_expr(Context *ctx, Type *type, AstExpr *expr) {
         }
 
         if (unary->op == Token_STAR) { // dereference
-            if (unary->expr->tag == Expr_BINARY) {
-                return check_deref_assign(ctx, unary);
+            if (unary->expr->tag != Expr_BINARY) {
+                check_assignment(ctx, (AstBinary *)unary->expr);
             }
             if (sub_expr_type->kind != Type_POINTER) {
                 compile_error_start(ctx, expr_token, "pointer dereference expects a pointer operand, but was given type ");
@@ -412,12 +412,16 @@ void check_if(Context *ctx, AstStmt *node) {
 bool check_assignment(Context *ctx, AstBinary *binary) {
     assert(is_assignment(*binary));
 
+    Type *left_type  = binary->left->resolved_type;
+    Type *right_type = binary->right->resolved_type;
+
+    if (binary->left->tag == Expr_PAREN) {
+        left_type = ((AstParen *)binary->left)->sub_expr->resolved_type;
+    }
+
     Token tok = ((AstNode *)binary)->token;
 
     bool is_math_assign = binary->op != Token_EQUAL; // is it a normal assignment? or *=, etc.
-
-    Type *left_type  = binary->left->resolved_type;
-    Type *right_type = binary->right->resolved_type;
 
     assert(left_type);
     assert(right_type);
@@ -459,12 +463,15 @@ void check_statement(Context *ctx, AstStmt *node) {
         break;
     case Stmt_ASSIGN: {
         // Guaranteed to be an assignment by parser
-        AstBinary *bin = &node->as.binary;
-        check_assignment(ctx, bin);
-    } break;
-    case Stmt_DEREF_ASSIGN: {
-        AstUnary *un = &node->as.deref_assign;
-        check_deref_assign(ctx, un);
+        AstExpr *e = (AstExpr *)node;
+        assert(e->tag == Expr_UNARY || e->tag == Expr_BINARY);
+        // if (e->tag == Expr_UNARY) {
+        //     check_deref_assign(ctx, (AstUnary *)e);
+        // } else if (e->tag == Expr_BINARY){
+        //     check_assignment(ctx, (AstBinary *)e);
+        // } else {
+        //     compile_error(ctx, stmt_tok(node), "expected an assignment or declaration");
+        // }
     } break;
     case Stmt_RETURN: {
         if (check_proc_return_value(ctx, node)) {

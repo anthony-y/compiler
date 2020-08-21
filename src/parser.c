@@ -28,7 +28,7 @@ static AstNode *parse_top_level(Context *);
 
 // These are implemented at the very bottom of the file
 static inline AstExpr *int_literal(Parser *);
-static inline AstExpr *string_literal(Parser *);
+static inline AstExpr *string_literal(Context *, Parser *);
 static inline AstExpr *float_literal(Parser *);
 static inline AstExpr *false_literal(Parser *);
 static inline AstExpr *true_literal(Parser *);
@@ -156,7 +156,7 @@ static AstExpr *parse_simple_expr(Context *c) {
     }
 
     case Token_INT_LIT:    return int_literal(p);
-    case Token_STRING_LIT: return string_literal(p);
+    case Token_STRING_LIT: return string_literal(c, p);
     case Token_FLOAT_LIT:  return float_literal(p);
     case Token_TRUE:       return true_literal(p);
     case Token_FALSE:      return false_literal(p);
@@ -234,8 +234,13 @@ static AstExpr *parse_expression(Context *c, int min_prec) {
         AstExpr *postfix = parse_postfix_expr(c, left);
         if (postfix && postfix->tag == Expr_CALL)
             return postfix;
-        if (postfix && postfix->tag == Expr_INDEX)
-            return maybe_parse_array_assignment(c, postfix);
+        if (postfix && postfix->tag == Expr_INDEX) {
+            if (p->curr[0].type == Token_DOT) {
+                left = postfix;
+            } else {
+                return maybe_parse_array_assignment(c, postfix);
+            }
+        }
 
         parser_next(p);
 
@@ -392,7 +397,7 @@ static AstNode *parse_typedef(Context *c) {
     Token name = *p->curr;
 
     if (!consume(p, Token_IDENT)) {
-        return make_error_node(p, name, "Typedefs must be given a name.");
+        return make_error_node(p, name, "typedefs must be given a name.");
     }
 
     AstTypedef td;
@@ -400,13 +405,13 @@ static AstNode *parse_typedef(Context *c) {
     AstExpr *namenode = ast_name(c, name);
 
     if (!consume(p, Token_COLON)) {
-        return make_error_node(p, *p->curr, "Expected a ':' in type definition.");
+        return make_error_node(p, *p->curr, "expected a ':' in type definition.");
     }
 
     if (shgeti(c->type_table, name.text) != -1) {
         assert(name.length < 61); // TODO lol
         char *buffer = arena_alloc(&c->scratch, 100);
-        sprintf(buffer, "Type \"%s\" was declared more than once.", name.text);
+        sprintf(buffer, "type \"%s\" was declared more than once.", name.text);
         AstNode *err = make_error_node(p, name, buffer);
         return err;
     }
@@ -434,7 +439,7 @@ static AstNode *parse_typedef(Context *c) {
         type->data.alias_of = decl->as.type;
         break;
     default:
-        return make_error_node(p, *p->curr, "Expected a declaration.");
+        return make_error_node(p, *p->curr, "expected a declaration.");
     }
 
     shput(c->type_table, name.text, type);
@@ -803,15 +808,6 @@ static AstNode *parse_statement(Context *c) {
     case Token_DEFER:      return (AstNode *)parse_defer(c);
     case Token_OPEN_BRACE: return (AstNode *)parse_block(c);
 
-    case Token_STAR: {
-        AstExpr *hopefully_binary = parse_expression(c, 1);
-        // if (hopefully_binary->tag != Expr_UNARY) {
-        //     parser_recover(p, Token_SEMI_COLON);
-        //     return make_error_node(p, start, "expected a pointer dereference-assignment.");
-        // }
-        return (AstNode *)ast_deref_assignment(p, start, (AstUnary *)hopefully_binary);
-    }
-
     case Token_IDENT: {
         // Function call
         if (p->curr[1].type == Token_OPEN_PAREN) {
@@ -838,19 +834,33 @@ static AstNode *parse_statement(Context *c) {
             return err;
         }
 
-        // Basically: if it's not some sort of assignment
-        if (expr->tag != Expr_BINARY || !is_assignment(expr->as.binary)) {
-            AstNode *err = make_error_node(p, *p->curr, "only assignments are allowed as statements.");
-            parser_recover(p, Token_SEMI_COLON);
-            return err;
-        }
+        return (AstNode *)ast_assignment(p, start, expr);
+    }
+    }
 
-        return (AstNode *)ast_assignment(p, start, (AstBinary *)expr);
+    Token *t = p->curr;
+    while ((t->type > Token_ASSIGNMENTS_START && t->type < Token_ASSIGNMENTS_END) && t->type != Token_EOF && t->type != Token_SEMI_COLON) {
+        t++;
     }
+    if (t->type == Token_SEMI_COLON || t->type == Token_EOF) {
+        AstNode *err = make_error_node(p, *p->curr, "only assignments are allowed as statements.");
+        parser_recover(p, Token_SEMI_COLON);
+        return err;
     }
-    AstNode *err = make_error_node(p, start, "failed to parse statement.");
-    parser_recover(p, Token_SEMI_COLON);
-    return err;
+    AstExpr *expr_left = parse_expression(c, 1);
+    if (expr_left->tag == Expr_ERROR) {
+        return (AstNode *)expr_left;
+    }
+    if (expr_left->tag != Expr_BINARY && expr_left->tag != Expr_UNARY) {
+        AstNode *err = make_error_node(p, *p->curr, "only assignments are allowed as statements.");
+        parser_recover(p, Token_SEMI_COLON);
+        return err;
+    }
+    return (AstNode *)ast_assignment(p, start, expr_left);
+
+    // AstNode *err = make_error_node(p, start, "failed to parse statement.");
+    // parser_recover(p, Token_SEMI_COLON);
+    // return err;
 }
 
 Ast parse(Context *c) {
@@ -947,12 +957,17 @@ static inline AstExpr *int_literal(Parser *p) {
     return &l->as.expr;
 }
 
-static inline AstExpr *string_literal(Parser *p) {
+static inline AstExpr *string_literal(Context *ctx, Parser *p) {
     parser_next(p);
-    AstNode *l = ast_node(p, Node_STRING_LIT, *p->prev);
-    l->as.expr.tag = Expr_STRING;
-    l->as.expr.as.literal.data.string = p->prev->text;
-    return &l->as.expr;
+    u64 str_index = shgeti(ctx->string_literal_pool, p->prev->text);
+    if (str_index == -1) {
+        AstNode *l = ast_node(p, Node_STRING_LIT, *p->prev);
+        l->as.expr.tag = Expr_STRING;
+        l->as.expr.as.literal.data.string = p->prev->text;
+        shput(ctx->string_literal_pool, p->prev->text, (AstLiteral *)l);
+        return &l->as.expr;
+    }
+    return (AstExpr *)ctx->string_literal_pool[str_index].value;
 }
 
 static inline AstExpr *float_literal(Parser *p) {

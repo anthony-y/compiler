@@ -35,9 +35,10 @@ typedef struct Context {
     AstProcedure *curr_checker_proc;
 
     // stb hash tables
-                       SymbolTable      *symbol_table;
-    struct {char *key; Type    *value;} *type_table;
-    struct {char *key; Name    *value;} *name_table;
+    SymbolTable *symbol_table;
+    struct {char *key; Type *value;} *type_table;
+    struct {char *key; Name *value;} *name_table;
+    struct {char *key; AstLiteral *value;} *string_literal_pool;
 
     /* Handles to types in the type table
        for easy comparison in type-checking, etc. */
@@ -75,6 +76,7 @@ void free_types(Context *);
 bool check_types_were_declared(Context *);
 
 Name *make_name(Context *, Token from);
+Name *make_namet(Context *, const char *txt);
 
 AstDecl *lookup_local(Context *ctx, AstProcedure *proc, Name *name);
 AstDecl *lookup_struct_field(AstStruct *, Name *);
