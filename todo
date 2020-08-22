@@ -4,23 +4,15 @@ Parse assignments
 
 Check binary maths
 Check if the casts expression can even be casted to the requested type
-Check if branches
-Check while loops
 
 Change AstBinary stmt to AstAssignment
-
-Call modifiers e.g: a := inline some_call()
-    inline is added to lexer
-
-//
-// Checker
-//
-
-When local procedures are implemented, proc calls will need to be checked using lookup_local or something else.
 
 //
 // Syntax
 //
+
+Call modifiers e.g: a := inline some_call()
+    inline is added to lexer
 
 Allocate and zero out syntax
     t: *T = alloct(1){0};
@@ -49,3 +41,9 @@ Const semantics
     }
 
 Enum composition
+
+//
+// Checker
+//
+
+When local procedures are implemented, proc calls will need to be checked using lookup_local or something else.

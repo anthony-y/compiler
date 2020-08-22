@@ -561,7 +561,7 @@ static AstStmt *parse_if(Context *c) {
     Token start = *p->curr;
     parser_next(p); // skip keyword
 
-    AstIf _if;
+    AstIf _if = (AstIf){0};
 
     _if.condition = parse_expression(c, 1);
 

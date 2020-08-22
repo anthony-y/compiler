@@ -13,6 +13,7 @@ Type *resolve_var(AstDecl *varsym, Context *ctx);
 Type *resolve_selector(Context *ctx, AstBinary *accessor);
 Type *resolve_expression(AstExpr *expr, Context *ctx);
 Type *resolve_type(Context *ctx, Type *type, bool cyclic_allowed);
+void resolve_block(Context *ctx, AstBlock *block);
 
 static AstProcedure **scope_stack = NULL; // stbds array
 
@@ -133,6 +134,9 @@ Type *resolve_expression_1(AstExpr *expr, Context *ctx) {
         }
         Type *lhs = resolve_expression(bin->left, ctx);
         resolve_expression(bin->right, ctx);
+        if (is_binary_comparison(*bin)) {
+            return ctx->type_bool;
+        }
         return lhs;
     } break;
     case Expr_PAREN: {
@@ -288,6 +292,53 @@ Type *resolve_var(AstDecl *decl, Context *ctx) {
     return inferred_type;
 }
 
+void resolve_statement(Context *ctx, AstNode *stmt) {
+    switch (stmt->tag) {
+    case Node_BLOCK:
+        resolve_block(ctx, (AstBlock *)stmt);
+        break;
+    case Node_CALL:
+        resolve_call(stmt, ctx);
+        break;
+    case Node_ASSIGN:
+        resolve_assignment(stmt, ctx);
+        break;
+    case Node_RETURN:
+        resolve_expression(((AstReturn *)stmt)->expr, ctx);
+        break;
+    case Node_IF: {
+        AstIf *iff = (AstIf *)stmt;
+        resolve_expression(iff->condition, ctx);
+        resolve_statement(ctx, (AstNode *)iff->block_or_stmt);
+        if (iff->other_branch) resolve_statement(ctx, (AstNode *)iff->other_branch);
+    } break;
+    case Node_WHILE: {
+        AstWhile *w = (AstWhile *)stmt;
+        resolve_expression(w->condition, ctx);
+        resolve_block(ctx, (AstBlock *)w->block);
+    } break;
+    default: printf("resolve_statement tag %d\n", stmt->tag);
+    }
+}
+
+void resolve_block(Context *ctx, AstBlock *block) {
+    u64 decls_len = shlenu(block->symbols);
+    for (int i = 0; i < decls_len; i++) {
+        AstDecl *sym = block->symbols[i].value;
+        switch (sym->tag) {
+        case Decl_VAR:
+            resolve_var(sym, ctx);
+            break;
+        // TODO
+        }
+    }
+
+    for (int i = 0; i < block->statements->len; i++) {
+        AstNode *stmt = block->statements->nodes[i];
+        resolve_statement(ctx, stmt);
+    }
+}
+
 void resolve_procedure(AstDecl *procsym, Context *ctx) {
     if (procsym->status == Status_RESOLVED) return;
     procsym->status = Status_RESOLVING;
@@ -312,31 +363,7 @@ void resolve_procedure(AstDecl *procsym, Context *ctx) {
     stbds_arrpush(scope_stack, proc); // push the new scope
 
     AstBlock *block = (AstBlock *)proc->block;
-    u64 decls_len = shlenu(block->symbols);
-    for (int i = 0; i < decls_len; i++) {
-        AstDecl *sym = block->symbols[i].value;
-        switch (sym->tag) {
-        case Decl_VAR:
-            resolve_var(sym, ctx);
-            break;
-        // TODO
-        }
-    }
-
-    for (int i = 0; i < block->statements->len; i++) {
-        AstNode *stmt = block->statements->nodes[i];
-        switch (stmt->tag) {
-        case Node_CALL:
-            resolve_call(stmt, ctx);
-            break;
-        case Node_ASSIGN:
-            resolve_assignment(stmt, ctx);
-            break;
-        case Node_RETURN:
-            resolve_expression(((AstReturn *)stmt)->expr, ctx);
-            break;
-        }
-    }
+    resolve_block(ctx, block);
     procsym->status = Status_RESOLVED;
     stbds_arrpop(scope_stack); // pop the scope
 }

@@ -409,6 +409,18 @@ void check_if(Context *ctx, AstStmt *node) {
     } else check_statement(ctx, iff->block_or_stmt);
 }
 
+void check_while(Context *ctx, AstStmt *node) {
+    assert(node->tag == Stmt_WHILE);
+    AstWhile *w = (AstWhile *)node;
+    if (w->condition->resolved_type != ctx->type_bool) {
+        compile_error_start(ctx, stmt_tok(node), "'while' statement requires a condition which evaluates to a boolean, this one evaluates to ");
+        print_type(w->condition->resolved_type, stderr);
+        compile_error_end();
+        return;
+    }
+    check_block(ctx, (AstBlock *)w->block, Node_ZERO);
+}
+
 bool check_assignment(Context *ctx, AstBinary *binary) {
     assert(is_assignment(*binary));
 
@@ -457,6 +469,9 @@ void check_statement(Context *ctx, AstStmt *node) {
     switch (node->tag) {
     case Stmt_IF:
         check_if(ctx, node);
+        break;
+    case Stmt_WHILE:
+        check_while(ctx, node);
         break;
     case Stmt_CALL:
         check_call(ctx, (AstNode *)node);

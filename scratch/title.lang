@@ -1,5 +1,11 @@
 proc main() {
     i := 1
+    while 10 < 10 {
+        i: T
+        return
+    }
 }
+
+type T: int
 
 //*store.position[0].x = 12; // TODO fix
