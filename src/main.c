@@ -80,7 +80,7 @@ bool process_file(const char *file_path) {
 
     if (context.error_count > 0) {
         // dump_parser_errors(&context.parser);
-        print_ast_errors(&context, &ast);
+        //print_ast_errors(&context, &ast);
         goto end;
     }
 

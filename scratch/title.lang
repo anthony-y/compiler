@@ -1,18 +1,5 @@
 proc main() {
-    player: Entity;
-    store : ComponentStorage;
-
-    //*store.position[0].x = 12; // TODO fix
+    i := 1
 }
 
-type Entity: int;
-
-type ComponentStorage: struct {
-    positions: []struct{x: ^int; y: int};
-    position:    struct{x: ^int};
-    // ...
-}
-
-proc draw()      #foreign;
-proc update()    #foreign;
-proc get_input() #foreign;
+//*store.position[0].x = 12; // TODO fix

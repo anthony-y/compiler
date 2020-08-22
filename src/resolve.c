@@ -156,7 +156,7 @@ void resolve_struct(AstStruct *def, Context *ctx) {
     for (int i = 0; i < len; i++) {
         AstDecl *field = table[i].value;
         if (field->tag != Decl_VAR) {
-            compile_error(ctx, decl_tok(field), "Only variable declarations are valid inside a struct body"); // this is semantic checking but we have to do it here otherwise it's a nightmare
+            compile_error(ctx, decl_tok(field), "only variable declarations are valid inside a struct body"); // this is semantic checking but we have to do it here otherwise it's a nightmare
         }
         resolve_var(field, ctx);
     }

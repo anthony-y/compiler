@@ -98,68 +98,6 @@ AstNode *ast_stmt(Parser *p, AstNodeType tag, Token t, const AstStmt *stmt) {
     return node;
 }
 
-AstNode *make_error_node(Parser *p, Token tok, const char *msg) {
-    AstNode *n = malloc(sizeof(AstNode));
-    n->token = tok;
-    n->tag = Node_ERROR;
-    n->as.error.msg = arena_alloc(&p->error_msg_allocator, strlen(msg)+1);
-    strcpy(n->as.error.msg, msg);
-
-    p->error_count++;
-
-    //printf("Error: line %lu in %s: %s\n", tok.line, NULL, n->error.msg);
-
-    return n;
-}
-
-AstStmt *make_stmt_error(Parser *p, char *msg) {
-    AstError err = (AstError){.msg = msg};
-    AstNode *errnode = ast_node(p, Node_ERROR, *p->prev);
-    errnode->as.stmt.tag = Stmt_ERROR;
-    errnode->as.stmt.as.error = err;
-    p->error_count++;
-    return &errnode->as.stmt;
-}
-
-AstExpr *make_expr_error(Parser *p, char *msg) {
-    AstError err = (AstError){.msg = msg};
-    AstNode *errnode = ast_node(p, Node_ERROR, *p->prev);
-    errnode->as.expr.tag = Expr_ERROR;
-    errnode->as.expr.as.error = err;
-    p->error_count++;
-    return &errnode->as.expr;
-}
-
-AstStmt *make_err_into_stmt(Parser *p, const AstNode *err) {
-    AstNode *new = ast_node(p, Node_ERROR, err->token);
-    new->as.stmt.tag = Stmt_ERROR;
-    new->as.stmt.as.error = err->as.error;
-    return &new->as.stmt;
-}
-
-AstExpr *make_err_into_expr(Parser *p, const AstNode *err) {
-    AstNode *new = ast_node(p, Node_ERROR, err->token);
-    new->as.expr.tag = Expr_ERROR;
-    new->as.expr.as.error = err->as.error;
-    return &new->as.expr;
-}
-
-AstNode *make_expr_err_into_node(Parser *p, const AstExpr *err) {
-    Token t = ((AstNode *)err)->token;
-    AstNode *new = make_error_node(p, t, err->as.error.msg);
-    return new;
-}
-
-/*
-void change_error_message(Parser *p, AstNode *node, const char *msg) {
-    assert(node->tag == Node_ERROR);
-    node->error.msg = arena_alloc(&p->error_msg_allocator, strlen(msg));
-    strcpy(node->error.msg, msg);
-
-    printf("Error: %s on line %lu: %s\n", NULL, node->error.line, node->error.msg);
-}
-*/
-
 inline bool is_assignment(AstBinary b) {
     return (b.op > Token_ASSIGNMENTS_START && b.op < Token_ASSIGNMENTS_END);
 }

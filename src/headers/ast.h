@@ -11,16 +11,12 @@ struct Name; // context.h
 struct Context;
 
 typedef enum {
-    Decl_ERROR,
-
     Decl_PROC,
     Decl_VAR,
     Decl_TYPEDEF,
 } DeclType;
 
 typedef enum {
-    Expr_ERROR,
-
     Expr_LITERALS_START,
     Expr_INT,
     Expr_FLOAT,
@@ -41,8 +37,6 @@ typedef enum {
 } ExprType;
 
 typedef enum {
-    Stmt_ERROR,
-
     Stmt_ASSIGN,
     Stmt_IMPORT,
     Stmt_BLOCK,
@@ -57,8 +51,6 @@ typedef enum {
 
 typedef enum {
     Node_ZERO, // nothing, just a sentinal value
-
-    Node_ERROR,
 
     Node_TYPENAME,
     Node_PROC_MOD,
@@ -248,14 +240,8 @@ typedef struct AstBlock {
     struct AstBlock *parent;
 } AstBlock;
 
-typedef struct AstError {
-    char *msg;
-} AstError;
-
 typedef struct AstExpr {
     union {
-        AstError error;
-
         struct Name *name;
         AstLiteral literal;
         AstCast cast;
@@ -272,8 +258,6 @@ typedef struct AstExpr {
 
 typedef struct AstStmt {
     union {
-        AstError error;
-
         AstExpr assign; // TODO replace with real assignment
         AstImport _import;
         AstBlock block;
@@ -289,8 +273,6 @@ typedef struct AstStmt {
 
 typedef struct AstDecl {
     union {
-        AstError error;
-
         AstProcedure proc;
         AstVar var;
         AstTypedef typedefi;
@@ -306,8 +288,6 @@ typedef struct AstDecl {
 
 typedef struct AstNode {
     union {
-        AstError error;
-
         AstExpr expr;
         AstDecl decl;
         AstStmt stmt;
@@ -359,15 +339,6 @@ AstStmt *ast_defer(struct Parser *p, Token t, const AstDefer *d);
 
 AstExpr *ast_call_expr(struct Parser *p, Token t, const AstCall *call);
 AstStmt *ast_call_stmt(struct Parser *p, Token t, const AstCall *call);
-
-AstNode *make_error_node(struct Parser *, Token, const char *msg);
-//AstNode *make_ident_node(struct Context *, Token);
-
-AstStmt *make_stmt_error(struct Parser *p, char *msg);
-AstExpr *make_expr_error(struct Parser *p, char *msg);
-AstStmt *make_err_into_stmt(struct Parser *p, const AstNode *err);
-AstExpr *make_err_into_expr(struct Parser *p, const AstNode *err);
-AstNode *make_expr_err_into_node(struct Parser *p, const AstExpr *err);
 
 struct Name *get_decl_name(AstNode *);
 
