@@ -147,7 +147,7 @@ static AstExpr *parse_simple_expr(Context *c) {
         cast.typename = parse_typename(c);
 
         if (!consume(p, Token_CLOSE_PAREN)) {
-            compile_error(c, *p->curr, "incorrect cast syntax (missing an closing parenthese)");
+            compile_error(c, *p->curr, "incorrect cast syntax (missing a closing parenthese)");
             parser_recover(p, Token_SEMI_COLON);
             return NULL;
         }
@@ -166,7 +166,7 @@ static AstExpr *parse_simple_expr(Context *c) {
 
     case Token_IDENT: {
         if (p->curr[1].type == Token_COLON) {
-            compile_error(c, *p->curr, "expected an expression, got a variable declaration.");
+            compile_error(c, *p->curr, "expected an expression, got a variable declaration");
             return NULL;
         }
 
@@ -584,7 +584,7 @@ static AstStmt *parse_if(Context *c) {
     } else if (consume(p, Token_OPEN_BRACE)) {
         _if.block_or_stmt = parse_block(c);
     } else {
-        compile_error(c, *p->curr, "expected an open brace or 'then' on 'if' statement.");
+        compile_error(c, *p->curr, "expected an open brace or 'then' on 'if' statement");
         parser_recover_to_declaration(p);
         return NULL;
     }
@@ -770,7 +770,7 @@ static AstNode *parse_proc(Context *c, bool in_typedef) {
             }
             AstDecl *decl = &arg->as.decl;
             if (decl->as.var.flags & VAR_IS_INITED) {
-                compile_error(c, arg->token, "this language does not (yet) have default call values; procedure parameters must be uninitialized.");
+                compile_error(c, arg->token, "this language does not (yet) have default call values; procedure parameters must be uninitialized");
                 parser_recover(p, Token_CLOSE_PAREN);
             }
 
@@ -797,7 +797,7 @@ static AstNode *parse_proc(Context *c, bool in_typedef) {
 
     if (in_typedef) {
         if (p->curr->type == Token_OPEN_BRACE) {
-            compile_error(c, *p->prev, "a typedef'd procedure must not have body.");
+            compile_error(c, *p->prev, "a typedef'd procedure must not have body");
             parser_recover_to_declaration(p);
             return NULL;
         }
@@ -818,7 +818,7 @@ static AstNode *parse_proc(Context *c, bool in_typedef) {
         }
         proc.flags |= modifier;
     } else if (!consume(p, Token_OPEN_BRACE)) {
-        compile_error(c, *p->curr, "expected a block on procedure declaration.");
+        compile_error(c, *p->curr, "expected a block on procedure declaration");
         parser_recover_to_declaration(p);
         return NULL;
     } else {
