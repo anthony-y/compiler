@@ -429,7 +429,7 @@ bool check_assignment(Context *ctx, AstExpr *expr, bool lhs_must_be_pointer) {
     bool is_maths_assign = binary->op != Token_EQUAL; // is it a normal assignment? or *=, etc.
     if (is_maths_assign) {
         Type *real_left = maybe_unwrap_type_alias(left_type);
-        if (!is_type_numeric(left_type) || !is_type_numeric(right_type)) {
+        if (!is_type_numeric(real_left) || !is_type_numeric(right_type)) {
             compile_error(ctx, tok, "type mismatch: arithmetic-assign operator expects numerical operands");
             return false;
         }
