@@ -866,18 +866,6 @@ static AstNode *parse_statement(Context *c) {
         if (p->curr[1].type == Token_COLON) {
             return parse_var_as_decl(c, false);
         }
-
-        AstExpr *expr = parse_expression(c, 1);
-        if (!expr) {
-            return NULL;
-        }
-
-        if (expr->tag == Expr_NAME) {
-            compile_error(c, *p->curr, "unexpected identifier");
-            return NULL;
-        }
-
-        return (AstNode *)ast_assignment(p, start, expr);
     }
     }
 
@@ -885,15 +873,15 @@ static AstNode *parse_statement(Context *c) {
     if (!expr_left) {
         return NULL;
     }
+    if (expr_left->tag == Expr_NAME) {
+        compile_error(c, expr_tok(expr_left), "unexpected identifier");
+        return NULL;
+    }
     if (expr_left->tag != Expr_BINARY && expr_left->tag != Expr_UNARY) {
         compile_error(c, *p->curr, "only assignments are allowed as statements");
         return NULL;
     }
     return (AstNode *)ast_assignment(p, start, expr_left);
-
-    // AstNode *err = make_error_node(p, start, "failed to parse statement.");
-    // parser_recover(p, Token_SEMI_COLON);
-    // return err;
 }
 
 Ast parse(Context *c) {

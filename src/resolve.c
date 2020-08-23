@@ -19,29 +19,28 @@ static void resolve_block(Context *ctx, AstBlock *block);
 static AstProcedure **proc_stack = NULL;
 static AstBlock **scope_stack = NULL;
 
+static void resolve_assignment_expr(AstExpr *assign, Context *ctx) {
+    if (assign->tag == Expr_UNARY) {
+        AstUnary *unary = (AstUnary *)assign;
+        resolve_assignment_expr(unary->expr, ctx);
+    } else if (assign->tag == Expr_BINARY) {
+        AstBinary *bin = (AstBinary *)assign;
+        if (!is_assignment(*bin)) {
+            compile_error(ctx, expr_tok(assign), "expected assignment"); // TODO maybe bad
+            return;
+        }
+        resolve_expression(bin->left, ctx);
+        resolve_expression(bin->right, ctx);
+    } else {
+        compile_error(ctx, expr_tok(assign), "expected assignment");
+    }
+}
+
 // Resolves the dependencies of an assignment statement,
 static void resolve_assignment(AstNode *ass, Context *ctx) {
     assert(ass->tag == Node_ASSIGN);
-    AstExpr *expr = (AstExpr *)ass;
-    switch (expr->tag) {
-    case Expr_UNARY: {
-        AstUnary *unary = (AstUnary *)expr;
-    } break;
-    case Expr_BINARY: {
-        AstBinary *binary = (AstBinary *)expr;
-    } break;
-    case Expr_PAREN: {
-        
-    } break;
-    }
-    // TODO maybe just rearrange the nodes during parsing to make this less complex
-}
-
-static Type *resolve_deref_assignment(AstStmt *node, Context *ctx) {
-    AstUnary *unary = (AstUnary *)node;
-    Type *ref_type = resolve_expression(unary->expr, ctx);
-    if (!ref_type) return NULL;
-    return ref_type->data.base;
+    AstStmt *stmt = (AstStmt *)ass;
+    resolve_assignment_expr(&stmt->as.assign, ctx);
 }
 
 static AstProcedure *resolve_call(AstNode *callnode, Context *ctx) {
@@ -91,8 +90,9 @@ static Type *resolve_expression_1(AstExpr *expr, Context *ctx) {
                 compile_error(ctx, t, "expected pointer operand to dereference");
                 return NULL;
             }
+            return expr_type->data.base;
         }
-        return expr_type->data.base;
+        return expr_type;
     } break;
     case Expr_NAME: {
         Name *name = expr->as.name;
@@ -101,11 +101,11 @@ static Type *resolve_expression_1(AstExpr *expr, Context *ctx) {
         AstBlock *scope = stbds_arrlast(scope_stack);
 
         AstDecl *var = lookup_local(ctx, in, name, scope);
-        assert(var->name == name);
         if (!var) {
             compile_error(ctx, t, "undeclared identifier \"%s\"", name->text);
             return NULL;
         }
+        assert(var->name == name);
         if (var->status == Status_UNRESOLVED) {
             Type *resolved_type = resolve_var(var, ctx);
             return resolved_type;
@@ -133,10 +133,17 @@ static Type *resolve_expression_1(AstExpr *expr, Context *ctx) {
         resolve_expression(index->index, ctx);
         return resolved_name->data.base;
     } break;
+
     case Expr_BINARY: {
         AstBinary *bin = (AstBinary *)expr;
         if (bin->op == Token_DOT) {
             return resolve_selector(ctx, bin);
+        }
+        if (is_assignment(*bin)) {
+            resolve_assignment_expr(expr, ctx);
+            if (bin->op != Token_EQUAL) {
+                return ctx->type_int;
+            }
         }
         Type *lhs = resolve_expression(bin->left, ctx);
         resolve_expression(bin->right, ctx);
@@ -145,6 +152,7 @@ static Type *resolve_expression_1(AstExpr *expr, Context *ctx) {
         }
         return lhs;
     } break;
+
     case Expr_PAREN: {
         return resolve_expression(((AstParen *)expr)->sub_expr, ctx);
     } break;
@@ -183,7 +191,7 @@ static Type *resolve_type(Context *ctx, Type *type, bool cyclic_allowed) {
     // We resolve those and wrap them back up each time.
     //
     if (type->kind == Type_POINTER)
-        return make_pointer_type(resolve_type(ctx, type->data.base, true));
+        return make_pointer_type(resolve_type(ctx, type->data.base, true)); // ... cyclic_allowed should only be passed as true here and below
 
     if (type->kind == Type_ARRAY)
         return make_array_type(resolve_type(ctx, type->data.base, true));
@@ -191,17 +199,25 @@ static Type *resolve_type(Context *ctx, Type *type, bool cyclic_allowed) {
     if (type->kind != Type_UNRESOLVED)
         return type;
 
+    // Unresolved types (that is, types which are used before they are defined) are returned
+    // as placeholder types in the type table. If they then go on to be defined in the source code,
+    // they will be placed into the type table.
+    // Here, we lookup the type in the type table. If it is not found, then it was never declared.
+    // ...
     u64 i = shgeti(ctx->type_table, type->name);
     if (i == -1) {
         compile_error(ctx, t, "undeclared type \"%s\"", type->name);
         return NULL;
     }
 
+    // ... if it was we store it here
     Type *real_type = ctx->type_table[i].value;
 
+    // Next we'll look up the actual declaration of the type.
     u64 type_i = shgeti(ctx->symbol_table, type->name);
     AstDecl *sym = ctx->symbol_table[type_i].value;
 
+    // If the declaration is already resolving...
     if (sym->status == Status_RESOLVING) {
         if (cyclic_allowed) {
             sym->status = Status_RESOLVED;
@@ -211,7 +227,7 @@ static Type *resolve_type(Context *ctx, Type *type, bool cyclic_allowed) {
         return NULL;
     }
 
-    sym->status = Status_RESOLVING;
+    sym->status = Status_RESOLVING; // the above if statements works because of this
 
     if (sym->tag != Decl_TYPEDEF) {
         compile_error(ctx, t, "\"%s\" is not a type", type->name);
@@ -222,6 +238,7 @@ static Type *resolve_type(Context *ctx, Type *type, bool cyclic_allowed) {
     if (my_typedef->of->tag == Node_STRUCT) {
         resolve_struct(&my_typedef->of->as.stmt.as._struct, ctx);
     }
+
     sym->status = Status_RESOLVED;
 
     return real_type;

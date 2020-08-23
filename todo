@@ -1,12 +1,10 @@
+Array indexes inside compound expressions (e.g: a.b[0].z)
+
+
+Type resolution for binary expressions, specifically maths. Just returning type of left or right side
+wont work out. Check the resolved type of binary exprs if mystery bugs (errors or lack thereof) show up.
+
 Check if the casts expression can even be casted to the requested type
-
-Parse assignments
-    Didn't consider arbitrary expressions on lhs before
-        Need to reimplement
-
-Check binary maths
-
-Change AstBinary stmt to AstAssignment
 
 //
 // Syntax

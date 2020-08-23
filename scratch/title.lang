@@ -1,9 +1,11 @@
 proc main() {
-    b := 1;
+    b := -1;
     i := cast(u64)b;
-    while (b < i) {
+    while b < i {
+        b += 12;
         return;
     }
+    my_ptr: ^int = ^b;
+    (*my_ptr+1) = 10;
+    i = *my_ptr;
 }
-
-//*store.position[0].x = 12; // TODO fix

@@ -15,7 +15,7 @@ proc whatever() {
 }
 
 proc _1() {
-    i := 10 + "st" // TODO shouldn't work
+    i := 10 + "st"
 }
 
 type Field: struct {

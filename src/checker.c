@@ -16,7 +16,7 @@
 void check_statement  (Context *, AstStmt *);
 void check_block      (Context *, AstBlock *, AstNodeType);
 void check_struct     (Context *, AstStruct *);
-bool check_assignment (Context *, AstBinary *);
+bool check_assignment(Context *ctx, AstExpr *expr, bool lhs_must_be_pointer);
 bool does_type_describe_expr(Context *ctx, Type *type, AstExpr *expr);
 
 // Returns true if `a` and `b` point to the same Type, false otherwise.
@@ -49,7 +49,7 @@ static bool do_types_match(Context *ctx, Type *a, Type *b) {
         return do_types_match(ctx, b, a);
     }
 
-    if (a->kind == Type_PRIMITIVE && b->kind == Type_PRIMITIVE && a->data.signage != Signage_NaN && b->data.signage != Signage_NaN) { // both types are integer types
+    if (is_type_numeric(a) && is_type_numeric(b)) { // both types are integer types
         return (a->data.signage == b->data.signage && a->size == b->size);
     }
 
@@ -65,11 +65,8 @@ static Type *maybe_unwrap_type_alias(Type *alias) {
     return alias->data.alias_of;
 }
 
-// Performs semantic analysis on a function call.
-// Returns true if the call was semantically correct, otherwise false.
-// Writes the return type to `out_return_type` ONLY if it is SUCCEEDS.
-// Prints its own errors.
-// You may pass `out_return_type` as NULL.
+// Performs type checking on a call and ensures it's arguments are correct.
+// Prints it's own errors.
 static bool check_call(Context *ctx, AstNode *callnode) {
     AstCall *call = (AstCall *)callnode;
 
@@ -116,35 +113,81 @@ static bool check_call(Context *ctx, AstNode *callnode) {
     return true;
 }
 
-static bool check_deref_assign(Context *ctx, const AstUnary *unary) {
-    Token expr_token = ((AstNode *)unary)->token;
-    AstBinary *assignment = NULL;
-    assert(unary->expr->tag == Expr_BINARY);
-    if (!is_assignment(unary->expr->as.binary)) {
-        compile_error(ctx, expr_token, "expected pointer dereference to be the LHS of an assignment statement");
-        return FAILED_BUT_DONT_ERROR_AT_CALL_SITE;
+static bool check_unary_against_type(Context *ctx, AstUnary *unary, Type *against, Token expr_token) {
+    Type *sub_expr_type = unary->expr->resolved_type;
+
+    if (unary->op == Token_BANG) {
+        if (sub_expr_type->kind != Type_POINTER && sub_expr_type != ctx->type_bool) {
+            compile_error(ctx, expr_token, "unary \"not\" expression must have a boolean or pointer operand");
+            return false;
+        }
+        return (against == ctx->type_bool || against->kind == Type_POINTER);
     }
-    assignment = (AstBinary *)unary->expr;
-    Type *lhs_type = assignment->left->resolved_type;
-    if (lhs_type->kind != Type_POINTER) {
-        compile_error_start(ctx, expr_token, "pointer dereference expects a pointer operand, but was given type ");
-        print_type(lhs_type, stderr);
-        compile_error_end();
-        return FAILED_BUT_DONT_ERROR_AT_CALL_SITE;
+
+    if (unary->op == Token_MINUS) {
+        if (!is_type_numeric(unary->expr->resolved_type)) {
+            compile_error_start(ctx, expr_token, "unary negating expression expects integer or float operand, given ");
+            print_type(unary->expr->resolved_type, stderr);
+            compile_error_end();
+            return FAILED_BUT_DONT_ERROR_AT_CALL_SITE;
+        }
+        return true;
     }
-    Type *elem = lhs_type->data.base;
-    if (!does_type_describe_expr(ctx, elem, assignment->right)) {
-        compile_error_start(ctx, expr_token, "type mismatch: cannot assign value of type ");
-        print_type(assignment->right->resolved_type, stderr);
-        compile_error_add_line(ctx, " to ");
-        print_type(elem, stderr);
-        compile_error_add_line(ctx, " (derefernced from ");
-        print_type(lhs_type, stderr);
-        compile_error_add_line(ctx, ")");
-        compile_error_end();
-        return false;
+
+    if (unary->op == Token_STAR) { // dereference
+        if (unary->expr->tag == Expr_BINARY) {
+            check_assignment(ctx, unary->expr, true);
+        }
+        if (sub_expr_type->kind != Type_POINTER) {
+            compile_error_start(ctx, expr_token, "pointer dereference expects a pointer operand, but was given type ");
+            print_type(sub_expr_type, stderr);
+            compile_error_end();
+            return FAILED_BUT_DONT_ERROR_AT_CALL_SITE;
+        }
+        return true;
     }
-    return true;
+
+    if (unary->op == Token_CARAT) { // address-of operator
+        if (against->kind != Type_POINTER) return false;
+
+        int addressof_depth = 1; // we'll use this a bit later on to create the real type of the expression.
+        while (unary->expr->tag == Expr_UNARY && unary->expr->as.unary.op == Token_CARAT) {
+            unary = &unary->expr->as.unary;
+            addressof_depth++;
+        }
+
+        sub_expr_type = unary->expr->resolved_type;
+
+        // It's a literal, you can't get a pointer to a literal
+        if (unary->expr->tag > Expr_LITERALS_START && unary->expr->tag < Expr_LITERALS_END) {
+            compile_error(ctx, expr_token, "cannot get the address of a literal value");
+            return false;
+        }
+
+        else if (unary->expr->tag == Expr_CALL) {
+            if (!check_call(ctx, (AstNode *)unary->expr)) {
+                return false;
+            }
+        }
+
+        assert(sub_expr_type);
+
+        // Both of these start out as the same value, but by the end
+        // resulting_type will still point to the outer pointer type,
+        // and inner_type will point to the inner-most pointer.
+        Type *resulting_type = make_pointer_type(NULL);
+        Type *inner_type = resulting_type;
+
+        for (int i = 1; i < addressof_depth; i++) { // i starts at 1 because we're already 1 deep
+            Type *inner_ptr = make_pointer_type(NULL);
+            inner_type->data.base = inner_ptr;
+            inner_type = inner_ptr;
+        }
+        inner_type->data.base = sub_expr_type;
+
+        return do_pointer_types_match(ctx, against, resulting_type);
+    }
+    return false;
 }
 
 static bool can_type_cast_to_type(Context *ctx, AstExpr *site, Type *from, Type *to) {
@@ -179,7 +222,7 @@ bool does_type_describe_expr(Context *ctx, Type *type, AstExpr *expr) {
         }
 
         // In other words, if the type is an int, allow any other integer type to be compatible with it.
-        if (type == ctx->type_int) return (return_type->kind == Type_PRIMITIVE && return_type->data.signage != Signage_NaN);
+        if (type == ctx->type_int) return is_type_numeric(return_type);
 
         return do_types_match(ctx, type, return_type);
     }
@@ -193,7 +236,7 @@ bool does_type_describe_expr(Context *ctx, Type *type, AstExpr *expr) {
             return (type == ctx->type_bool);
         }
         if (is_assignment(*binary)) {
-            return check_assignment(ctx, binary);
+            return check_assignment(ctx, expr, false);
         }
         if (binary->op == Token_DOT) {
             return do_types_match(ctx, expr->resolved_type, type);
@@ -201,91 +244,14 @@ bool does_type_describe_expr(Context *ctx, Type *type, AstExpr *expr) {
 
         Type *left_type = binary->left->resolved_type;
         Type *right_type = binary->right->resolved_type;
-        if (left_type->kind != Type_POINTER || (left_type->kind == Type_PRIMITIVE && left_type->data.signage == Signage_NaN)) {
-            compile_error(ctx, expr_token, "left hand side of arithmetic expression must be of one of these types: integer, floating point or pointer");
-            return true; // We don't want more errors after this, so return true
+        if (!is_type_numeric(left_type) || !is_type_numeric(right_type)) {
+            compile_error(ctx, expr_token, "operands of arithmetic expressions need to be numeric");
+            return FAILED_BUT_DONT_ERROR_AT_CALL_SITE;
         }
-        if (right_type->kind != Type_POINTER || (right_type->kind == Type_PRIMITIVE && right_type->data.signage == Signage_NaN)) {
-            compile_error(ctx, expr_token, "right hand side of arithmetic expression must be of one of these types: integer, floating point or pointer");
-            return true; // We don't want more errors after this, so return true
-        }
-        return (type->kind == Type_PRIMITIVE && type->data.signage != Signage_NaN);
+        return is_type_numeric(type);
     } break;
     case Expr_UNARY: {
-        const AstUnary *unary = &expr->as.unary;
-        Type *sub_expr_type = unary->expr->resolved_type;
-
-        if (unary->op == Token_BANG) {
-            if (sub_expr_type->kind != Type_POINTER && sub_expr_type != ctx->type_bool) {
-                compile_error(ctx, expr_token, "unary \"not\" expression must have a boolean or pointer operand");
-                return false;
-            }
-            return (type == ctx->type_bool || type->kind == Type_POINTER);
-        }
-
-        if (unary->op == Token_MINUS) {
-            if (sub_expr_type->kind != Type_PRIMITIVE && sub_expr_type->data.signage != Signage_NaN) {
-                compile_error_start(ctx, expr_token, "unary negating expression expects integer or float operand, given ");
-                print_type(unary->expr->resolved_type, stderr);
-                compile_error_end();
-                return FAILED_BUT_DONT_ERROR_AT_CALL_SITE;
-            }
-            return true;
-        }
-
-        if (unary->op == Token_STAR) { // dereference
-            if (unary->expr->tag != Expr_BINARY) {
-                check_assignment(ctx, (AstBinary *)unary->expr);
-            }
-            if (sub_expr_type->kind != Type_POINTER) {
-                compile_error_start(ctx, expr_token, "pointer dereference expects a pointer operand, but was given type ");
-                print_type(sub_expr_type, stderr);
-                compile_error_end();
-                return FAILED_BUT_DONT_ERROR_AT_CALL_SITE;
-            }
-            return true;
-        }
-
-        if (unary->op == Token_CARAT) { // address-of operator
-            if (type->kind != Type_POINTER) return false;
-
-            int addressof_depth = 1; // we'll use this a bit later on to create the real type of the expression.
-            while (unary->expr->tag == Expr_UNARY && unary->expr->as.unary.op == Token_CARAT) {
-                unary = &unary->expr->as.unary;
-                addressof_depth++;
-            }
-
-            sub_expr_type = unary->expr->resolved_type;
-
-            // It's a literal, you can't get a pointer to a literal
-            if (unary->expr->tag > Expr_LITERALS_START && unary->expr->tag < Expr_LITERALS_END) {
-                compile_error(ctx, expr_token, "cannot get the address of a literal value");
-                return false;
-            }
-
-            else if (unary->expr->tag == Expr_CALL) {
-                if (!check_call(ctx, (AstNode *)unary->expr)) {
-                    return false;
-                }
-            }
-
-            assert(sub_expr_type);
-
-            // Both of these start out as the same value, but by the end
-            // resulting_type will still point to the outer pointer type,
-            // and inner_type will point to the inner-most pointer.
-            Type *resulting_type = make_pointer_type(NULL);
-            Type *inner_type = resulting_type;
-
-            for (int i = 1; i < addressof_depth; i++) { // i starts at 1 because we're already 1 deep
-                Type *inner_ptr = make_pointer_type(NULL);
-                inner_type->data.base = inner_ptr;
-                inner_type = inner_ptr;
-            }
-            inner_type->data.base = sub_expr_type;
-
-            return do_pointer_types_match(ctx, type, resulting_type);
-        }
+        return check_unary_against_type(ctx, (AstUnary *)expr, type, expr_token);
     } break;
     case Expr_CAST: {
         AstCast *cast = &expr->as.cast;
@@ -319,7 +285,7 @@ bool does_type_describe_expr(Context *ctx, Type *type, AstExpr *expr) {
     case Expr_NULL:
         return (type->kind == Type_POINTER);
     case Expr_INT:
-        return (type->kind == Type_PRIMITIVE && type->data.signage != Signage_NaN);
+        return is_type_numeric(type);
     case Expr_STRING:
         return (type == ctx->type_string);
     case Expr_BOOL:
@@ -435,22 +401,49 @@ void check_while(Context *ctx, AstStmt *node) {
     check_block(ctx, (AstBlock *)w->block, Node_ZERO);
 }
 
-bool check_assignment(Context *ctx, AstBinary *binary) {
-    assert(is_assignment(*binary));
+bool check_assignment(Context *ctx, AstExpr *expr, bool lhs_must_be_pointer) {
+    Token tok = expr_tok(expr);
+    if (expr->tag == Expr_UNARY) {
+        AstUnary *u = (AstUnary *)expr;
+        if (u->op != Token_STAR) {
+            compile_error(ctx, tok, "unary expression on left hand side of assignment must be a dereference");
+            return false;
+        }
+        return check_assignment(ctx, u->expr, true);
+    }
 
-    Type *left_type  = binary->left->resolved_type;
+    // expr is ensured to be either Expr_UNARY or Expr_BINARY
+
+    AstBinary *binary = (AstBinary *)expr;
+
+    Type *left_type = binary->left->resolved_type;
     Type *right_type = binary->right->resolved_type;
 
     if (binary->left->tag == Expr_PAREN) {
         left_type = ((AstParen *)binary->left)->sub_expr->resolved_type;
     }
 
-    Token tok = ((AstNode *)binary)->token;
-
-    bool is_math_assign = binary->op != Token_EQUAL; // is it a normal assignment? or *=, etc.
-
     assert(left_type);
     assert(right_type);
+
+    bool is_maths_assign = binary->op != Token_EQUAL; // is it a normal assignment? or *=, etc.
+    if (is_maths_assign) {
+        Type *real_left = maybe_unwrap_type_alias(left_type);
+        if (!is_type_numeric(left_type) || !is_type_numeric(right_type)) {
+            compile_error(ctx, tok, "type mismatch: arithmetic-assign operator expects numerical operands");
+            return false;
+        }
+    }
+
+    if (lhs_must_be_pointer) {
+        if (left_type->kind != Type_POINTER) {
+            compile_error_start(ctx, tok, "cannot dereference type ");
+            print_type(left_type, stderr);
+            compile_error_end();
+            return false;
+        }
+        left_type = left_type->data.base; // unwrap
+    }
 
     if (!does_type_describe_expr(ctx, left_type, binary->right)) {
         compile_error_start(ctx, tok, "type mismatch: cannot assign value of type ");
@@ -491,16 +484,7 @@ void check_statement(Context *ctx, AstStmt *node) {
         check_call(ctx, (AstNode *)node);
         break;
     case Stmt_ASSIGN: {
-        // Guaranteed to be an assignment by parser
-        AstExpr *e = (AstExpr *)node;
-        assert(e->tag == Expr_UNARY || e->tag == Expr_BINARY);
-        // if (e->tag == Expr_UNARY) {
-        //     check_deref_assign(ctx, (AstUnary *)e);
-        // } else if (e->tag == Expr_BINARY){
-        //     check_assignment(ctx, (AstBinary *)e);
-        // } else {
-        //     compile_error(ctx, stmt_tok(node), "expected an assignment or declaration");
-        // }
+        check_assignment(ctx, &node->as.assign, false);
     } break;
     case Stmt_RETURN: {
         if (check_proc_return_value(ctx, node)) {

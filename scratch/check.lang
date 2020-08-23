@@ -1,6 +1,6 @@
 proc main() {
     my_s: S
-    my_s.s.d.s = null
+    my_s.s[0].d.s[0] = null
     msg := hi()
 }
 
@@ -9,8 +9,8 @@ proc hi(): string {
 }
 
 type S: struct {
-    //s: []struct{d: ^string};
-    s: ^D;
+    s: []struct{d: ^string};
+    //s: ^D;
 }
 
 type D: struct {

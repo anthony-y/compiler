@@ -39,6 +39,10 @@ Type *make_array_type(Type *base) {
     return out;
 }
 
+inline bool is_type_numeric(Type *t) {
+    return (t->kind == Type_PRIMITIVE && t->data.signage != Signage_NaN);
+}
+
 // Allocates a type, fills out its basic fields, adds it to the type table and returns it.
 static inline Type *make_and_insert_primitive(Context *ctx, char *name, u64 size, Signage signage) {
     Type *t = make_type(Type_PRIMITIVE, name, size);
