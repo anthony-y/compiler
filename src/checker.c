@@ -147,6 +147,17 @@ static bool check_deref_assign(Context *ctx, const AstUnary *unary) {
     return true;
 }
 
+static bool can_type_cast_to_type(Context *ctx, AstExpr *site, Type *from, Type *to) {
+    if (do_types_match(ctx, to, from)) {
+        compile_error(ctx, expr_tok(site), "unnecessary cast"); // TODO make this a warning
+        return true;
+    }
+    if (from->data.signage != Signage_NaN) {
+        return (to != ctx->type_string);
+    }
+    return true;
+}
+
 // Returns true if `expr` is compatible with `type`.
 bool does_type_describe_expr(Context *ctx, Type *type, AstExpr *expr) {
     Token expr_token = expr_tok(expr);
@@ -246,7 +257,7 @@ bool does_type_describe_expr(Context *ctx, Type *type, AstExpr *expr) {
 
             sub_expr_type = unary->expr->resolved_type;
 
-            // It's a literal, you can't get a pointer a literal
+            // It's a literal, you can't get a pointer to a literal
             if (unary->expr->tag > Expr_LITERALS_START && unary->expr->tag < Expr_LITERALS_END) {
                 compile_error(ctx, expr_token, "cannot get the address of a literal value");
                 return false;
@@ -278,12 +289,16 @@ bool does_type_describe_expr(Context *ctx, Type *type, AstExpr *expr) {
     } break;
     case Expr_CAST: {
         AstCast *cast = &expr->as.cast;
-        // TODO check if the casts expression can even be casted to the requested type
-        bool matches = do_types_match(ctx, cast->typename->as.type, type);
-        if (matches) {
-            return true;
+        Type *as_type = cast->typename->as.type;
+        if (!can_type_cast_to_type(ctx, expr, cast->expr->resolved_type, as_type)) {
+            compile_error_start(ctx, expr_token, "cannot cast value of type ");
+            print_type(cast->expr->resolved_type, stderr);
+            compile_error_add_line(ctx, " to type ");
+            print_type(as_type, stderr);
+            compile_error_end();
+            return FAILED_BUT_DONT_ERROR_AT_CALL_SITE;
         }
-        return false;
+        return do_types_match(ctx, as_type, type);
     } break;
     case Expr_INDEX: {
         Type *array_type = ((AstArrayIndex *)expr)->name->resolved_type;
@@ -347,7 +362,7 @@ bool check_proc_return_value(Context *ctx, AstStmt *retnode) {
 }
 
 bool check_var(Context *ctx, AstDecl *node) {
-    Token   tok = decl_tok(node);
+    Token tok = decl_tok(node);
     AstVar *var = &node->as.var;
 
     if (var->flags & VAR_IS_INFERRED) {
@@ -356,7 +371,6 @@ bool check_var(Context *ctx, AstDecl *node) {
             compile_error(ctx, tok, "cannot assign void value (in the form of call to \"%s\") to variable \"%s\"", var->value->as.call.name->as.name->text, node->name->text);
             return false;
         }
-        return true;
     }
 
     Type *type = var->typename->as.type;

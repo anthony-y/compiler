@@ -19,14 +19,6 @@ static char *read_file(const char *path);
 // From parser.c, circular dependency in the header files.
 Ast parse(Context *);
 
-void dump_parser_errors(const Parser *p) {
-    for (int i = 0; i < p->error_msg_allocator.pos; i++) {
-        const char c = p->error_msg_allocator.block[i];
-        if (c == '\n') printf("\n");
-        printf("%c", c);
-    }
-}
-
 // THINK: for imports, just lex, parse and resolve all the files and then merge their scopes into one scope, then generate code for the symbols, symbols that are Sym_UNRESOLVED, can be ignored.
 
 bool process_file(const char *file_path) {
@@ -73,8 +65,6 @@ bool process_file(const char *file_path) {
         /* In microseconds */
         parse_delta = (pend.tv_sec - pstart.tv_sec) * 1000000 + pend.tv_usec - pstart.tv_usec;
     #endif
-
-    context.error_count += context.parser.error_count;
 
     token_list_free(&tokens);
 
@@ -128,9 +118,10 @@ end:
         }
 
         printf("Error count: %d\n", context.error_count);
-        printf("Lexing took %ldus\n", lex_delta);
-        printf("Parsing took %ldus\n", parse_delta);
-        printf("Inferring, resolving and checking took %ldus\n", check_delta);
+        printf("Total time: %ldus\n", lex_delta + parse_delta + check_delta);
+        printf("\tLexing took %ldus\n", lex_delta);
+        printf("\tParsing took %ldus\n", parse_delta);
+        printf("\tInferring, resolving and checking took %ldus\n", check_delta);
         printf("Parser used %lu nodes out of %lu allocated.\n", context.parser.node_count, context.parser.node_allocator.capacity);
 
         free_types(&context);
@@ -142,8 +133,6 @@ end:
         return ret;
     }
 }
-
-// TODO disallow duplicate symbols
 
 int main(int arg_count, char *args[]) {
     if (arg_count < 2) {

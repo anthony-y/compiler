@@ -12,16 +12,15 @@ AstDecl *lookup_in_block(AstBlock *block, Name *name) {
     return block->symbols[index].value;
 }
 
-AstDecl *lookup_local(Context *ctx, AstProcedure *proc, Name *name) {
+AstDecl *lookup_local(Context *ctx, AstProcedure *proc, Name *name, AstBlock *start_from) {
     u64 param_i = shgeti(proc->params, name->text);
     if (param_i != -1) {
         return proc->params[param_i].value;
     }
 
-    AstBlock *block = (AstBlock *)proc->block;
-    AstDecl *s = lookup_in_block(block, name);
+    AstDecl *s = lookup_in_block(start_from, name);
     if (!s) {
-        AstBlock *parent = block->parent;
+        AstBlock *parent = start_from->parent;
         while (parent) {
             AstDecl *sym = lookup_in_block(parent, name);
             if (sym) return sym;

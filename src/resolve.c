@@ -8,17 +8,19 @@
 
 #include <assert.h>
 
-void resolve_procedure(AstDecl *procsym, Context *ctx);
-Type *resolve_var(AstDecl *varsym, Context *ctx);
-Type *resolve_selector(Context *ctx, AstBinary *accessor);
-Type *resolve_expression(AstExpr *expr, Context *ctx);
-Type *resolve_type(Context *ctx, Type *type, bool cyclic_allowed);
-void resolve_block(Context *ctx, AstBlock *block);
+static void resolve_procedure(AstDecl *procsym, Context *ctx);
+static Type *resolve_var(AstDecl *varsym, Context *ctx);
+static Type *resolve_selector(Context *ctx, AstBinary *accessor);
+static Type *resolve_expression(AstExpr *expr, Context *ctx);
+static Type *resolve_type(Context *ctx, Type *type, bool cyclic_allowed);
+static void resolve_block(Context *ctx, AstBlock *block);
 
-static AstProcedure **scope_stack = NULL; // stbds array
+// stbds arrays
+static AstProcedure **proc_stack = NULL;
+static AstBlock **scope_stack = NULL;
 
 // Resolves the dependencies of an assignment statement,
-void resolve_assignment(AstNode *ass, Context *ctx) {
+static void resolve_assignment(AstNode *ass, Context *ctx) {
     assert(ass->tag == Node_ASSIGN);
     AstExpr *expr = (AstExpr *)ass;
     switch (expr->tag) {
@@ -35,14 +37,14 @@ void resolve_assignment(AstNode *ass, Context *ctx) {
     // TODO maybe just rearrange the nodes during parsing to make this less complex
 }
 
-Type *resolve_deref_assignment(AstStmt *node, Context *ctx) {
+static Type *resolve_deref_assignment(AstStmt *node, Context *ctx) {
     AstUnary *unary = (AstUnary *)node;
     Type *ref_type = resolve_expression(unary->expr, ctx);
     if (!ref_type) return NULL;
     return ref_type->data.base;
 }
 
-AstProcedure *resolve_call(AstNode *callnode, Context *ctx) {
+static AstProcedure *resolve_call(AstNode *callnode, Context *ctx) {
     Token tok = callnode->token;
     AstCall *call = (AstCall *)callnode;
     char *str_name = call->name->as.name->text;
@@ -68,7 +70,7 @@ AstProcedure *resolve_call(AstNode *callnode, Context *ctx) {
     return calling;
 }
 
-Type *resolve_expression_1(AstExpr *expr, Context *ctx) {
+static Type *resolve_expression_1(AstExpr *expr, Context *ctx) {
     Token t = expr_tok(expr);
     switch (expr->tag) {
     case Expr_STRING: return ctx->type_string;
@@ -86,7 +88,7 @@ Type *resolve_expression_1(AstExpr *expr, Context *ctx) {
         Type *expr_type = resolve_expression(unary->expr, ctx);
         if (unary->op == Token_STAR) {
             if (expr_type->kind != Type_POINTER) {
-                compile_error(ctx, expr_tok((AstExpr *)unary), "expected pointer operand to dereference");
+                compile_error(ctx, t, "expected pointer operand to dereference");
                 return NULL;
             }
         }
@@ -94,8 +96,12 @@ Type *resolve_expression_1(AstExpr *expr, Context *ctx) {
     } break;
     case Expr_NAME: {
         Name *name = expr->as.name;
-        AstProcedure *in = stbds_arrlast(scope_stack);
-        AstDecl *var = lookup_local(ctx, in, name);
+
+        AstProcedure *in = stbds_arrlast(proc_stack);
+        AstBlock *scope = stbds_arrlast(scope_stack);
+
+        AstDecl *var = lookup_local(ctx, in, name, scope);
+        assert(var->name == name);
         if (!var) {
             compile_error(ctx, t, "undeclared identifier \"%s\"", name->text);
             return NULL;
@@ -147,7 +153,7 @@ Type *resolve_expression_1(AstExpr *expr, Context *ctx) {
     return NULL;
 }
 
-Type *resolve_expression(AstExpr *expr, Context *ctx) {
+static Type *resolve_expression(AstExpr *expr, Context *ctx) {
     if (!expr) return NULL;
     Type *re = resolve_expression_1(expr, ctx);
     expr->resolved_type = re;
@@ -167,7 +173,7 @@ void resolve_struct(AstStruct *def, Context *ctx) {
 }
 
 // Resolves an unresolved type to it's "real" type
-Type *resolve_type(Context *ctx, Type *type, bool cyclic_allowed) {
+static Type *resolve_type(Context *ctx, Type *type, bool cyclic_allowed) {
     Token t = ((AstNode *)type)->token; // TODO doesnt work lol
 
     if (type->kind == Type_PRIMITIVE) return type;
@@ -222,7 +228,7 @@ Type *resolve_type(Context *ctx, Type *type, bool cyclic_allowed) {
 }
 
 // Resolves the dependencies of a selector and returns the type of the field it selects.
-Type *resolve_selector(Context *ctx, AstBinary *accessor) { // TODO rename to resolve_selector
+static Type *resolve_selector(Context *ctx, AstBinary *accessor) { // TODO rename to resolve_selector
     assert(accessor->op == Token_DOT);
 
     Name *rhs = accessor->right->as.name;
@@ -262,7 +268,7 @@ Type *resolve_selector(Context *ctx, AstBinary *accessor) { // TODO rename to re
 
 // Resolves the dependencies and type of a variable declaration,
 // and apply type inference if needed.
-Type *resolve_var(AstDecl *decl, Context *ctx) {
+static Type *resolve_var(AstDecl *decl, Context *ctx) {
     AstVar *var = (AstVar *)decl;
     Type **specified_type = &var->typename->as.type;
     if (decl->status == Status_RESOLVED)
@@ -292,7 +298,7 @@ Type *resolve_var(AstDecl *decl, Context *ctx) {
     return inferred_type;
 }
 
-void resolve_statement(Context *ctx, AstNode *stmt) {
+static void resolve_statement(Context *ctx, AstNode *stmt) {
     switch (stmt->tag) {
     case Node_BLOCK:
         resolve_block(ctx, (AstBlock *)stmt);
@@ -321,7 +327,8 @@ void resolve_statement(Context *ctx, AstNode *stmt) {
     }
 }
 
-void resolve_block(Context *ctx, AstBlock *block) {
+static void resolve_block(Context *ctx, AstBlock *block) {
+    stbds_arrpush(scope_stack, block);
     u64 decls_len = shlenu(block->symbols);
     for (int i = 0; i < decls_len; i++) {
         AstDecl *sym = block->symbols[i].value;
@@ -337,9 +344,10 @@ void resolve_block(Context *ctx, AstBlock *block) {
         AstNode *stmt = block->statements->nodes[i];
         resolve_statement(ctx, stmt);
     }
+    stbds_arrpop(scope_stack);
 }
 
-void resolve_procedure(AstDecl *procsym, Context *ctx) {
+static void resolve_procedure(AstDecl *procsym, Context *ctx) {
     if (procsym->status == Status_RESOLVED) return;
     procsym->status = Status_RESOLVING;
 
@@ -360,12 +368,12 @@ void resolve_procedure(AstDecl *procsym, Context *ctx) {
         return;
     }
 
-    stbds_arrpush(scope_stack, proc); // push the new scope
+    stbds_arrpush(proc_stack, proc); // push the new scope
 
     AstBlock *block = (AstBlock *)proc->block;
     resolve_block(ctx, block);
     procsym->status = Status_RESOLVED;
-    stbds_arrpop(scope_stack); // pop the scope
+    stbds_arrpop(proc_stack); // pop the scope
 }
 
 void resolve_top_level(Context *ctx) {

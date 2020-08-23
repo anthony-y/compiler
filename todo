@@ -1,9 +1,10 @@
+Check if the casts expression can even be casted to the requested type
+
 Parse assignments
     Didn't consider arbitrary expressions on lhs before
         Need to reimplement
 
 Check binary maths
-Check if the casts expression can even be casted to the requested type
 
 Change AstBinary stmt to AstAssignment
 

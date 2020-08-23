@@ -12,12 +12,10 @@ typedef struct Parser {
 
     Arena node_allocator;
     Arena tree_allocator;
-    Arena error_msg_allocator;
 
     AstBlock *current_scope;
 
     u64 node_count;
-    u64 error_count;
 } Parser;
 
 struct SourceStats;
@@ -25,6 +23,5 @@ struct SourceStats;
 void parser_init(Parser *, const TokenList *, const struct SourceStats *);
 void parser_free(Parser *, Ast *);
 void parser_recover(Parser *p, TokenType tt);
-void dump_parser_errors(const Parser *p);
 
 #endif

@@ -73,12 +73,11 @@ void free_context(Context *c);
 void init_types(Context *, SourceStats *);
 void free_types(Context *);
 
-bool check_types_were_declared(Context *);
-
 Name *make_name(Context *, Token from);
 Name *make_namet(Context *, const char *txt);
 
-AstDecl *lookup_local(Context *ctx, AstProcedure *proc, Name *name);
+//AstDecl *lookup_local(Context *ctx, AstProcedure *proc, Name *name);
+AstDecl *lookup_local(Context *ctx, AstProcedure *proc, Name *name, AstBlock *start_from);
 AstDecl *lookup_struct_field(AstStruct *, Name *);
 AstDecl *lookup_in_block(AstBlock *, Name *);
 

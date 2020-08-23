@@ -958,8 +958,6 @@ void parser_init(Parser *p, const TokenList *l, const SourceStats *stats) {
     u64 num_trees = (stats->blocks) + stats->argument_lists;
     arena_init(&p->tree_allocator, num_trees, sizeof(Ast), 8);
 
-    arena_init(&p->error_msg_allocator, 1024, sizeof(char), 1);
-
     p->curr = l->tokens;
     p->prev = l->tokens;
     p->node_count = 0;
@@ -978,7 +976,6 @@ void parser_free(Parser *p, Ast *a) {
 
     arena_free(&p->tree_allocator);
     arena_free(&p->node_allocator);
-    arena_free(&p->error_msg_allocator);
     ast_free(a);
 }
 
