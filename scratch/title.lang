@@ -9,3 +9,5 @@ proc main() {
     (*my_ptr+1) = 10;
     i = *my_ptr;
 }
+
+type T: int;

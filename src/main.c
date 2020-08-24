@@ -7,6 +7,7 @@
 #include "headers/lexer.h"
 #include "headers/passes.h"
 #include "headers/type.h"
+#include "headers/ast.h"
 
 #define STB_DS_IMPLEMENTATION
 #include "headers/stb/stb_ds.h"
@@ -15,6 +16,7 @@
 #define perfstats 1
 
 static char *read_file(const char *path);
+static void print_unused_symbol_warnings(Context *);
 
 // From parser.c, circular dependency in the header files.
 Ast parse(Context *);
@@ -90,6 +92,7 @@ bool process_file(const char *file_path) {
     if (context.error_count > 0)
         goto end;
 
+    print_unused_symbol_warnings(&context);
     check_ast(&context, &ast); // type and semantic checking
 
     if (context.error_count > 0)
@@ -133,6 +136,22 @@ int main(int arg_count, char *args[]) {
     }
 
     return !process_file(args[1]); // 0 (good) is false in this case
+}
+
+static void print_unused_symbol_warnings(Context *ctx) {
+    u64 len = shlenu(ctx->symbol_table);
+    for (int i = 0; i < len; i++) {
+        AstDecl *d = ctx->symbol_table[i].value;
+        char *name = d->name->text;
+        Token t = decl_tok(d);
+        if (d->status == Status_UNRESOLVED) {
+            switch (d->tag) {
+            case Decl_VAR: compile_warning(ctx, t, "variable \"%s\" was declared but never used", name); break;
+            case Decl_PROC: compile_warning(ctx, t, "procedure \"%s\" was declared but never called",name); break;
+            case Decl_TYPEDEF: compile_warning(ctx, t, "type \"%s\" was declared but never used", name); break;
+            }
+        }
+    }
 }
 
 static char *read_file(const char *path) {
