@@ -33,6 +33,7 @@ typedef struct Context {
     Arena  scratch;
 
     AstProcedure *curr_checker_proc;
+    AstDecl *decl_for_main;
 
     // stb hash tables
     SymbolTable *symbol_table;

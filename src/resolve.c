@@ -393,24 +393,7 @@ static void resolve_procedure(AstDecl *procsym, Context *ctx) {
     stbds_arrpop(proc_stack); // pop the scope
 }
 
-void resolve_top_level(Context *ctx) {
-    u64 len = shlenu(ctx->symbol_table);
-    for (int i = 0; i < len; i++) {
-        AstDecl *decl = ctx->symbol_table[i].value;
-        decl->status = Status_RESOLVING;
-        switch (decl->tag) {
-        case Decl_PROC:
-            resolve_procedure(decl, ctx);
-            break;
-        case Decl_VAR:
-            resolve_var(decl, ctx);
-            break;
-        case Decl_TYPEDEF: {
-            AstTypedef *def = (AstTypedef *)decl;
-            if (def->of->tag == Node_STRUCT) {
-                resolve_struct((AstStruct *)def->of, ctx);
-            }
-        } break;
-        }
-    }
+void resolve_program(Context *ctx, AstDecl *main) {
+    assert(main->tag == Decl_PROC);
+    resolve_procedure(main, ctx);
 }

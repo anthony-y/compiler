@@ -826,6 +826,9 @@ static AstNode *parse_proc(Context *c, bool in_typedef) {
     }
 
     AstDecl *procnode = ast_proc(p, start, ident, &proc);
+    if (ident == make_namet(c, "main")) {
+        c->decl_for_main = procnode;
+    }
     add_symbol(c, procnode, name.text);
 
     return (AstNode *)procnode;
