@@ -11,7 +11,7 @@ proc read_file(path: string): string {
 proc main() {
     //ms: struct {a := 10; b: string}
     //ms.a = 10 // TODO this should work
-    data := read_file()
+    data := read_file("cat.lang")
     print(data) // cat
 }
 

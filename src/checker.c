@@ -212,7 +212,7 @@ bool does_type_describe_expr(Context *ctx, Type *type, AstExpr *expr) {
 
     if (expr->tag == Expr_CALL) {
         if (!check_call(ctx, (AstNode *)expr))
-            return false;
+            return FAILED_BUT_DONT_ERROR_AT_CALL_SITE;
 
         Type *return_type = expr->resolved_type;
 
