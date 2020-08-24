@@ -196,6 +196,7 @@ AstExpr *ast_index(Parser *p, Token t, const AstArrayIndex *index) {
 
 AstDecl *ast_proc(Parser *p, Token t, Name *name, const AstProcedure *proc) {
     AstNode *n = ast_node(p, Node_PROCEDURE, t);
+    n->as.decl.flags = 0;
     n->as.decl.status = Status_UNRESOLVED;
     n->as.decl.tag = Decl_PROC;
     n->as.decl.name = name;
@@ -205,6 +206,7 @@ AstDecl *ast_proc(Parser *p, Token t, Name *name, const AstProcedure *proc) {
 
 AstDecl *ast_var(Parser *p, Token t, Name *name, const AstVar *var) {
     AstNode *n = ast_node(p, Node_VAR, t);
+    n->as.decl.flags = 0;
     n->as.decl.status = Status_UNRESOLVED;
     n->as.decl.tag = Decl_VAR;
     n->as.decl.name = name;
@@ -214,6 +216,7 @@ AstDecl *ast_var(Parser *p, Token t, Name *name, const AstVar *var) {
 
 AstDecl *ast_typedefi(Parser *p, Token t, Name *name, const AstTypedef *td) {
     AstNode *n = ast_node(p, Node_TYPEDEF, t);
+    n->as.decl.flags = 0;
     n->as.decl.status = Status_UNRESOLVED;
     n->as.decl.tag = Decl_TYPEDEF;
     n->as.decl.name = name;

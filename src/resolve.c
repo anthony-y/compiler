@@ -107,6 +107,9 @@ static Type *resolve_expression_1(AstExpr *expr, Context *ctx) {
         }
         assert(var->name == name);
         if (var->status == Status_UNRESOLVED) {
+            if (!(var->flags & DECL_IS_TOP_LEVEL))
+                compile_error(ctx, t, "local variable \"%s\" was used before it was declared", name->text);
+
             Type *resolved_type = resolve_var(var, ctx);
             return resolved_type;
         }

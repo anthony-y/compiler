@@ -103,8 +103,8 @@ typedef enum {
 } AstNodeType;
 
 enum {
-    VAR_IS_INFERRED         = 1 << 0,
-    VAR_IS_INITED           = 1 << 1,
+    VAR_IS_INFERRED  = 1 << 0,
+    VAR_IS_INITED    = 1 << 1,
 };
 
 struct AstExpr;
@@ -271,6 +271,10 @@ typedef struct AstStmt {
     StmtType tag;
 } AstStmt;
 
+enum {
+    DECL_IS_TOP_LEVEL = 1 << 0,
+};
+
 typedef struct AstDecl {
     union {
         AstProcedure proc;
@@ -279,6 +283,7 @@ typedef struct AstDecl {
     } as;
     struct Name *name;
     DeclType tag;
+    int flags;
     enum {
         Status_RESOLVED,
         Status_RESOLVING,

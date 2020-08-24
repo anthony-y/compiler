@@ -635,6 +635,7 @@ static AstNode *parse_var_as_decl(Context *c, bool top_level) {
     }
     AstDecl *decl = ast_var(p, start, var.name->as.expr.as.name, &var);
     if (top_level) {
+        decl->flags |= DECL_IS_TOP_LEVEL;
         add_symbol(c, decl, decl->name->text);
     }
     return (AstNode *)decl;
