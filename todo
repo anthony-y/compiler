@@ -1,6 +1,8 @@
 Incorrect unclosed block error if no blank line at end of file (broken.lang)
 
 Disallow type inference on null literals since it's ambiguous.
+Disallow pointers to anonymous struct types e.g:
+    t: ^struct{a: int};
 
 Array indexes inside compound expressions (e.g: a.b[0].z)
 

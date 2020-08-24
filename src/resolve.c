@@ -203,8 +203,14 @@ static Type *resolve_type(Context *ctx, Type *type, bool cyclic_allowed) {
     if (type->kind == Type_ARRAY)
         return make_array_type(resolve_type(ctx, type->data.base, true));
 
-    if (type->kind != Type_UNRESOLVED)
+    if (type->kind != Type_UNRESOLVED) {
+        // For types which were declared before they are used, the declaration
+        // won't get resolved at top level, so we just do it here.
+        AstDecl *types_decl = shget(ctx->symbol_table, type->name);
+        assert(types_decl);
+        types_decl->status = Status_RESOLVED;
         return type;
+    }
 
     // Unresolved types (that is, types which are used before they are defined) are returned
     // as placeholder types, and are not put in the type table. If they then go on to be defined in the source code, they will be placed into the type table.
