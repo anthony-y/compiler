@@ -396,7 +396,37 @@ static void resolve_procedure(AstDecl *procsym, Context *ctx) {
     stbds_arrpop(proc_stack); // pop the scope
 }
 
-void resolve_program(Context *ctx, AstDecl *main) {
-    assert(main->tag == Decl_PROC);
-    resolve_procedure(main, ctx);
+void resolve_program(Context *ctx) {
+    resolve_procedure(ctx->decl_for_main, ctx);
+
+    // Resolving main will resolve all the symbols in the code
+    // that are actually used. There may be some top level symbols
+    // that are left as unresolved because they do not get used.
+    // The following code exists to validate that these unused decls
+    // are still correct, however we will keep their status as Status_UNRESOLVED
+    // so that later on the compiler will correctly assert that they were not
+    // referred to in the code.
+
+    u64 len = shlenu(ctx->symbol_table);
+    for (int i = 0; i < len; i++) {
+        AstDecl *decl = ctx->symbol_table[i].value;
+        if (decl->status == Status_RESOLVED) continue;
+
+        decl->status = Status_RESOLVING;
+        switch (decl->tag) {
+        case Decl_PROC:
+            resolve_procedure(decl, ctx);
+            break;
+        case Decl_VAR:
+            resolve_var(decl, ctx);
+            break;
+        case Decl_TYPEDEF: {
+            AstTypedef *def = (AstTypedef *)decl;
+            if (def->of->tag == Node_STRUCT) {
+                resolve_struct((AstStruct *)def->of, ctx);
+            }
+        } break;
+        }
+        decl->status = Status_UNRESOLVED;
+    }
 }
