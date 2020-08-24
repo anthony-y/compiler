@@ -47,7 +47,6 @@ typedef struct Context {
         *type_u16, *type_s16, *type_u8, *type_s8;
 
     Type *type_string, *type_void, *type_bool; // non-integer types
-    Type *decoy_ptr; // for comparison and printing in errors
     Type *error_type; // returned during type/semantic checking in does_type_describe_expr if an error occurred.
 } Context;
 

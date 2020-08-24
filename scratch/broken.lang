@@ -109,3 +109,4 @@ proc make_lexer(l: ^Lexer, s: String): bool {
 proc m() {
     count := 11211
     i := count == 2
+}

@@ -92,10 +92,6 @@ void init_types(Context *ctx, SourceStats *stats) {
     ctx->type_string = make_and_insert_primitive(ctx, "string", sizeof(StringType), Signage_NaN);
 
     //Type *string = make_type(Type_STRUCT, "string", sizeof(StringType));
-
-    // This isn't inserted into the type table, it's only referred to directly by its pointer handle.
-    ctx->decoy_ptr = make_type(Type_POINTER, "pointer", 0);
-    ctx->decoy_ptr->data.base = NULL;
 }
 
 // Utility function to unwrap a pointer to it's ultimate base type.
@@ -128,7 +124,7 @@ void print_type(Type *type, FILE *stream) {
         fprintf(stream, "anonyous struct");
         return;
     case Type_POINTER:
-        if (!type->data.base) { // it's the decoy_ptr (context.hpp)
+        if (!type->data.base) { // generic pointer type, probably from a null literal
             fprintf(stream, "pointer");
             return;
         }

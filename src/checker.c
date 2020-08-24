@@ -26,8 +26,6 @@ static bool do_pointer_types_match(Context *ctx, Type *a, Type *b) {
         return true; // ^void is compatible with all pointer types
     } else if (a->data.base == b->data.base) {
         return true; // both types point to the same thing
-    } else if (a == ctx->decoy_ptr || b == ctx->decoy_ptr) {
-        return true; // one of them is the decoy pointer type, which can be assigned to any pointer type.
     } else if (a->data.base->kind != b->data.base->kind) {
         return false; // they don't point to the same type
     } else if (a->data.base->kind == Type_POINTER) { // since the previous case failed, this is effectively checking that both types are pointers to pointers.
