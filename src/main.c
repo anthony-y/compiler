@@ -66,11 +66,13 @@ bool process_file(const char *file_path) {
 
     if (!context.decl_for_main)
         compile_error(&context, (Token){0}, "No entry point found. Please declare \"main\"");
+    if (context.decl_for_main->tag != Decl_PROC)
+        compile_error(&context, decl_tok(context.decl_for_main), "Entry point \"main\" must be a procedure");
 
     NEXT_STAGE_OR_QUIT();
 
     PROFILE(checker, {
-        resolve_program(&context, context.decl_for_main);
+        resolve_program(&context);
         NEXT_STAGE_OR_QUIT();
         check_ast(&context, &ast); // type and semantic checking
         NEXT_STAGE_OR_QUIT();
