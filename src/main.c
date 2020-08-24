@@ -32,8 +32,6 @@ Ast parse(Context *);
 // THINK: for imports, just lex, parse and resolve all the files and then merge their scopes into one scope, then generate code for the symbols, symbols that are Sym_UNRESOLVED, can be ignored.
 
 bool process_file(const char *file_path) {
-    #define NEXT_STAGE_OR_QUIT() if (context.error_count > 0) goto end;
-
     char *file_data = read_file(file_path); // read the file into a zero-terminated buffer.
 
     u64 lexer_delta = 0;
@@ -44,6 +42,8 @@ bool process_file(const char *file_path) {
     TokenList tokens;
     Context context;
     Ast ast;
+
+    #define NEXT_STAGE_OR_QUIT() if (context.error_count > 0) goto end;
 
     init_context(&context, file_path);
     token_list_init(&tokens);
