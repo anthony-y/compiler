@@ -111,3 +111,13 @@ void compile_error_add_line(Context *ctx, const char *fmt, ...) {
 void compile_error_end() {
     fprintf(stderr, ".\n");
 }
+
+void compile_warning(Context *ctx, Token t, const char *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+
+    fprintf(stderr, "%s:%lu: Warning: ", ctx->current_file_path, t.line);
+    vfprintf(stderr, fmt, args);
+    fprintf(stderr, ".\n");
+    va_end(args);
+}

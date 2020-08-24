@@ -67,6 +67,8 @@ void compile_error_start(Context *, Token, const char *fmt, ...);
 void compile_error_add_line(Context *ctx, const char *fmt, ...);
 void compile_error_end();
 
+void compile_warning(Context *ctx, Token t, const char *fmt, ...);
+
 void init_context(Context *c, const char *file_path);
 void free_context(Context *c);
 

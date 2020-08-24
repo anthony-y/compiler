@@ -192,7 +192,7 @@ static bool check_unary_against_type(Context *ctx, AstUnary *unary, Type *agains
 
 static bool can_type_cast_to_type(Context *ctx, AstExpr *site, Type *from, Type *to) {
     if (do_types_match(ctx, to, from)) {
-        compile_error(ctx, expr_tok(site), "unnecessary cast"); // TODO make this a warning
+        compile_warning(ctx, expr_tok(site), "unnecessary cast");
         return true;
     }
     if (from->data.signage != Signage_NaN) {
