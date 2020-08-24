@@ -50,7 +50,13 @@ bool process_file(const char *file_path) {
     lexer_init(&context.lexer, file_path, file_data);
 
     PROFILE(lexer, {
-        if (!lexer_lex(&context, &tokens, &stats)) return 1;
+        if (!lexer_lex(&context, &tokens, &stats)) {
+            lexer_free(&context.lexer);
+            token_list_free(&tokens);
+            free_context(&context);
+            free(file_data);
+            return 1;
+        }
     });
 
     if (tokens.len == 1) return 0;
@@ -99,6 +105,7 @@ end:
         parser_free(&context.parser, &ast);
         free_subtrees_and_blocks(&ast);
         lexer_free(&context.lexer);
+        free_context(&context);
         free(file_data);
 
         return ret;
