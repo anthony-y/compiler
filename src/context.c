@@ -43,11 +43,11 @@ Name *make_name(Context *ctx, Token token) {
 }
 
 Name *make_namet(Context *ctx, const char *txt) {
-    Name *n = malloc(sizeof(Name));
-    n->text = (char *)txt;
-    n->resolved_decl = NULL;
     u64 i = shgeti(ctx->name_table, txt);
     if (i == -1) { // not in the table yet
+        Name *n = malloc(sizeof(Name));
+        n->text = (char *)txt;
+        n->resolved_decl = NULL;
         shput(ctx->name_table, txt, n);
         return n;
     }
