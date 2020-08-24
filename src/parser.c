@@ -323,6 +323,10 @@ static AstStmt *parse_block(Context *c) {
     Ast *stmts = make_subtree(p);
 
     while (!consume(p, Token_CLOSE_BRACE) && p->curr->type != Token_EOF) {
+        if (p->curr->type == Token_EOF) {
+            compile_error(c, *p->curr, "unclosed block (missing a '}')");
+            return NULL;
+        }
         AstNode *statement = parse_statement(c);
         if (!statement) {
             parser_recover(p, Token_CLOSE_BRACE);
@@ -343,11 +347,6 @@ static AstStmt *parse_block(Context *c) {
             continue;
         }
         ast_add(stmts, statement);
-    }
-
-    if (p->curr->type == Token_EOF) {
-        compile_error(c, *p->curr, "unclosed block starting on line %lu", open.line);
-        return NULL;
     }
 
     block->statements = stmts;
