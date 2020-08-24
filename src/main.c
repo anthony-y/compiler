@@ -135,7 +135,6 @@ static void print_unused_symbol_warnings(Context *ctx) {
             }
         }
     }
-    printf("\n");
 }
 
 static char *read_file(const char *path) {
