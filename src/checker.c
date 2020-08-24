@@ -352,7 +352,8 @@ bool check_var(Context *ctx, AstDecl *node) {
     }
 
     else if (type->kind == Type_ALIAS && maybe_unwrap_type_alias(type) == ctx->type_void) {
-        compile_error_start(ctx, tok, "variable is declared to have type \"%s\" ", type->name);
+        compile_error_start(ctx, tok, "variable is declared to have type ");
+        print_type(type, stderr);
         compile_error_add_line(ctx, "which is an alias of void; only procedures may use the \"void\" type");
         compile_error_end();
         return false;
