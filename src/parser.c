@@ -958,14 +958,6 @@ void parser_init(Parser *p, const TokenList *l, const SourceStats *stats) {
 
 // Free all resources held by the parser.
 void parser_free(Parser *p, Ast *a) {
-    //
-    // TODO LEAK FOR SOME REASON
-    //
-    // u8 *end = p->tree_allocator.block+p->tree_allocator.pos;
-    // for (u8 *data = p->tree_allocator.block; data != end; data++) {
-    //     ast_free((Ast *)data);
-    // }
-
     arena_free(&p->tree_allocator);
     arena_free(&p->node_allocator);
     ast_free(a);
