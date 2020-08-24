@@ -1,3 +1,7 @@
+Incorrect unclosed block error if no blank line at end of file (broken.lang)
+
+Disallow type inference on null literals since it's ambiguous.
+
 Array indexes inside compound expressions (e.g: a.b[0].z)
 
 

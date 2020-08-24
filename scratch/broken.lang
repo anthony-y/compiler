@@ -6,6 +6,7 @@ proc printf(s: string){}
 
 proc main(): int {
     i := 2
+    a := true
     if !a {
         printf("Incorrect number of arguments.\n")
         return 0
@@ -106,6 +107,6 @@ proc make_lexer(l: ^Lexer, s: String): bool {
 // Entry point
 //
 proc m() {
-    i := count == 2
     count := 11211
+    i := count == 2
 }

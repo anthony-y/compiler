@@ -92,6 +92,9 @@ static Type *resolve_expression_1(AstExpr *expr, Context *ctx) {
             }
             return expr_type->data.base;
         }
+        if (unary->op == Token_CARAT) {
+            return make_pointer_type(expr_type);
+        }
         return expr_type;
     } break;
     case Expr_NAME: {
