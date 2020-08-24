@@ -201,8 +201,7 @@ static Type *resolve_type(Context *ctx, Type *type, bool cyclic_allowed) {
         return type;
 
     // Unresolved types (that is, types which are used before they are defined) are returned
-    // as placeholder types in the type table. If they then go on to be defined in the source code,
-    // they will be placed into the type table.
+    // as placeholder types, and are not put in the type table. If they then go on to be defined in the source code, they will be placed into the type table.
     // Here, we lookup the type in the type table. If it is not found, then it was never declared.
     // ...
     u64 i = shgeti(ctx->type_table, type->name);
