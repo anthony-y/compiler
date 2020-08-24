@@ -102,8 +102,8 @@ end:
         printf("Parser used %lu nodes out of %lu allocated.\n", context.parser.node_count, context.parser.node_allocator.capacity);
 
         free_types(&context);
-        parser_free(&context.parser, &ast);
         free_subtrees_and_blocks(&ast);
+        parser_free(&context.parser, &ast);
         lexer_free(&context.lexer);
         free_context(&context);
         free(file_data);

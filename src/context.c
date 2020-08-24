@@ -76,6 +76,8 @@ void free_context(Context *c) {
         free(c->name_table[i].value);
     shfree(c->name_table);
     arena_free(&c->scratch);
+    shfree(c->string_literal_pool);
+    shfree(c->symbol_table);
 }
 
 void compile_error(Context *ctx, Token t, const char *fmt, ...) {

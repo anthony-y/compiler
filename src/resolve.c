@@ -429,4 +429,7 @@ void resolve_program(Context *ctx) {
         }
         decl->status = Status_UNRESOLVED;
     }
+
+    stbds_arrfree(proc_stack);
+    stbds_arrfree(scope_stack);
 }
