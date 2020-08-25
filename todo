@@ -1,4 +1,3 @@
-Disallow type inference on null literals since it's ambiguous.
 Disallow pointers to anonymous struct types e.g:
     t: ^struct{a: int};
 

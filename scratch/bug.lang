@@ -1,4 +1,5 @@
-proc magic_os_proc(_: string): string #foreign
+proc magic_os_proc(_: string): string #foreign "hi"
 proc main() {
     file_data := magic_os_proc("bug.lang")
+    i := null    
 }

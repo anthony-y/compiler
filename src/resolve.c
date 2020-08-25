@@ -75,7 +75,7 @@ static Type *resolve_expression_1(AstExpr *expr, Context *ctx) {
     case Expr_STRING: return ctx->type_string;
     case Expr_INT:    return ctx->type_int;
     case Expr_BOOL:   return ctx->type_bool;
-    case Expr_NULL:   return make_pointer_type(NULL);
+    case Expr_NULL:   return ctx->null_type;
 
     case Expr_CALL: {
         AstProcedure *resolved = resolve_call((AstNode *)expr, ctx);
@@ -328,6 +328,10 @@ static Type *resolve_var(AstDecl *decl, Context *ctx) {
 
     if (!inferred_type) return NULL;
     if (var->flags & VAR_IS_INFERRED) {
+        if (inferred_type == ctx->null_type) {
+            compile_error(ctx, decl_tok(decl), "cannot infer type for \"null\" as it is ambiguous");
+            return NULL;
+        }
         *specified_type = inferred_type; // type inference!
     }
     return inferred_type;

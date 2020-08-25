@@ -91,6 +91,8 @@ void init_types(Context *ctx, SourceStats *stats) {
     ctx->type_void = make_and_insert_primitive(ctx, "void", 0, Signage_NaN);
     ctx->type_string = make_and_insert_primitive(ctx, "string", sizeof(StringType), Signage_NaN);
 
+    ctx->null_type = make_pointer_type(NULL);
+
     //Type *string = make_type(Type_STRUCT, "string", sizeof(StringType));
 }
 

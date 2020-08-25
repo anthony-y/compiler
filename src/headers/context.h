@@ -47,6 +47,7 @@ typedef struct Context {
         *type_u16, *type_s16, *type_u8, *type_s8;
 
     Type *type_string, *type_void, *type_bool; // non-integer types
+    Type *null_type; // type of "null" literal
 } Context;
 
 // Contains statistics about the source code
