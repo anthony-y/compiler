@@ -84,7 +84,7 @@ void compile_error(Context *ctx, Token t, const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
 
-    fprintf(stderr, "%s:%lu: Error: ", ctx->current_file_path, t.line);
+    fprintf(stderr, "%s:%lu: \033[0;31mError\033[0m: ", ctx->current_file_path, t.line);
     vfprintf(stderr, fmt, args);
     fprintf(stderr, ".\n");
     va_end(args);
@@ -96,7 +96,7 @@ void compile_error_start(Context *ctx, Token t, const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
 
-    fprintf(stderr, "%s:%lu: Error: ", ctx->current_file_path, t.line);
+    fprintf(stderr, "%s:%lu: \033[0;31mError\033[0m: ", ctx->current_file_path, t.line);
     vfprintf(stderr, fmt, args);
     va_end(args);
 
@@ -118,7 +118,7 @@ void compile_warning(Context *ctx, Token t, const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
 
-    fprintf(stderr, "%s:%lu: Warning: ", ctx->current_file_path, t.line);
+    fprintf(stderr, "%s:%lu: \033[0;33mWarning\033[0m: ", ctx->current_file_path, t.line);
     vfprintf(stderr, fmt, args);
     fprintf(stderr, ".\n");
     va_end(args);
