@@ -35,6 +35,7 @@ static bool do_pointer_types_match(Context *ctx, Type *a, Type *b) {
 }
 
 static bool do_types_match(Context *ctx, Type *a, Type *b) {
+    if (a->kind == Type_ANON_STRUCT || b->kind == Type_ANON_STRUCT) return false;
     if (a->kind == Type_ALIAS && b->kind == Type_ALIAS) return (a == b);
 
     // This allows us to ensure that literals can be compared with aliases,
