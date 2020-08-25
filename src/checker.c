@@ -142,7 +142,7 @@ static bool check_unary_against_type(Context *ctx, AstUnary *unary, Type *agains
             compile_error_end();
             return FAILED_BUT_DONT_ERROR_AT_CALL_SITE;
         }
-        return true;
+        return do_types_match(ctx, against, sub_expr_type);
     }
 
     if (unary->op == Token_CARAT) { // address-of operator
