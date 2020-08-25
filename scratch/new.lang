@@ -8,7 +8,6 @@ type Fun: struct {
 
 proc value(){}
 
-// TODO dump argument decls into block scope
 proc test(xyz: ^string): Whatever {
     z := true;
     x := have_fun()
