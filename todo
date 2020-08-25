@@ -1,9 +1,6 @@
 Disallow pointers to anonymous struct types e.g:
     t: ^struct{a: int};
 
-Type resolution for binary expressions, specifically maths. Just returning type of left or right side
-wont work out. Check the resolved type of binary exprs if mystery bugs (errors or lack thereof) show up.
-
 Check if the casts expression can even be casted to the requested type
 
 When adding local procedures, make sure the non-local ones get their flags set as DECL_IS_TOP_LEVEL.

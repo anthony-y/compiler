@@ -146,18 +146,31 @@ static Type *resolve_expression_1(AstExpr *expr, Context *ctx) {
         if (bin->op == Token_DOT) {
             return resolve_selector(ctx, bin);
         }
-        if (is_assignment(*bin)) {
-            resolve_assignment_expr(expr, ctx);
-            if (bin->op != Token_EQUAL) {
-                return ctx->type_int;
-            }
-        }
-        Type *lhs = resolve_expression(bin->left, ctx);
-        resolve_expression(bin->right, ctx);
         if (is_binary_comparison(*bin)) {
             return ctx->type_bool;
         }
-        return lhs;
+        if (is_assignment(*bin)) {
+            resolve_assignment_expr(expr, ctx);
+            if (bin->op != Token_EQUAL) { // it's a +=, -=, *= or /=
+                return ctx->type_int; // so its type must be integer
+            }
+        }
+
+        // Should only be maths operators left
+        assert(bin->op == Token_PLUS || bin->op == Token_MINUS || bin->op == Token_SLASH || bin->op == Token_STAR);
+
+        Type *left_type = resolve_expression(bin->left, ctx);
+        Type *right_type = resolve_expression(bin->right, ctx);
+
+        // You can add and substract to/from pointers
+        if (bin->op == Token_PLUS || bin->op == Token_MINUS) {
+            if (left_type->kind == Type_POINTER)
+                return left_type;
+            if (right_type->kind == Type_POINTER)
+                return left_type;
+        }
+
+        return ctx->type_int;
     } break;
 
     case Expr_PAREN: {
