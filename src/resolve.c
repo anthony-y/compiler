@@ -394,7 +394,7 @@ static void resolve_procedure(AstDecl *procsym, Context *ctx) {
     Type **return_type = &proc->return_type->as.type;
     *return_type = resolve_type(ctx, *return_type, false);
 
-    if (proc->flags & PROC_MOD_FOREIGN) {
+    if (proc->flags & PROC_IS_FOREIGN) {
         procsym->status = Status_RESOLVED;
         return;
     }

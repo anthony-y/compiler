@@ -17,7 +17,7 @@ proc main() {
 
 proc test(): void {}
 
-proc print(s: string) #foreign // TODO store extra info like name and whatever
+proc print(s: string) #foreign
 proc magic_os_proc(_: string): string #foreign
 
 type i: struct {

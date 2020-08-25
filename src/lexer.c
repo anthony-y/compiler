@@ -342,8 +342,8 @@ bool lexer_lex(Context *ctx, TokenList *list, SourceStats *stats) {
         case Token_TYPEDEF:
             types++;
             break;
+
         case Token_IDENT:
-            
         case Token_RESERVED_TYPE:
         case Token_CARAT:
             if (last == Token_CARAT) pointers++;

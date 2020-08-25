@@ -706,14 +706,16 @@ static bool parse_var(Context *c, bool top_level, AstVar *out) {
     return true;
 }
 
-static int parse_proc_mod(Context *c) {
+static int parse_proc_mod(Context *c, Token *out_maybe_foreign_link_name) {
     Parser *p = &c->parser;
-    if (!consume(p, Token_HASH)) return -1;
     if (strcmp(p->curr->text, "foreign")==0) {
         parser_next(p);
-        return PROC_MOD_FOREIGN;
+        if (consume(p, Token_STRING_LIT)) {
+            *out_maybe_foreign_link_name = *p->prev;
+        }
+        return PROC_IS_FOREIGN;
     }
-    return -2; // TODO make this an actual node
+    return -1;
 }
 
 // Parse a procuedure declaration.
@@ -802,6 +804,15 @@ static AstNode *parse_proc(Context *c, bool in_typedef) {
     }
     proc.return_type = return_type;
 
+    if (p->curr->type == Token_HASH) {
+        while (consume(p, Token_HASH)) {
+            Token link_name;
+            int mod = parse_proc_mod(c, &link_name);
+            if (mod == PROC_IS_FOREIGN) proc.foreign_link_name = link_name;
+            proc.flags |= mod;
+        }
+    }
+
     if (in_typedef) {
         if (p->curr->type == Token_OPEN_BRACE) {
             compile_error(c, *p->prev, "a typedef'd procedure must not have body");
@@ -811,19 +822,12 @@ static AstNode *parse_proc(Context *c, bool in_typedef) {
         return (AstNode *)ast_proc(p, start, ident, &proc);
     }
 
-    int modifier = parse_proc_mod(c);
-    if (modifier == -2) { // TODO cleanup
-        compile_error(c, *p->curr, "unknown procedure modifier");
-        return NULL;
-    }
-
-    if (modifier == PROC_MOD_FOREIGN) {
+    if (proc.flags & PROC_IS_FOREIGN) {
         if (consume(p, Token_OPEN_BRACE)) {
             compile_error(c, *p->curr, "procedure marked as foreign should not have a body");
             parser_recover_to_declaration(p);
             return NULL;
         }
-        proc.flags |= modifier;
     } else if (!consume(p, Token_OPEN_BRACE)) {
         compile_error(c, *p->curr, "expected a block on procedure declaration");
         parser_recover_to_declaration(p);

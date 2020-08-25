@@ -17,7 +17,7 @@ typedef enum {
 } DeclType;
 
 typedef enum {
-    Expr_LITERALS_START,
+    Expr_LITERALS_START = 0,
     Expr_INT,
     Expr_FLOAT,
     Expr_STRING,
@@ -37,7 +37,7 @@ typedef enum {
 } ExprType;
 
 typedef enum {
-    Stmt_ASSIGN,
+    Stmt_ASSIGN = 0,
     Stmt_IMPORT,
     Stmt_BLOCK,
     Stmt_IF,
@@ -50,10 +50,9 @@ typedef enum {
 } StmtType;
 
 typedef enum {
-    Node_ZERO, // nothing, just a sentinal value
+    Node_ZERO = 0, // nothing, just a sentinal value
 
     Node_TYPENAME,
-    Node_PROC_MOD,
 
     Node_EXPRESSIONS_START, // sentinal expressions start
 
@@ -119,7 +118,7 @@ typedef struct {
 } AstVar;
 
 enum {
-    PROC_MOD_FOREIGN = 1 << 0,
+    PROC_IS_FOREIGN        = 1 << 0,
     PROC_RET_VALUE_CHECKED = 1 << 1,
 };
 typedef struct {
@@ -127,7 +126,9 @@ typedef struct {
     struct AstStmt *block;
     struct AstNode *name;
     struct AstNode *return_type;
+
     int flags;
+    Token foreign_link_name;
 } AstProcedure;
 
 typedef struct {
@@ -208,10 +209,6 @@ typedef struct {
     struct AstExpr *left;
     struct AstExpr *right;
 } AstSelector;
-
-// typedef struct {
-//     Type *real_type;
-// } AstTypename;
 
 typedef struct {
     struct AstExpr *sub_expr;

@@ -540,7 +540,7 @@ void check_ast(Context *ctx, Ast *ast) {
                     check_var(ctx, proc->params[i].value);
                 }
             }
-            if (proc->flags & PROC_MOD_FOREIGN) continue;
+            if (proc->flags & PROC_IS_FOREIGN) continue;
             ctx->curr_checker_proc = proc;
             check_block(ctx, (AstBlock *)((AstProcedure *)node)->block, Node_ZERO);
             if (!(ctx->curr_checker_proc->flags & PROC_RET_VALUE_CHECKED)) {

@@ -1,7 +1,4 @@
-
-proc main(): int {
-    as: struct{
-        n := 10
-    };
-    return as.n;
+proc magic_os_proc(_: string): string #foreign
+proc main() {
+    file_data := magic_os_proc("bug.lang")
 }
