@@ -16,6 +16,7 @@
 static bool consume(Parser *, TokenType);
 static Ast *make_subtree(Parser *);
 static void parser_recover_to_declaration(Parser *);
+static void parser_recover(Parser *p, TokenType tt);
 
 static AstCall  parse_call(Context *, AstExpr *name);
 static AstExpr *parse_expression(Context *, int min_precedence);
@@ -934,7 +935,7 @@ static Ast *make_subtree(Parser *p) {
 }
 
 // Used to recover from errors by skipping to a token of type `tt`.
-void parser_recover(Parser *p, TokenType tt) {
+static void parser_recover(Parser *p, TokenType tt) {
     while (p->curr->type != tt && p->curr->type != Token_EOF) {
         parser_next(p);
     }

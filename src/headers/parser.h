@@ -19,9 +19,10 @@ typedef struct Parser {
 } Parser;
 
 struct SourceStats;
+struct Context;
 
 void parser_init(Parser *, const TokenList *, const struct SourceStats *);
 void parser_free(Parser *, Ast *);
-void parser_recover(Parser *p, TokenType tt);
+Ast parse(struct Context *);
 
 #endif

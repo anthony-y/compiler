@@ -26,9 +26,6 @@ static void print_unused_symbol_warnings(Context *);
     id##_delta = (id##end.tv_sec - id##start.tv_sec) * 1000000 + id##end.tv_usec - id##start.tv_usec;\
 } while (false)
 
-// From parser.c, circular dependency in the header files.
-Ast parse(Context *);
-
 // THINK: for imports, just lex, parse and resolve all the files and then merge their scopes into one scope, then generate code for the symbols, symbols that are Sym_UNRESOLVED, can be ignored.
 
 bool process_file(const char *file_path) {
