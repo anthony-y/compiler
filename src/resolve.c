@@ -108,20 +108,21 @@ static Type *resolve_expression_1(AstExpr *expr, Context *ctx) {
             compile_error(ctx, t, "undeclared identifier \"%s\"", name->text);
             return NULL;
         }
+        if (var->tag != Decl_VAR) {
+            compile_error(ctx, t, "\"%s\" was used like a variable, but it isn't one", name->text);
+            return NULL;
+        }
         assert(var->name == name);
         if (var->status == Status_UNRESOLVED) {
-            if (!(var->flags & DECL_IS_TOP_LEVEL))
+            if (!(var->flags & DECL_IS_TOP_LEVEL)) {
                 compile_error(ctx, t, "local variable \"%s\" was used before it was declared", name->text);
-
+                return NULL;
+            }
             Type *resolved_type = resolve_var(var, ctx);
             return resolved_type;
         }
         if (var->status == Status_RESOLVING) {
             compile_error(ctx, t, "initial instantiation of variable \"%s\" mentions itself", name->text);
-            return NULL;
-        }
-        if (var->tag != Decl_VAR) {
-            compile_error(ctx, t, "\"%s\" was used like a variable, but it isn't one", name->text);
             return NULL;
         }
         name->resolved_decl = var;
@@ -329,6 +330,10 @@ static Type *resolve_var(AstDecl *decl, Context *ctx) {
 
 static void resolve_statement(Context *ctx, AstNode *stmt) {
     switch (stmt->tag) {
+    case Node_VAR:
+        resolve_var((AstDecl *)stmt, ctx);
+        break;
+
     case Node_BLOCK:
         resolve_block(ctx, (AstBlock *)stmt);
         break;
@@ -340,6 +345,9 @@ static void resolve_statement(Context *ctx, AstNode *stmt) {
         break;
     case Node_RETURN:
         resolve_expression(((AstReturn *)stmt)->expr, ctx);
+        break;
+    case Node_DEFER:
+        resolve_statement(ctx, (AstNode *)((AstDefer *)stmt)->statement);
         break;
     case Node_IF: {
         AstIf *iff = (AstIf *)stmt;
@@ -358,17 +366,6 @@ static void resolve_statement(Context *ctx, AstNode *stmt) {
 
 static void resolve_block(Context *ctx, AstBlock *block) {
     stbds_arrpush(scope_stack, block);
-    u64 decls_len = shlenu(block->symbols);
-    for (int i = 0; i < decls_len; i++) {
-        AstDecl *sym = block->symbols[i].value;
-        switch (sym->tag) {
-        case Decl_VAR:
-            resolve_var(sym, ctx);
-            break;
-        // TODO
-        }
-    }
-
     for (int i = 0; i < block->statements->len; i++) {
         AstNode *stmt = block->statements->nodes[i];
         resolve_statement(ctx, stmt);

@@ -1,8 +1,4 @@
-type T: struct {
-    data: ^void;
-}
-
 proc main() {
-    t: T;
-    t.data = null
+    t : string
+    defer t = "8)"
 }

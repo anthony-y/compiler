@@ -229,7 +229,7 @@ typedef struct {
 } AstArrayIndex;
 
 typedef struct {
-    struct AstNode *statement;
+    struct AstStmt *statement;
 } AstDefer;
 
 struct SymbolTable;

@@ -344,8 +344,10 @@ static AstStmt *parse_block(Context *c) {
             }
             shput(block->symbols, decl->name->text, decl);
             consume(p, Token_SEMI_COLON);
-            continue;
         }
+
+        // Declarations still get added to the statements list so that we can resolve them
+        // properly later on.
         ast_add(stmts, statement);
     }
 
@@ -385,7 +387,7 @@ static AstStmt *parse_defer(Context *c) {
         return NULL;
     }
 
-    defer.statement = sub_stmt;
+    defer.statement = (AstStmt *)sub_stmt;
     return ast_defer(p, start, &defer);
 }
 

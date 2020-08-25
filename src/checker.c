@@ -462,6 +462,7 @@ void check_block(Context *ctx, AstBlock *block, AstNodeType restriction) {
     }
     for (int i = 0; i < block->statements->len; i++) {
         AstNode *stmt = block->statements->nodes[i];
+        if (is_decl(stmt)) continue; // we already checked the declarations
         if (restriction != Node_ZERO && restriction != stmt->tag) {
             compile_error(ctx, stmt->token, "this statement is not allowed at this scope");
             return;
@@ -485,6 +486,9 @@ void check_statement(Context *ctx, AstStmt *node) {
     case Stmt_ASSIGN: {
         check_assignment(ctx, &node->as.assign, false);
     } break;
+    case Stmt_DEFER:
+        check_statement(ctx, ((AstDefer *)node)->statement);
+        break;
     case Stmt_RETURN: {
         if (check_proc_return_value(ctx, node)) {
             ctx->curr_checker_proc->flags |= PROC_RET_VALUE_CHECKED;
