@@ -1,10 +1,9 @@
+
 proc main() {
-    ms: []MyStruct
-    msi := ms[0].i[2]
-    ptr: ^int = null
-    ms[0].i[0] = *ptr;
+    //t: T;
 }
 
-type MyStruct: struct {
-    i: []int;
+type T: struct {
+    the_a: A;
 }
+type A: int;

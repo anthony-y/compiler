@@ -1,6 +1,6 @@
 proc main() {
     b := -1;
-    i := cast(u64)b;
+    i := cast(int)b;
     while b < i {
         b += 12;
         return;

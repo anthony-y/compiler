@@ -204,6 +204,7 @@ static Type *resolve_type(Context *ctx, Type *type, bool cyclic_allowed) {
     if (type->kind == Type_ARRAY)
         return make_array_type(resolve_type(ctx, type->data.base, true));
 
+    #if 0
     if (type->kind != Type_UNRESOLVED) {
         // For types which were declared before they are used, the declaration
         // won't get resolved at top level, so we just do it here.
@@ -212,6 +213,7 @@ static Type *resolve_type(Context *ctx, Type *type, bool cyclic_allowed) {
         types_decl->status = Status_RESOLVED;
         return type;
     }
+    #endif
 
     // Unresolved types (that is, types which are used before they are defined) are returned
     // as placeholder types, and are not put in the type table. If they then go on to be defined in the source code, they will be placed into the type table.
@@ -229,6 +231,9 @@ static Type *resolve_type(Context *ctx, Type *type, bool cyclic_allowed) {
     // Next we'll look up the actual declaration of the type.
     u64 type_i = shgeti(ctx->symbol_table, type->name);
     AstDecl *sym = ctx->symbol_table[type_i].value;
+
+    if (sym->status == Status_RESOLVED)
+        return real_type;
 
     // If the declaration is already resolving...
     if (sym->status == Status_RESOLVING) {
@@ -430,6 +435,8 @@ void resolve_program(Context *ctx) {
             AstTypedef *def = (AstTypedef *)decl;
             if (def->of->tag == Node_STRUCT) {
                 resolve_struct((AstStruct *)def->of, ctx);
+                // TODO (maybe) types that are only used inside unused structs
+                // will still be set as Status_RESOLVED. Maybe this shouldn't be the case?
             }
         } break;
         }
