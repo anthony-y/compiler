@@ -84,6 +84,8 @@ void compile_error(Context *ctx, Token t, const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
 
+    // The weird looking escape characters are to set the text color
+    // to red, print "Error", and then reset the colour.
     fprintf(stderr, "%s:%lu: \033[0;31mError\033[0m: ", ctx->current_file_path, t.line);
     vfprintf(stderr, fmt, args);
     fprintf(stderr, ".\n");

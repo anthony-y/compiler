@@ -311,11 +311,11 @@ static Type *resolve_var(AstDecl *decl, Context *ctx) {
 
     if (!(var->flags & VAR_IS_INFERRED)) {
         if (var->typename->as.type->kind == Type_ANON_STRUCT) {
-            resolve_struct(&var->typename->as.stmt.as._struct, ctx);
+            resolve_struct(&var->typename->as.type->data.user->as._struct, ctx);
         } else {
             *specified_type = resolve_type(ctx, *specified_type, false);
         }
-    } 
+    }
 
     if (!(var->flags & VAR_IS_INITED)) {
         decl->status = Status_RESOLVED;

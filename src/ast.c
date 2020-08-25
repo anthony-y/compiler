@@ -46,7 +46,7 @@ void free_block(AstStmt *stmt) {
         } break;
         case Node_CALL: {
             AstCall *call = (AstCall *)n;
-            ast_free(call->params);
+            if (call->params) ast_free(call->params);
         } break;
         }
     }

@@ -501,10 +501,7 @@ void check_struct(Context *ctx, AstStruct *s) { // TODO default struct values
     u64 struct_len = shlenu(s->members->as.block.symbols);
     for (int i = 0; i < struct_len; i++) {
         AstDecl *d = s->members->as.block.symbols[i].value;
-        AstVar *v = (AstVar *)d;
-        if (v->flags & VAR_IS_INITED) {
-            compile_error(ctx, decl_tok(d), "struct fields cannot yet have default values");
-        }
+        check_var(ctx, d);
     }
     // AstBlock *fields = &s->members->as.block;
     // check_block(ctx, fields, Node_VAR);

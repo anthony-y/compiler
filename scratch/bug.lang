@@ -1,9 +1,7 @@
 
-proc main() {
-    //t: T;
+proc main(): int {
+    as: struct{
+        n := 10
+    };
+    return as.n;
 }
-
-type T: struct {
-    the_a: A;
-}
-type A: int;
