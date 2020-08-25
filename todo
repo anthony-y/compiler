@@ -2,9 +2,6 @@ Disallow type inference on null literals since it's ambiguous.
 Disallow pointers to anonymous struct types e.g:
     t: ^struct{a: int};
 
-Array indexes inside compound expressions (e.g: a.b[0].z)
-
-
 Type resolution for binary expressions, specifically maths. Just returning type of left or right side
 wont work out. Check the resolved type of binary exprs if mystery bugs (errors or lack thereof) show up.
 

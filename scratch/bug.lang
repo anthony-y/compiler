@@ -1,4 +1,8 @@
 proc main() {
-    t : string
-    defer t = "8)"
+    ms: []MyStruct
+    msi := ms[0].i[2]
+}
+
+type MyStruct: struct {
+    i: []int;
 }
