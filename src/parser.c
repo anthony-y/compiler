@@ -224,8 +224,10 @@ static AstExpr *maybe_parse_array_assignment(Context *c, AstExpr *index) {
 static AstExpr *parse_expression(Context *c, int min_prec) {
     Parser *p = &c->parser;
     Token start = *p->curr;
+
     AstExpr *left = parse_simple_expr(c);
     if (!left) return NULL;
+
     while (true) {
         TokenType op = p->curr->type;
         BinaryOperator info = get_binary_op_info(op);

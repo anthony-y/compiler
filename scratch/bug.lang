@@ -1,6 +1,7 @@
 proc main() {
     ms: []MyStruct
     msi := ms[0].i[2]
+    ms[0].i[0] = ""
 }
 
 type MyStruct: struct {

@@ -136,7 +136,7 @@ static Type *resolve_expression_1(AstExpr *expr, Context *ctx) {
     case Expr_INDEX: {
         AstArrayIndex *index = (AstArrayIndex *)expr;
         Type *resolved_name = resolve_expression(index->name, ctx);
-        assert(resolved_name->data.base);
+        if (!resolved_name) return NULL;
         resolve_expression(index->index, ctx);
         return resolved_name->data.base;
     } break;
