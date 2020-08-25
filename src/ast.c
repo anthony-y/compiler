@@ -26,7 +26,7 @@ void free_block(AstStmt *stmt) {
         AstDecl *d = b->symbols[i].value;
         if (d->tag == Decl_VAR) {
             AstVar *var = (AstVar *)d;
-            if (var->typename->as.type->kind == Type_ANON_STRUCT) {
+            if (var->typename->as.type && var->typename->as.type->kind == Type_ANON_STRUCT) {
                 free_block(((AstStruct *)var->typename->as.type->data.user)->members);
             }
         }
