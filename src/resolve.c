@@ -289,6 +289,20 @@ static Type *resolve_selector(Context *ctx, AstBinary *accessor) { // TODO renam
         assert(lhs_type);
     }
 
+    // TODO kinda rough
+    if (lhs_type == ctx->type_string || (lhs_type->kind == Type_POINTER && lhs_type->data.base == ctx->type_string)) {
+        if (rhs == make_namet(ctx, "data")) {
+            static Type *data_type;
+            data_type = make_pointer_type(ctx->type_u8);
+            return data_type;
+        } else if (rhs == make_namet(ctx, "length")) {
+            return ctx->type_u64;
+        } else {
+            compile_error(ctx, expr_tok(accessor->left), "type \"string\" has no field \"%s\"", rhs->text);
+            return NULL;
+        }
+    }
+
     // In English: throw an error if the type of the left hand side is not either:
     //  - a struct or anonymous struct
     //  - a pointer, the base type of which is a struct or anonymous struct

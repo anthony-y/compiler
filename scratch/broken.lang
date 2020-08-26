@@ -42,7 +42,7 @@ type Lexer: struct {
     //string_allocator: mem.Pool
 }
 
-proc lexer_init(l: ^Lexer, ss: String): bool {
+proc lexer_init(l: ^Lexer, ss: string): bool {
     l.curr = ss.data
     l.start = ss.data
     l.line = 1
@@ -94,7 +94,7 @@ type String: struct {
     length: u64;
 }
 
-proc make_lexer(l: ^Lexer, s: String): bool {
+proc make_lexer(l: ^Lexer, s: string): bool {
     l.curr = s.data
     l.start = s.data
     l.line = 1

@@ -14,8 +14,8 @@ proc c_str_length(s: ^u8): int {
 proc to_c_string(s: string): ^u8 {
 	s : string;
 	c_str := cast(^u8)alloc(s.length+1)
-	//mem_copy(c_str, s.data, s.length) // s.data TODO
-	//c_str+s.length = 0 // Todo
+	mem_copy(c_str, s.data, s.length)
+	c_str+s.length = 0
 	c_str[s.length] = null
 	return c_str
 }

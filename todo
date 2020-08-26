@@ -1,3 +1,7 @@
+string members
+    s := "blah"
+    s.data = null
+
 Disallow pointers to anonymous struct types e.g:
     t: ^struct{a: int};
 
