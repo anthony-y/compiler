@@ -206,6 +206,10 @@ static Type *resolve_type(Context *ctx, Type *type, bool cyclic_allowed) {
     Token t = ((AstNode *)type)->token; // TODO doesnt work lol
 
     if (type->kind == Type_PRIMITIVE) return type;
+    if (type->kind == Type_ANON_STRUCT) {
+        resolve_struct(&type->data.user->as._struct, ctx);
+        return type;
+    }
 
     //
     // Pointers and arrays might have unresolved types in their sub-types.

@@ -243,7 +243,7 @@ bool does_type_describe_expr(Context *ctx, Type *type, AstExpr *expr) {
 
         Type *left_type = binary->left->resolved_type;
         Type *right_type = binary->right->resolved_type;
-        if (!is_type_numeric(left_type) || !is_type_numeric(right_type)) {
+        if (!is_type_numeric(left_type) && !is_type_numeric(right_type) && left_type->kind != Type_POINTER && right_type->kind != Type_POINTER) {
             compile_error(ctx, expr_token, "operands of arithmetic expressions need to be numeric");
             return FAILED_BUT_DONT_ERROR_AT_CALL_SITE;
         }
@@ -392,7 +392,7 @@ void check_if(Context *ctx, AstStmt *node) {
 void check_while(Context *ctx, AstStmt *node) {
     assert(node->tag == Stmt_WHILE);
     AstWhile *w = (AstWhile *)node;
-    if (w->condition->resolved_type != ctx->type_bool) {
+    if (w->condition->resolved_type != ctx->type_bool && w->condition->resolved_type->kind != Type_POINTER) {
         compile_error_start(ctx, stmt_tok(node), "'while' statement requires a condition which evaluates to a boolean, this one evaluates to ");
         print_type(w->condition->resolved_type, stderr);
         compile_error_end();
@@ -429,10 +429,11 @@ bool check_assignment(Context *ctx, AstExpr *expr, bool lhs_must_be_pointer) {
     bool is_maths_assign = binary->op != Token_EQUAL; // is it a normal assignment? or *=, etc.
     if (is_maths_assign) {
         Type *real_left = maybe_unwrap_type_alias(left_type);
-        if (!is_type_numeric(real_left) || !is_type_numeric(right_type)) {
+        if (!is_type_numeric(real_left) && !is_type_numeric(right_type) && real_left->kind != Type_POINTER && right_type->kind != Type_POINTER) {
             compile_error(ctx, tok, "type mismatch: arithmetic-assign operator expects numerical operands");
             return false;
         }
+        return true;
     }
 
     if (lhs_must_be_pointer) {
