@@ -1,7 +1,3 @@
-string members
-    s := "blah"
-    s.data = null
-
 Anon structs access arrays are broken (check.lang)
 Disallow pointers to anonymous struct types e.g:
     t: ^struct{a: int};
