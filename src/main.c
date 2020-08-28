@@ -8,6 +8,7 @@
 #include "headers/passes.h"
 #include "headers/type.h"
 #include "headers/ast.h"
+#include "headers/interp.h"
 
 #define STB_DS_IMPLEMENTATION
 #include "headers/stb/stb_ds.h"
@@ -31,14 +32,17 @@ static void print_unused_symbol_warnings(Context *);
 bool process_file(const char *file_path) {
     char *file_data = read_file(file_path); // read the file into a zero-terminated buffer.
 
-    u64 lexer_delta = 0;
-    u64 parser_delta = 0;
+    u64 lexer_delta   = 0;
+    u64 parser_delta  = 0;
     u64 checker_delta = 0;
+    u64 bc_gen_delta  = 0;
+    u64 interp_delta  = 0;
 
     SourceStats stats = (SourceStats){10}; // initialize all the fields to 10
     TokenList tokens;
     Context context;
     Ast ast;
+    Interp interp;
 
     #define NEXT_STAGE_OR_QUIT() if (context.error_count > 0) goto end;
 
@@ -69,7 +73,7 @@ bool process_file(const char *file_path) {
 
     if (!context.decl_for_main)
         compile_error(&context, (Token){0}, "No entry point found. Please declare \"main\"");
-    if (context.decl_for_main->tag != Decl_PROC)
+    else if (context.decl_for_main->tag != Decl_PROC)
         compile_error(&context, decl_tok(context.decl_for_main), "Entry point \"main\" must be a procedure");
 
     NEXT_STAGE_OR_QUIT();
@@ -79,6 +83,15 @@ bool process_file(const char *file_path) {
         NEXT_STAGE_OR_QUIT();
         check_ast(&context, &ast); // type and semantic checking
         NEXT_STAGE_OR_QUIT();
+    });
+
+    PROFILE(bc_gen, {
+        
+    });
+
+    interp_init(&interp);
+    PROFILE(interp, {
+        interp_run(&interp, NULL);
     });
 
     print_unused_symbol_warnings(&context);
@@ -95,8 +108,10 @@ end:
         printf("Total time: %ldus\n", lexer_delta + parser_delta + checker_delta);
         printf("\tLexing took %ldus\n", lexer_delta);
         printf("\tParsing took %ldus\n", parser_delta);
+        printf("\t\tParser used %lu/%lu nodes\n", context.parser.node_count, context.parser.node_allocator.capacity);
         printf("\tInferring, resolving and checking took %ldus\n", checker_delta);
-        printf("Parser used %lu nodes out of %lu allocated.\n", context.parser.node_count, context.parser.node_allocator.capacity);
+        printf("\tBytecode generation took %ldus\n", bc_gen_delta);
+        printf("\tCompile time execution took %ldus\n", interp_delta);
 
         free_subtrees_and_blocks(&ast);
         free_types(&context);

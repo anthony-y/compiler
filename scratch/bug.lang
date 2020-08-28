@@ -1,5 +1,7 @@
-proc magic_os_proc(_: string): string #foreign "hi"
-proc main() {
+proc _main() {
     file_data := magic_os_proc("bug.lang")
-    i := null
+    ptr := ^file_data
+    *(cast(^string)ptr) = ":)"
 }
+
+proc magic_os_proc(_: string): string #foreign "hi"
