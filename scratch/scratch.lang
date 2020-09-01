@@ -1,4 +1,5 @@
 i := 10
+j := i
 
 proc main() {
     message := get_message() // look up name in symbol table (and local scope but we'll worry about local procs later)
@@ -6,6 +7,8 @@ proc main() {
                                     // if it is, and it's not resolved, resolve it and change the symbol in the table of key "get_message" to Symbol_RESOLVED
 
     use_i(i)
+
+    j = 10
 
     b := "testing symbol resolution"
     a := b // look up b in scope, if it's not there, undeclared error, if it is and it's not resolved, resolve it to a Type* and infer the type, change state to Symbol_RESOLVED, if b state is Symbol_RESOLVING then error

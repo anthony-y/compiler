@@ -1,4 +1,4 @@
-proc _main() {
+proc main() {
     file_data := magic_os_proc("bug.lang")
     ptr := ^file_data
     *(cast(^string)ptr) = ":)"

@@ -9,6 +9,7 @@ struct Parser;
 struct Ast;
 struct Name; // context.h
 struct Context;
+union Register;
 
 typedef enum {
     Decl_PROC,
@@ -114,6 +115,7 @@ typedef struct {
     struct AstNode *name;
     struct AstExpr *value;
     struct AstNode *typename;
+    u64 register_index;
     int flags;
 } AstVar;
 
@@ -315,8 +317,6 @@ AstNode *ast_node(struct Parser *, AstNodeType tag, Token);
 AstNode *ast_decl(struct Parser *, AstNodeType tag, Token, const AstDecl *);
 AstNode *ast_expr(struct Parser *, AstNodeType tag, Token, const AstExpr *);
 AstNode *ast_stmt(struct Parser *, AstNodeType tag, Token, const AstStmt *);
-
-struct Context;
 
 AstExpr *ast_name(struct Context *, Token t);
 AstExpr *ast_binary(struct Parser *p, Token t, const AstBinary *binary);

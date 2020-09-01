@@ -664,6 +664,7 @@ static bool parse_var(Context *c, bool top_level, AstVar *out) {
     var.flags    = 0;
     var.name     = (AstNode *)ast_name(c, name); // probs remove AstDecl names from their actual nodes
     var.typename = ast_node(p, Node_TYPENAME, *p->curr);
+    var.register_index = 0;
 
     if (!consume(p, Token_COLON)) {
         parser_recover(p, Token_SEMI_COLON);

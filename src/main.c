@@ -8,7 +8,7 @@
 #include "headers/passes.h"
 #include "headers/type.h"
 #include "headers/ast.h"
-#include "headers/interp.h"
+#include "headers/bytecode.h"
 
 #define STB_DS_IMPLEMENTATION
 #include "headers/stb/stb_ds.h"
@@ -42,7 +42,6 @@ bool process_file(const char *file_path) {
     TokenList tokens;
     Context context;
     Ast ast;
-    Interp interp;
 
     #define NEXT_STAGE_OR_QUIT() if (context.error_count > 0) goto end;
 
@@ -85,13 +84,15 @@ bool process_file(const char *file_path) {
         NEXT_STAGE_OR_QUIT();
     });
 
+    Interp interp;
     PROFILE(bc_gen, {
-        
+        interp = compile_to_bytecode(&context, &ast);
     });
 
-    interp_init(&interp);
+    NEXT_STAGE_OR_QUIT();
+
     PROFILE(interp, {
-        interp_run(&interp, NULL);
+        interp_run(&interp);
     });
 
     print_unused_symbol_warnings(&context);
@@ -113,6 +114,7 @@ end:
         printf("\tBytecode generation took %ldus\n", bc_gen_delta);
         printf("\tCompile time execution took %ldus\n", interp_delta);
 
+        interp_free(&interp);
         free_subtrees_and_blocks(&ast);
         free_types(&context);
         parser_free(&context.parser, &ast);
@@ -130,7 +132,7 @@ int main(int arg_count, char *args[]) {
         return 1;
     }
 
-    return !process_file(args[1]); // 0 (good) is false in this case
+    return !process_file(args[1]); // 0 means good, which is false
 }
 
 static void print_unused_symbol_warnings(Context *ctx) {
