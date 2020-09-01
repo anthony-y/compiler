@@ -103,7 +103,12 @@ static Type *resolve_expression_1(AstExpr *expr, Context *ctx) {
         AstProcedure *in = stbds_arrlast(proc_stack);
         AstBlock *scope = stbds_arrlast(scope_stack);
 
-        AstDecl *var = lookup_local(ctx, in, name, scope);
+        AstDecl *var = NULL;
+        if (!scope) {
+            var = shget(ctx->symbol_table, name->text);
+        } else {
+            var = lookup_local(ctx, in, name, scope);
+        }
         if (!var) {
             compile_error(ctx, t, "undeclared identifier \"%s\"", name->text);
             return NULL;
