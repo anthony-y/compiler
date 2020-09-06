@@ -18,6 +18,7 @@ static void emit_c_for_var(AstVar *var);
 static void emit_c_for_local_var(AstVar *var);
 static void emit_c_for_expr(AstExpr *expr);
 static void emit_c_for_stmt(AstNode *stmt);
+static void emit_c_for_struct(AstStruct *def, char *name);
 
 static void emit_c_for_type(Type *type) {
     assert(type);
@@ -32,6 +33,9 @@ static void emit_c_for_type(Type *type) {
         break;
     case Type_STRUCT:
         fprintf(output, "struct %s", type->name);
+        return;
+    case Type_ANON_STRUCT:
+        emit_c_for_struct(&type->data.user->as._struct, NULL);
         return;
     case Type_POINTER:
         if (!type->data.base) { // generic pointer type, probably from a null literal
@@ -58,7 +62,6 @@ static void emit_c_for_type(Type *type) {
 static void emit_deferred_stmts(AstBlock *block) {
     for (int i = block->deferred->len-1; i >= 0; i--) {
         AstNode *node = block->deferred->nodes[i];
-        fprintf(output, "    ");
         emit_c_for_stmt(node);
         fprintf(output, ";\n");
     }
@@ -140,7 +143,12 @@ static void emit_c_for_expr(AstExpr *expr) {
         case Token_MINUS: fprintf(output, "-"); break;
         case Token_SLASH: fprintf(output, "/"); break;
         case Token_STAR: fprintf(output, "*"); break;
-        case Token_DOT: fprintf(output, "."); break;
+        case Token_DOT: {
+            if (binary->left->resolved_type->kind == Type_POINTER)
+                fprintf(output, "->");
+            else
+                fprintf(output, ".");
+        } break;
         default: assert(false);
         }
         emit_c_for_expr(binary->right);
@@ -196,23 +204,31 @@ static void emit_c_for_stmt(AstNode *stmt) {
     case Node_BLOCK: {
         AstBlock *block = (AstBlock *)stmt;
         for (int i = 0; i < block->statements->len; i++) {
-            fprintf(output, "        "); // TODO automate indentation
             emit_c_for_stmt(block->statements->nodes[i]);
             fprintf(output, ";\n");
         }
     } break;
     case Node_IF: {
+        // if (/*condition*/) {
+        //   ...           
+        // }
         AstIf *iff = (AstIf *)stmt;
         fprintf(output, "if (");
         emit_c_for_expr(iff->condition);
         fprintf(output, ") {\n");
         emit_c_for_stmt((AstNode *)iff->block_or_stmt);
-        if (iff->block_or_stmt->tag != Stmt_BLOCK)
-            fprintf(output, ";\n");
-        fprintf(output, "    }");
+        fprintf(output, ";\n");
+        fprintf(output, "}");
+
         if (iff->other_branch) {
-            emit_c_for_stmt((AstNode *)iff->other_branch);
-            fprintf(output, "}");
+            fprintf(output, "else ");
+            if (iff->other_branch->tag == Stmt_BLOCK) {
+                fprintf(output, "{\n");
+                emit_c_for_stmt((AstNode *)iff->other_branch);
+                fprintf(output, "}");
+            } else {
+                emit_c_for_stmt((AstNode *)iff->other_branch);
+            }
         }
     } break;
     case Node_WHILE: {
@@ -221,7 +237,7 @@ static void emit_c_for_stmt(AstNode *stmt) {
         emit_c_for_expr(w->condition);
         fprintf(output, ") {\n");
         emit_c_for_stmt((AstNode *)w->block);
-        fprintf(output, "    }");
+        fprintf(output, "}");
     } break;
     case Node_RETURN: {
         AstReturn *ret = (AstReturn *)stmt;
@@ -243,11 +259,10 @@ static void emit_c_for_struct(AstStruct *def, char *name) {
     fprintf(output, " {\n");
     for (int i = 0; i < block->statements->len; i++) {
         AstVar *var = (AstVar *)block->statements->nodes[i];
-        fprintf(output, "    ");
         emit_c_for_var(var);
         fprintf(output, ";\n");
     }
-    fprintf(output, "};\n");
+    fprintf(output, "} ");
 }
 
 static void emit_c_for_var(AstVar *var) {
@@ -301,12 +316,11 @@ static void emit_c_for_proc(AstProcedure *proc, bool entry_point) {
     }
     fprintf(output, " {\n");
     if (entry_point) {
-        fprintf(output, "    __global_initializers();\n");
+        fprintf(output, "__global_initializers();\n");
     }
     AstBlock *block = (AstBlock *)proc->block;
     for (u64 i = 0; i < block->statements->len; i++) {
         AstNode *node = block->statements->nodes[i];
-        fprintf(output, "    ");
         emit_c_for_stmt(node);
         fprintf(output, ";\n");
     }
@@ -369,6 +383,7 @@ char *generate_and_write_c_code(Context *ctx, Ast *ast) {
             AstTypedef *def = (AstTypedef *)decl;
             if (def->of->tag == Node_STRUCT) {
                 emit_c_for_struct((AstStruct *)def->of, def->name->as.name->text);
+                fprintf(output, ";\n");
             }
         }
     }
@@ -400,14 +415,14 @@ char *generate_and_write_c_code(Context *ctx, Ast *ast) {
         AstVar *var = (AstVar *)decl;
         if (!(var->flags & VAR_IS_INITED)) continue;
 
-        fprintf(output, "    %s = ", var->name->as.expr.as.name->text);
+        fprintf(output, "%s = ", var->name->as.expr.as.name->text);
         emit_c_for_expr(var->value);
         fprintf(output, ";\n");
     }
     fprintf(output, "}\n");
 
     fprintf(output, "int main(int __argcount, char *__args[]) {\n");
-    fprintf(output, "    __compiler_main();\n");
+    fprintf(output, "__compiler_main();\n");
     fprintf(output, "}\n");
 
     fclose(output);

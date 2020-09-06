@@ -31,98 +31,104 @@ void free(void* _);
 void puts(u8* s);
 
 void __compiler_main() {
-    __global_initializers();
-    string msg = __make_string("Hello, world!", 13);
-    string length_string = to_string(msg.length);
-    string substring = scuffed_substring(msg, 5);
-    ;
-    defer_test();
-    print(msg);
-    print(substring);
-    print(length_string);
-    free(substring.data);
+__global_initializers();
+string msg = __make_string("Hello, world!", 13);
+string length_string = to_string(msg.length);
+string substring = scuffed_substring(msg, 5);
+;
+defer_test();
+print(msg);
+print(substring);
+print(length_string);
+free(substring.data);
 }
 void defer_test() {
-    ;
-    ;
-    ;
-    if (true) {
-            print(__make_string("3", 1));
-    print(__make_string("2", 1));
-    print(__make_string("1", 1));
+;
+;
+;
+if (false) {
+print(__make_string("3", 1));
+print(__make_string("2", 1));
+print(__make_string("1", 1));
 return;
-    };
-    print(__make_string("ay", 2));
-    print(__make_string("3", 1));
-    print(__make_string("2", 1));
-    print(__make_string("1", 1));
+;
+}else if (true) {
+print(__make_string("no", 2));
+;
+}else {
+print(__make_string("else", 4));
+};
+print(__make_string("ay", 2));
+print(__make_string("3", 1));
+print(__make_string("2", 1));
+print(__make_string("1", 1));
 }
 string scuffed_substring(string s, int up_to) {
-    string sub;
-    u64 up_to_big = (cast(u64)up_to);
-    sub.data = malloc((cast(u64)(up_to_big+1)));
-    memcpy(sub.data, s.data, up_to_big);
-    sub.data[up_to] = 0;
-    sub.length = up_to_big;
-    return sub;
+string sub;
+u64 up_to_big = (cast(u64)up_to);
+sub.data = malloc((cast(u64)(up_to_big+1)));
+memcpy(sub.data, s.data, up_to_big);
+sub.data[up_to] = 0;
+sub.length = up_to_big;
+return sub;
 }
 string to_string(u64 i) {
-    if (i==0) {
+if (i==0) {
 return __make_string("0", 1);
-    };
-    if (i==1) {
+};
+if (i==1) {
 return __make_string("1", 1);
-    };
-    if (i==2) {
+};
+if (i==2) {
 return __make_string("2", 1);
-    };
-    if (i==3) {
+};
+if (i==3) {
 return __make_string("3", 1);
-    };
-    if (i==4) {
+};
+if (i==4) {
 return __make_string("4", 1);
-    };
-    if (i==5) {
+};
+if (i==5) {
 return __make_string("5", 1);
-    };
-    if (i==6) {
+};
+if (i==6) {
 return __make_string("6", 1);
-    };
-    if (i==7) {
+};
+if (i==7) {
 return __make_string("7", 1);
-    };
-    if (i==8) {
+};
+if (i==8) {
 return __make_string("8", 1);
-    };
-    if (i==9) {
+};
+if (i==9) {
 return __make_string("9", 1);
-    };
-    if (i==10) {
+};
+if (i==10) {
 return __make_string("10", 2);
-    };
-    if (i==11) {
+};
+if (i==11) {
 return __make_string("11", 2);
-    };
-    if (i==12) {
+};
+if (i==12) {
 return __make_string("12", 2);
-    };
-    if (i==13) {
+};
+if (i==13) {
 return __make_string("13", 2);
-    };
-    if (i==14) {
+};
+if (i==14) {
 return __make_string("14", 2);
-    };
-    if (i==15) {
+};
+if (i==15) {
 return __make_string("15", 2);
-    };
-    return __make_string("(bad)", 5);
+};
+return __make_string("(bad)", 5);
 }
 void print(string s) {
-    puts(s.data);
+puts(s.data);
 }
 
 void __global_initializers() {
 }
 int main(int __argcount, char *__args[]) {
-    __compiler_main();
+__compiler_main();
 }
