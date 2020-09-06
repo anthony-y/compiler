@@ -115,7 +115,6 @@ typedef struct {
     struct AstNode *name;
     struct AstExpr *value;
     struct AstNode *typename;
-    u64 register_index;
     int flags;
 } AstVar;
 
@@ -124,13 +123,12 @@ enum {
     PROC_RET_VALUE_CHECKED = 1 << 1,
 };
 typedef struct {
-    struct SymbolTable *params;
+    struct Ast *params;
     struct AstStmt *block;
-    struct AstNode *name;
+    struct Name *name;
     struct AstNode *return_type;
-
     int flags;
-    Token foreign_link_name;
+    struct AstExpr *foreign_link_name;
 } AstProcedure;
 
 typedef struct {
@@ -174,7 +172,7 @@ typedef struct {
     struct AstExpr *expr;
 } AstReturn;
 
-typedef struct {
+typedef struct AstLiteral {
     union {
         s64 integer;
         char *string;
@@ -272,6 +270,7 @@ typedef struct AstStmt {
 
 enum {
     DECL_IS_TOP_LEVEL = 1 << 0,
+    DECL_IS_PROC_ARGUMENT = 1 << 1,
 };
 
 typedef struct AstDecl {

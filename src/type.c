@@ -1,3 +1,5 @@
+// Functions for working with the compilers
+// internal representation of a data-type.
 #include "headers/common.h"
 #include "headers/passes.h"
 #include "headers/ast.h"
@@ -12,7 +14,7 @@
 #include <stdio.h>
 #include <assert.h>
 
-static Arena type_arena;
+static Arena type_arena; // the structure which types are allocated from
 
 // checker.c
 Type *type_from_expr(Context *ctx, AstNode *expr);
@@ -43,7 +45,7 @@ inline bool is_type_numeric(Type *t) {
     return (t->kind == Type_PRIMITIVE && t->data.signage != Signage_NaN);
 }
 
-// Allocates a type, fills out its basic fields, adds it to the type table and returns it.
+// Allocates and initializes a primitive type, and returns it.
 static inline Type *make_and_insert_primitive(Context *ctx, char *name, u64 size, Signage signage) {
     Type *t = make_type(Type_PRIMITIVE, name, size);
     t->data.signage = signage;
@@ -72,7 +74,6 @@ void init_types(Context *ctx, SourceStats *stats) {
 
     sh_new_arena(ctx->type_table); // initialize the type table as a string hash map
 
-    // The following `sizeof` expressions do not 
     ctx->type_int = make_and_insert_primitive(ctx, "int", sizeof(s64), Signage_SIGNED);
 
     ctx->type_s64 = make_and_insert_primitive(ctx, "s64", sizeof(s64), Signage_SIGNED);
@@ -97,7 +98,7 @@ void init_types(Context *ctx, SourceStats *stats) {
 }
 
 // Utility function to unwrap a pointer to it's ultimate base type.
-// Returns the unwrapped pointer, and return the depth to `out_depth`.
+// Returns the unwrapped pointer, and returns the depth to `out_depth`.
 // Does not print errors.
 inline Type *unwrap_pointer_type(Type *ptr, int *out_depth) {
     assert(ptr->kind == Type_POINTER);
@@ -110,8 +111,8 @@ inline Type *unwrap_pointer_type(Type *ptr, int *out_depth) {
     return ptr;
 }
 
-// TODO most of the time this will be stderr, so maybe just enforce that
-void print_type(Type *type, FILE *stream) {
+void print_type(Type *type) {
+    FILE *stream = stderr;
     if (!type) {
         fprintf(stream, "unknown");
         return;
@@ -131,16 +132,16 @@ void print_type(Type *type, FILE *stream) {
             return;
         }
         fprintf(stream, "^");
-        print_type(type->data.base, stream);
+        print_type(type->data.base);
         return;
     case Type_ALIAS:
         fprintf(stream, "%s (alias of ", type->name);
-        print_type(type->data.alias_of, stream);
+        print_type(type->data.alias_of);
         fprintf(stream, ")");
         return;
     case Type_ARRAY:
         fprintf(stream, "[]");
-        print_type(type->data.base, stream);
+        print_type(type->data.base);
         return;
     case Type_UNRESOLVED:
         fprintf(stream, "Internal compiler error: Type_UNRESOLVED is not supposed to be printed.\n");

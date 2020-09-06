@@ -1,3 +1,6 @@
+// resolve.c contains code which recursively traverses an abstract syntax tree
+// to resolve identifiers to the symbols which declared them, resolve expressions to types
+// and to apply type inference to variable declarations which specify it.
 #include "headers/common.h"
 #include "headers/ast.h"
 #include "headers/type.h"
@@ -69,7 +72,7 @@ static AstProcedure *resolve_call(AstNode *callnode, Context *ctx) {
     return calling;
 }
 
-static Type *resolve_expression_1(AstExpr *expr, Context *ctx) {
+static Type *resolve_expression_1(AstExpr *expr, Context *ctx, AstDecl *target) {
     Token t = expr_tok(expr);
     switch (expr->tag) {
     case Expr_STRING: return ctx->type_string;
@@ -104,20 +107,24 @@ static Type *resolve_expression_1(AstExpr *expr, Context *ctx) {
         AstBlock *scope = stbds_arrlast(scope_stack);
 
         AstDecl *var = NULL;
-        if (!scope) {
-            var = shget(ctx->symbol_table, name->text);
-        } else {
-            var = lookup_local(ctx, in, name, scope);
-        }
+
+        if (!scope) var = shget(ctx->symbol_table, name->text); // global scope
+        else var = lookup_local(ctx, in, name, scope);
+
         if (!var) {
             compile_error(ctx, t, "undeclared identifier \"%s\"", name->text);
             return NULL;
         }
+
         if (var->tag != Decl_VAR) {
             compile_error(ctx, t, "\"%s\" was used like a variable, but it isn't one", name->text);
             return NULL;
         }
+
         assert(var->name == name);
+
+        name->resolved_decl = var;
+
         if (var->status == Status_UNRESOLVED) {
             if (!(var->flags & DECL_IS_TOP_LEVEL)) {
                 compile_error(ctx, t, "local variable \"%s\" was used before it was declared", name->text);
@@ -126,11 +133,11 @@ static Type *resolve_expression_1(AstExpr *expr, Context *ctx) {
             Type *resolved_type = resolve_var(var, ctx);
             return resolved_type;
         }
-        if (var->status == Status_RESOLVING) {
+
+        else if (var->status == Status_RESOLVING) {
             compile_error(ctx, t, "initial instantiation of variable \"%s\" mentions itself", name->text);
             return NULL;
         }
-        name->resolved_decl = var;
         return var->as.var.typename->as.type;
     } break;
     case Expr_CAST: {
@@ -188,7 +195,14 @@ static Type *resolve_expression_1(AstExpr *expr, Context *ctx) {
 
 static Type *resolve_expression(AstExpr *expr, Context *ctx) {
     if (!expr) return NULL;
-    Type *re = resolve_expression_1(expr, ctx);
+    Type *re = resolve_expression_1(expr, ctx, NULL);
+    expr->resolved_type = re;
+    return re;
+}
+
+static Type *resolve_expression_for_variable(Context *ctx, AstExpr *expr, AstDecl *target) {
+    if (!expr) return NULL;
+    Type *re = resolve_expression_1(expr, ctx, target);
     expr->resolved_type = re;
     return re;
 }
@@ -359,7 +373,7 @@ static Type *resolve_var(AstDecl *decl, Context *ctx) {
     }
 
     decl->status = Status_RESOLVING;
-    Type *inferred_type = resolve_expression(var->value, ctx);
+    Type *inferred_type = resolve_expression_for_variable(ctx, var->value, decl);
     decl->status = Status_RESOLVED;
 
     if (!inferred_type) return NULL;
@@ -425,9 +439,9 @@ static void resolve_procedure(AstDecl *procsym, Context *ctx) {
     AstProcedure *proc = (AstProcedure *)procsym;
 
     if (proc->params) {
-        u64 num_params = shlenu(proc->params);
+        u64 num_params = proc->params->len;
         for (int i = 0; i < num_params; i++) {
-            resolve_var(proc->params[i].value, ctx);
+            resolve_var((AstDecl *)proc->params->nodes[i], ctx);
         }
     }
 

@@ -13,7 +13,9 @@ proc test(xyz: ^string): Whatever {
     x := have_fun()
     z = false;
     w : ^bool = ^z;
-    return ^^w;
+    w2 := ^w;
+    // return ^^w; // TODO gcc overlaps with this with its unary && operator (codegen)
+    return ^w2; 
 }
 
 proc have_fun(): Fun {

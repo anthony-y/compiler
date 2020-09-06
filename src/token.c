@@ -1,3 +1,5 @@
+// Utility functions for working with the Token,
+// the first major abstraction in the compilation pipeline.
 #include "headers/token.h"
 #include "headers/common.h"
 

@@ -1,0 +1,12 @@
+i: int = -10;
+zz : int = i;
+pp : ^int = null;
+s := "Hii"
+ss := s
+
+proc main() {
+	zz = 1;
+	ss = "a"
+	//main()
+	pp = null;
+}

@@ -72,8 +72,7 @@ static bool check_call(Context *ctx, AstNode *callnode) {
     char *name = call->name->as.name->text;
 
     AstProcedure *proc = call->calling;
-    int real_len = shlenu(proc->params);
-    int proc_arg_count = (proc->params ? real_len : 0);
+    int proc_arg_count = (proc->params ? proc->params->len : 0);
     if (!call->params) {
         if (proc_arg_count != 0) {
             compile_error(ctx, callnode->token, "call to \"%s\" specifies no arguments, but it's defined to expect %d of them", name, proc_arg_count);
@@ -90,7 +89,7 @@ static bool check_call(Context *ctx, AstNode *callnode) {
         return false;
     }
 
-    if (call_arg_count < real_len) {
+    if (call_arg_count < proc_arg_count) {
         int diff = proc_arg_count - call_arg_count;
         compile_error(ctx, callnode->token, "%d too few arguments in call to \"%s\"", diff, name);
         return false;
@@ -100,12 +99,12 @@ static bool check_call(Context *ctx, AstNode *callnode) {
 
     for (int i = 0; i < call_arg_count; i++) {
         Type *caller_type = call->params->nodes[i]->as.expr.resolved_type;
-        Type *defn_type = proc->params[i].value->as.var.typename->as.type;
+        Type *defn_type = proc->params->nodes[i]->as.decl.as.var.typename->as.type;
         if (!do_types_match(ctx, caller_type, defn_type)) {
             compile_error_start(ctx, callnode->token, "type mismatch: argument %d of procedure \"%s\" is defined as type ", i+1, name);
-            print_type(defn_type, stderr);
+            print_type(defn_type);
             compile_error_add_line(ctx, " but caller provided argument of type ");
-            print_type(caller_type, stderr);
+            print_type(caller_type);
             compile_error_end();
         }
     }
@@ -126,7 +125,7 @@ static bool check_unary_against_type(Context *ctx, AstUnary *unary, Type *agains
     if (unary->op == Token_MINUS) {
         if (!is_type_numeric(unary->expr->resolved_type)) {
             compile_error_start(ctx, expr_token, "unary negating expression expects integer or float operand, given ");
-            print_type(unary->expr->resolved_type, stderr);
+            print_type(unary->expr->resolved_type);
             compile_error_end();
             return FAILED_BUT_DONT_ERROR_AT_CALL_SITE;
         }
@@ -139,7 +138,7 @@ static bool check_unary_against_type(Context *ctx, AstUnary *unary, Type *agains
         }
         if (sub_expr_type->kind != Type_POINTER) {
             compile_error_start(ctx, expr_token, "pointer dereference expects a pointer operand, but was given type ");
-            print_type(sub_expr_type, stderr);
+            print_type(sub_expr_type);
             compile_error_end();
             return FAILED_BUT_DONT_ERROR_AT_CALL_SITE;
         }
@@ -257,9 +256,9 @@ bool does_type_describe_expr(Context *ctx, Type *type, AstExpr *expr) {
         Type *as_type = cast->typename->as.type;
         if (!can_type_cast_to_type(ctx, expr, cast->expr->resolved_type, as_type)) {
             compile_error_start(ctx, expr_token, "cannot cast value of type ");
-            print_type(cast->expr->resolved_type, stderr);
+            print_type(cast->expr->resolved_type);
             compile_error_add_line(ctx, " to type ");
-            print_type(as_type, stderr);
+            print_type(as_type);
             compile_error_end();
             return FAILED_BUT_DONT_ERROR_AT_CALL_SITE;
         }
@@ -315,9 +314,9 @@ bool check_proc_return_value(Context *ctx, AstStmt *retnode) {
     // Return value was provided, type was just wrong.
     if (!does_type_describe_expr(ctx, return_type, r->expr)) {
         compile_error_start(ctx, tok, "type mismatch: procedure has return type ");
-        print_type(return_type, stderr);
+        print_type(return_type);
         compile_error_add_line(ctx, ", but return value is of type ");
-        print_type(r->expr->resolved_type, stderr);
+        print_type(r->expr->resolved_type);
         compile_error_end();
 
         return false;
@@ -352,7 +351,7 @@ bool check_var(Context *ctx, AstDecl *node) {
 
     else if (type->kind == Type_ALIAS && maybe_unwrap_type_alias(type) == ctx->type_void) {
         compile_error_start(ctx, tok, "variable is declared to have type ");
-        print_type(type, stderr);
+        print_type(type);
         compile_error_add_line(ctx, "which is an alias of void; only procedures may use the \"void\" type");
         compile_error_end();
         return false;
@@ -365,9 +364,9 @@ bool check_var(Context *ctx, AstDecl *node) {
 
     if (!does_type_describe_expr(ctx, type, var->value)) {
         compile_error_start(ctx, tok, "type mismatch: variable declared as type ");
-        print_type(type, stderr);
+        print_type(type);
         compile_error_add_line(ctx, ", but value was of type ");
-        print_type(value_type, stderr);
+        print_type(value_type);
         compile_error_end();
 
         return false;
@@ -380,7 +379,7 @@ void check_if(Context *ctx, AstStmt *node) {
     AstIf *iff = &node->as._if;
     if (iff->condition->resolved_type != ctx->type_bool) {
         compile_error_start(ctx, stmt_tok(node), "'If' statement requires a condition which evaluates to a boolean, this one evaluates to ");
-        print_type(iff->condition->resolved_type, stderr);
+        print_type(iff->condition->resolved_type);
         compile_error_end();
         return;
     }
@@ -394,7 +393,7 @@ void check_while(Context *ctx, AstStmt *node) {
     AstWhile *w = (AstWhile *)node;
     if (w->condition->resolved_type != ctx->type_bool && w->condition->resolved_type->kind != Type_POINTER) {
         compile_error_start(ctx, stmt_tok(node), "'while' statement requires a condition which evaluates to a boolean, this one evaluates to ");
-        print_type(w->condition->resolved_type, stderr);
+        print_type(w->condition->resolved_type);
         compile_error_end();
         return;
     }
@@ -439,7 +438,7 @@ bool check_assignment(Context *ctx, AstExpr *expr, bool lhs_must_be_pointer) {
     if (lhs_must_be_pointer) {
         if (left_type->kind != Type_POINTER) {
             compile_error_start(ctx, tok, "cannot dereference type ");
-            print_type(left_type, stderr);
+            print_type(left_type);
             compile_error_end();
             return false;
         }
@@ -448,9 +447,9 @@ bool check_assignment(Context *ctx, AstExpr *expr, bool lhs_must_be_pointer) {
 
     if (!does_type_describe_expr(ctx, left_type, binary->right)) {
         compile_error_start(ctx, tok, "type mismatch: cannot assign value of type ");
-        print_type(right_type, stderr);
+        print_type(right_type);
         compile_error_add_line(ctx, " to variable of type ");
-        print_type(left_type, stderr);
+        print_type(left_type);
         compile_error_end();
         return false;
     }
@@ -538,8 +537,8 @@ void check_ast(Context *ctx, Ast *ast) {
         case Node_PROCEDURE: {
             AstProcedure *proc = (AstProcedure *)node;
             if (proc->params) {
-                for (int i = 0; i < shlenu(proc->params); i++) {
-                    check_var(ctx, proc->params[i].value);
+                for (int i = 0; i < proc->params->len; i++) {
+                    check_var(ctx, (AstDecl *)proc->params->nodes[i]);
                 }
             }
             if (proc->flags & PROC_IS_FOREIGN) continue;

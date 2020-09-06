@@ -62,7 +62,7 @@ void free_subtrees_and_blocks(Ast *ast) {
         switch (node->tag) {
         case Node_PROCEDURE: {
             AstProcedure *proc = (AstProcedure *)node;
-            shfree(proc->params);
+            if (proc->params) ast_free(proc->params);
             free_block(proc->block);
         } break;
         }

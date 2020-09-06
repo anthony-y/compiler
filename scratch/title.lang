@@ -1,3 +1,5 @@
+proc puts(s: ^u8): int #foreign;
+
 proc main() {
     b := -1;
     i := cast(int)b;
@@ -6,8 +8,13 @@ proc main() {
         return;
     }
     my_ptr: ^int = ^b;
-    (*my_ptr+1) = 10;
+    //(*my_ptr+1) = 10; // TODO C gen bug
+    (*(my_ptr+1)) = 10;
     i = *my_ptr;
+    
+    puts(msg.data);
 }
+
+msg := "hi"
 
 type T: int;

@@ -1,14 +1,18 @@
-proc main(args: []string): string {
+proc main(): void {
+    args: []string
     args[10] = ""
     i: []int
     i[0] = 10
     sum : int = -i[0]
-    return args[10]
+    //return args[10]
 }
+
+type T: int;
 
 proc whatever() {
     f: Field
     i: int
+    ttt: T;
     ip: ^int = ^i
     *f.name = "Anthony"
     f.not_ptr = *ip

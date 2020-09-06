@@ -53,7 +53,7 @@ typedef struct Type {
 Type *make_type(TypeKind kind, char *name, u64 size);
 Type *make_pointer_type(Type *base_type);
 Type *make_array_type(Type *base);
-void print_type(Type *, FILE *);
+void print_type(Type *);
 Type *unwrap_pointer_type(Type *ptr, int *out_depth);
 bool is_type_numeric(Type *);
 

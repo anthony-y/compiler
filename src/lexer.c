@@ -1,3 +1,6 @@
+// The lexer transforms a chunk of bytes
+// (typically a loaded file) into an array
+// of Tokens, ready to be handed off to the parser.
 #include "headers/lexer.h"
 #include "headers/token.h"
 #include "headers/context.h"
@@ -79,8 +82,11 @@ Token token_new(Lexer *tz, TokenType type) {
     
     tz->last = type;
 
-    t.text = arena_alloc(&tz->string_allocator, t.length + 1);
-    strncpy(t.text, tz->start, t.length);
+    if (type == Token_IDENT || type == Token_INT_LIT || type == Token_STRING_LIT || type == Token_FLOAT_LIT || type == Token_RESERVED_TYPE) {
+        t.text = arena_alloc(&tz->string_allocator, t.length + 1);
+        strncpy(t.text, tz->start, t.length);
+        t.text[t.length] = 0;
+    }
 
     return t;
 }

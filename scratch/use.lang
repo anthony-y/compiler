@@ -1,20 +1,22 @@
-proc alloc(_: u64)                             #foreign
+proc alloc(_: u64): ^void                      #foreign "malloc"
 proc free(_: ^void)                            #foreign
-proc mem_copy(dest: ^void, src: ^void, n: int) #foreign
+proc mem_copy(dest: ^void, src: ^void, n: u64) #foreign "memcpy"
+
+proc puts(_: ^u8) #foreign
 
 proc c_str_length(s: ^u8): int {
-	s := ""
-	new_s: ^u8
-	while s {
-		s += 1
-	}
-	return new_s - s
+	len := 0
+	// while s {
+	// 	len += 1
+	// 	s += 1
+	// }
+	return len
 }
 
 proc to_c_string(s: string): ^u8 {
-	s : string;
+	//s : string; // TODO dissallow duplication
 	c_str := cast(^u8)alloc(s.length+1)
-	mem_copy(c_str, s.data, cast(int)s.length)
+	mem_copy(c_str, s.data, s.length)
 	c_str[s.length] = 0
 	return c_str
 }
@@ -22,9 +24,9 @@ proc to_c_string(s: string): ^u8 {
 proc main() {
 	name := "Anthony"
 	i := ^name
-	a := !i
-	//bb := 10 + 12 - "string"
+	// a := !i // TODO this should eval to bool
 	name_c := to_c_string(name)
 	length := c_str_length(name_c)
+	puts(name_c)
 	free(name_c)
 }

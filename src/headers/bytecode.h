@@ -4,25 +4,12 @@
 #include "common.h"
 #include "arena.h"
 #include "ast.h"
-
-typedef union Register {
-    void *ptr;
-    u64 integer;
-    double floating;
-} Register;
-
-typedef struct Instruction {
-    u8  op;
-    u64 src;
-    u64 dest;
-} Instruction;
+#include "type.h"
 
 typedef struct Interp {
     char **call_stack; // stb_sb
-    Register *reg; // stb_sb
-    Register rP; // procedure parameter count
-    Arena data; // aka constants pool, where data is kept while its not in a register
-    Instruction *code; // stb_sb
+    u8 *code; // stb_sb
+    u8 *stack;
 } Interp;
 
 void interp_run(Interp *);
@@ -34,13 +21,11 @@ Interp compile_to_bytecode(struct Context *ctx, Ast *ast);
 
 // Opcodes
 enum {
-    SET_PTR_IMMEDIATE, // set a register to a pointer value
+    STACK_POP,
 
-    ISET_IMMEDIATE,
-
-    ISET_REFERENCE, // sets dest to the address of src
-
-    IDEREFERENCE_AND_COPY,
+    IPUSH,
+    IPUSH_REF,
+    IDEREF,
 
     IADD,
     ISUB,
@@ -48,16 +33,19 @@ enum {
     IDIV,
     IMOD,
 
+    INEG,
+
     JMP,
     JMPZ,
     JMPNZ,
 
-    COPY_REGISTER,
-
     CALL,
+    
+    PRINT_VALUE_PTR,
+    PRINT_VALUE_INT,
 
-    IPRINT_REG,
-    PPRINT_REG,
+    FPUSH,
+    PPUSH,
 
     HALT,
 };

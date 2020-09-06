@@ -1,0 +1,10 @@
+proc main() {
+	main: int = 0
+	other(10)
+}
+
+proc other(k: int) {
+	if k == 10 then return
+		
+	main()
+}

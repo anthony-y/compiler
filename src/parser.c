@@ -1,3 +1,6 @@
+// Code to enforce the language grammar while
+// transforming the program text into an
+// abstract syntax tree.
 #include "headers/common.h"
 #include "headers/parser.h"
 #include "headers/token.h"
@@ -322,7 +325,7 @@ static AstStmt *parse_block(Context *c) {
     AstNode *blocknode = ast_node(p, Node_BLOCK, open);
     blocknode->as.stmt.tag = Stmt_BLOCK;
     AstBlock *block = &blocknode->as.stmt.as.block;
-    sh_new_arena(block->symbols); // TODO leak
+    sh_new_arena(block->symbols);
 
     p->current_scope = block;
 
@@ -664,7 +667,6 @@ static bool parse_var(Context *c, bool top_level, AstVar *out) {
     var.flags    = 0;
     var.name     = (AstNode *)ast_name(c, name); // probs remove AstDecl names from their actual nodes
     var.typename = ast_node(p, Node_TYPENAME, *p->curr);
-    var.register_index = 0;
 
     if (!consume(p, Token_COLON)) {
         parser_recover(p, Token_SEMI_COLON);
@@ -708,12 +710,12 @@ static bool parse_var(Context *c, bool top_level, AstVar *out) {
     return true;
 }
 
-static int parse_proc_mod(Context *c, Token *out_maybe_foreign_link_name) {
+static int parse_proc_mod(Context *c, AstExpr **out_maybe_foreign_link_name) {
     Parser *p = &c->parser;
     if (strcmp(p->curr->text, "foreign")==0) {
         parser_next(p);
-        if (consume(p, Token_STRING_LIT)) {
-            *out_maybe_foreign_link_name = *p->prev;
+        if (p->curr->type == Token_STRING_LIT) {
+            *out_maybe_foreign_link_name = string_literal(c, p);
         }
         return PROC_IS_FOREIGN;
     }
@@ -742,10 +744,9 @@ static AstNode *parse_proc(Context *c, bool in_typedef) {
         return NULL;
     }
 
-    AstExpr *name_node = ast_name(c, *p->prev);
-    proc.name = (AstNode *)name_node;
-
     Name *ident = make_name(c, *p->prev);
+
+    proc.name = ident;
 
     if (!consume(p, Token_OPEN_PAREN)) {
         compile_error(c, *p->curr, "expected parameter list (even if it's empty) after procedure name");
@@ -754,7 +755,7 @@ static AstNode *parse_proc(Context *c, bool in_typedef) {
 
     // If the argument list isn't empty.
     if (!consume(p, Token_CLOSE_PAREN)) {
-        sh_new_arena(proc.params);
+        proc.params = make_subtree(p);
         while (!consume(p, Token_CLOSE_PAREN)) {
             if (p->curr->type == Token_OPEN_BRACE || 
                 p->curr->type == Token_SEMI_COLON ||
@@ -785,7 +786,7 @@ static AstNode *parse_proc(Context *c, bool in_typedef) {
                 parser_recover(p, Token_CLOSE_PAREN);
             }
 
-            shput(proc.params, decl->name->text, (AstDecl *)arg);
+            ast_add(proc.params, arg);
 
             consume(p, Token_COMMA);
         }
@@ -794,6 +795,7 @@ static AstNode *parse_proc(Context *c, bool in_typedef) {
     proc.flags = 0;
     proc.block = NULL;
     proc.params = proc.params;
+    proc.foreign_link_name = NULL;
 
     AstNode *return_type = ast_node(p, Node_TYPENAME, *p->curr);
     return_type->as.type = c->type_void;
@@ -808,7 +810,7 @@ static AstNode *parse_proc(Context *c, bool in_typedef) {
 
     if (p->curr->type == Token_HASH) {
         while (consume(p, Token_HASH)) {
-            Token link_name;
+            AstExpr *link_name = NULL;
             int mod = parse_proc_mod(c, &link_name);
             if (mod == PROC_IS_FOREIGN) proc.foreign_link_name = link_name;
             proc.flags |= mod;

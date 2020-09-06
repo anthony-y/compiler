@@ -1,3 +1,11 @@
+// A fixed size "arena" allocator/linear allocator.
+// Used throughout the compiler, the parser uses it to
+// allocate AST nodes, for example.
+// Adapted from Jonathan Blow's arena allocator, 
+// used in the Jai compiler.
+//
+// The commented out code at the bottom of the file
+// is my naive old approach, without alignment.
 #include "headers/arena.h"
 
 #include <stdlib.h>

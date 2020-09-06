@@ -13,9 +13,11 @@ AstDecl *lookup_in_block(AstBlock *block, Name *name) {
 }
 
 AstDecl *lookup_local(Context *ctx, AstProcedure *proc, Name *name, AstBlock *start_from) {
-    u64 param_i = shgeti(proc->params, name->text);
-    if (param_i != -1) {
-        return proc->params[param_i].value;
+    if (proc->params) {
+        for (int i = 0; i < proc->params->len; i++) {
+            AstDecl *decl = (AstDecl *)proc->params->nodes[i];
+            if (decl->name == name) return decl;
+        }
     }
 
     AstDecl *s = lookup_in_block(start_from, name);
