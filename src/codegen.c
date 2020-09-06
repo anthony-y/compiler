@@ -408,13 +408,13 @@ static void emit_boilerplate(const char *file_name) {
     fprintf(output, "typedef unsigned long int u64;\n");
     fprintf(output, "typedef float  f32;\n");
     fprintf(output, "typedef double f64;\n");
-    fprintf(output, "typedef struct string {const u8 *data; u64 length;} string;\n");
+    fprintf(output, "typedef struct string {u8 *data; u64 length;} string;\n");
     fprintf(output, "typedef enum bool {false, true} bool;\n");
     fprintf(output, "#define cast \n");
     fprintf(output, "#define NULL (void *)0\n");
     fprintf(output, "\n");
     fprintf(output, "void __global_initializers();\n");
-    fprintf(output, "static inline string __make_string(const u8 *data, u64 length) {\n");
+    fprintf(output, "static inline string __make_string(u8 *data, u64 length) {\n");
     fprintf(output, "    return (string){.data=data, .length=length};\n");
     fprintf(output, "}\n");
     fprintf(output, "\n");

@@ -15,4 +15,32 @@ typedef enum bool {false, true} bool;
 #define cast 
 #define NULL (void *)0
 
-void __gl
+void __global_initializers();
+static inline string __make_string(const u8 *data, u64 length) {
+    return (string){.data=data, .length=length};
+}
+
+int puts(u8* s);
+void compiler_main();
+string msg;
+
+void __compiler_main() {
+    __global_initializers();
+    int b = -1;
+    int i = (cast(int)b);
+    while (b<i) {
+        b += 12;
+        return;
+    };
+    int* my_ptr = &b;
+    (*(my_ptr+1)) = 10;
+    i = *my_ptr;
+    puts(msg.data);
+}
+
+void __global_initializers() {
+    msg = __make_string("hi", 2);
+}
+int main(int __argcount, char *__args[]) {
+    __compiler_main();
+}

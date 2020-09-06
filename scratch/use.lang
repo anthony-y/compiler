@@ -22,9 +22,9 @@ proc to_c_string(s: string): ^u8 {
 }
 
 proc main() {
+	// a := !i // TODO this should eval to bool
 	name := "Anthony"
 	i := ^name
-	// a := !i // TODO this should eval to bool
 	name_c := to_c_string(name)
 	length := c_str_length(name_c)
 	puts(name_c)
