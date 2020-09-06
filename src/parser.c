@@ -373,6 +373,7 @@ static AstStmt *parse_return(Context *c) {
 
     Token start = *p->curr;
     AstReturn ret;
+    ret.owning = NULL; // filled in by resolve.c
 
     if (p->curr->type == Token_SEMI_COLON) {
         ret.expr = NULL;
@@ -913,6 +914,7 @@ Ast parse(Context *c) {
         arena_clear(&c->scratch); // clear the temp allocator
         Token curr = *p->curr;
         if (curr.type == Token_EOF) break;
+        p->current_scope = NULL;
         AstNode *node = parse_top_level(c);
         consume(p, Token_SEMI_COLON);
         ast_add(&nodes, node);

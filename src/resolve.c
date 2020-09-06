@@ -402,9 +402,11 @@ static void resolve_statement(Context *ctx, AstNode *stmt) {
     case Node_ASSIGN:
         resolve_assignment(stmt, ctx);
         break;
-    case Node_RETURN:
-        resolve_expression(((AstReturn *)stmt)->expr, ctx);
-        break;
+    case Node_RETURN: {
+        AstReturn *ret = (AstReturn *)stmt;
+        resolve_expression(ret->expr, ctx);
+        ret->owning = stbds_arrlast(scope_stack);
+    } break;
     case Node_DEFER: {
         AstDefer *d = (AstDefer *)stmt;
         AstBlock *current_block = stbds_arrlast(scope_stack);

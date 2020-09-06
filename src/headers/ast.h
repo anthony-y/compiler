@@ -170,6 +170,7 @@ typedef struct {
 
 typedef struct {
     struct AstExpr *expr;
+    struct AstBlock *owning;
 } AstReturn;
 
 typedef struct AstLiteral {

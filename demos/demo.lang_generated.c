@@ -46,6 +46,13 @@ void defer_test() {
     ;
     ;
     ;
+    if (true) {
+            print(__make_string("3", 1));
+    print(__make_string("2", 1));
+    print(__make_string("1", 1));
+return;
+    };
+    print(__make_string("ay", 2));
     print(__make_string("3", 1));
     print(__make_string("2", 1));
     print(__make_string("1", 1));

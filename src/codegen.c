@@ -17,6 +17,7 @@ static void emit_boilerplate(const char *file_name);
 static void emit_c_for_var(AstVar *var);
 static void emit_c_for_local_var(AstVar *var);
 static void emit_c_for_expr(AstExpr *expr);
+static void emit_c_for_stmt(AstNode *stmt);
 
 static void emit_c_for_type(Type *type) {
     assert(type);
@@ -52,6 +53,16 @@ static void emit_c_for_type(Type *type) {
     default:
         fprintf(stderr, "Internal compiler error: type not covered in emit_c_for_type switch; type kind is %d\n", type->kind);
     }
+}
+
+static void emit_deferred_stmts(AstBlock *block) {
+    for (int i = block->deferred->len-1; i >= 0; i--) {
+        AstNode *node = block->deferred->nodes[i];
+        fprintf(output, "    ");
+        emit_c_for_stmt(node);
+        fprintf(output, ";\n");
+    }
+    if (block->parent) emit_deferred_stmts(block->parent);
 }
 
 static void emit_c_for_call(AstCall *call) {
@@ -214,6 +225,7 @@ static void emit_c_for_stmt(AstNode *stmt) {
     } break;
     case Node_RETURN: {
         AstReturn *ret = (AstReturn *)stmt;
+        emit_deferred_stmts(ret->owning);
         fprintf(output, "return");
         if (ret->expr) {
             fprintf(output, " ");
@@ -298,12 +310,7 @@ static void emit_c_for_proc(AstProcedure *proc, bool entry_point) {
         emit_c_for_stmt(node);
         fprintf(output, ";\n");
     }
-    for (int i = block->deferred->len-1; i >= 0; i--) {
-        AstNode *node = block->deferred->nodes[i];
-        fprintf(output, "    ");
-        emit_c_for_stmt(node);
-        fprintf(output, ";\n");
-    }
+    emit_deferred_stmts(block);
     fprintf(output, "}\n");
 }
 

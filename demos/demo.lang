@@ -10,13 +10,16 @@ proc main() {
 	print(msg);
 	print(substring);
 	print(length_string);
-
 }
 
 proc defer_test() {
 	defer print("1");
 	defer print("2");
 	defer print("3");
+	if true {
+		return;
+	}
+	print("ay");
 }
 
 proc scuffed_substring(s: string, up_to: int): string {
