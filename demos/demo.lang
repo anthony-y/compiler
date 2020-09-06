@@ -16,13 +16,8 @@ proc defer_test() {
 	defer print("1");
 	defer print("2");
 	defer print("3");
-	if false {
-		return;
-	} else if true {
-		print("no");
-	} else {
-		print("else");
-	}
+	if true then return;
+	else if false then return 1;
 	print("ay");
 }
 

@@ -10,8 +10,8 @@
 #include <string.h>
 #include <assert.h>
 
-FILE *output;
-Name *name_for_main;
+static FILE *output;
+static Name *name_for_main;
 
 static void emit_boilerplate(const char *file_name);
 static void emit_c_for_var(AstVar *var);
@@ -191,6 +191,7 @@ static void emit_c_for_stmt(AstNode *stmt) {
         // they are accumulated during the resolution phase
         // and then at the end of a block, the deferred
         // statements are appended in reverse order.
+        fprintf(output, "// defer'd statement");
         return;
     case Node_VAR:
         emit_c_for_local_var((AstVar *)stmt);

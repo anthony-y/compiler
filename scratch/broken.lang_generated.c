@@ -27,15 +27,15 @@ struct Lexer;
 bool lexer_init(struct Lexer* l, string ss);
 int Token_EOF;
 struct Lexer {
-    u8* curr;
-    u8* start;
-    u64 line;
-    u32 column;
-    int last;
-    struct {
-    u8* block;
-    int cap;
-    int len;
+u8* curr;
+u8* start;
+u64 line;
+u32 column;
+int last;
+struct {
+u8* block;
+int cap;
+int len;
 }  string_allocator;
 } ;
 
@@ -44,33 +44,36 @@ void free(void* p) {
 void printf(string s) {
 }
 void __compiler_main() {
-    __global_initializers();
-    int i = 2;
-    bool a = true;
-    if (!a) {
-        printf(__make_string("Incorrect number of arguments.\n", 32));
-        return;
-    }else if (1) {
-        return 1;
-    };
-    string file_data = __make_string("", 0);
-    struct Lexer* lexer = NULL;
-    lexer_init(lexer, file_data);
-    free(lexer);
-    return;
+__global_initializers();
+int i = 2;
+bool a = true;
+if (!a) {
+printf(__make_string("Incorrect number of arguments.\n", 32));
+return;
+;
+}else if (true) {
+return;
+;
+}else {
+};
+string file_data = __make_string("", 0);
+struct Lexer* lexer = NULL;
+lexer_init(lexer, file_data);
+free(lexer);
+return;
 }
 bool lexer_init(struct Lexer* l, string ss) {
-    l->curr = ss.data;
-    l->start = ss.data;
-    l->line = 1;
-    l->column = 1;
-    l->last = Token_EOF;
-    return true;
+l->curr = ss.data;
+l->start = ss.data;
+l->line = 1;
+l->column = 1;
+l->last = Token_EOF;
+return true;
 }
 
 void __global_initializers() {
-    Token_EOF = 0;
+Token_EOF = 0;
 }
 int main(int __argcount, char *__args[]) {
-    __compiler_main();
+__compiler_main();
 }

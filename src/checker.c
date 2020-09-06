@@ -386,6 +386,7 @@ void check_if(Context *ctx, AstStmt *node) {
     if (iff->block_or_stmt->tag == Stmt_BLOCK) {
         check_block(ctx, &iff->block_or_stmt->as.block, Node_ZERO);
     } else check_statement(ctx, iff->block_or_stmt);
+    if (iff->other_branch) check_statement(ctx, iff->other_branch);
 }
 
 void check_while(Context *ctx, AstStmt *node) {

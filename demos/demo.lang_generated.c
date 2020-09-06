@@ -35,7 +35,7 @@ __global_initializers();
 string msg = __make_string("Hello, world!", 13);
 string length_string = to_string(msg.length);
 string substring = scuffed_substring(msg, 5);
-;
+// defer'd statement;
 defer_test();
 print(msg);
 print(substring);
@@ -43,20 +43,19 @@ print(length_string);
 free(substring.data);
 }
 void defer_test() {
-;
-;
-;
-if (false) {
+// defer'd statement;
+// defer'd statement;
+// defer'd statement;
+if (true) {
 print(__make_string("3", 1));
 print(__make_string("2", 1));
 print(__make_string("1", 1));
 return;
-;
-}else if (true) {
-print(__make_string("no", 2));
-;
-}else {
-print(__make_string("else", 4));
+}else if (false) {
+print(__make_string("3", 1));
+print(__make_string("2", 1));
+print(__make_string("1", 1));
+return 1;
 };
 print(__make_string("ay", 2));
 print(__make_string("3", 1));

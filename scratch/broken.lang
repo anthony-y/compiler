@@ -10,8 +10,8 @@ proc main() {
     if !a {
         printf("Incorrect number of arguments.\n")
         return
-    } else if 1 {
-        return 1
+    } else if true {
+        return
     } else {
 
     }
@@ -59,7 +59,7 @@ proc main_(): int {
     if true {
         printf("Incorrect number of arguments.\n")
         return 0
-    } else if 1 {
+    } else if true {
         return 1
     } else {
 
