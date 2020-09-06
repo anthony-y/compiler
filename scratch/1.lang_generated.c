@@ -10,23 +10,22 @@ typedef signed   long int s64;
 typedef unsigned long int u64;
 typedef float  f32;
 typedef double f64;
-typedef struct string {const u8 *data; u64 length;} string;
+typedef struct string {u8 *data; u64 length;} string;
 typedef enum bool {false, true} bool;
 #define cast 
 #define NULL (void *)0
 
 void __global_initializers();
-static inline string __make_string(const u8 *data, u64 length) {
+static inline string __make_string(u8 *data, u64 length) {
     return (string){.data=data, .length=length};
 }
 
 void compiler_main();
-typedef int T;
 struct Field;
-typedef struct Field {
+struct Field {
     string* name;
     int not_ptr;
-}Field;
+};
 
 void __compiler_main() {
     __global_initializers();

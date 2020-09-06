@@ -52,6 +52,7 @@ void free_block(AstStmt *stmt) {
     }
 
     ast_free(b->statements);
+    ast_free(b->deferred);
     shfree(b->symbols);
     b->parent = NULL;
 }

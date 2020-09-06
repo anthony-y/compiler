@@ -167,6 +167,12 @@ static void emit_c_for_expr(AstExpr *expr) {
 
 static void emit_c_for_stmt(AstNode *stmt) {
     switch (stmt->tag) {
+    case Node_DEFER:
+        // No code is generated for a defer
+        // they are accumulated during the resolution phase
+        // and then at the end of a block, the deferred
+        // statements are appended in reverse order.
+        return;
     case Node_VAR:
         emit_c_for_local_var((AstVar *)stmt);
         break;
@@ -288,6 +294,12 @@ static void emit_c_for_proc(AstProcedure *proc, bool entry_point) {
     AstBlock *block = (AstBlock *)proc->block;
     for (u64 i = 0; i < block->statements->len; i++) {
         AstNode *node = block->statements->nodes[i];
+        fprintf(output, "    ");
+        emit_c_for_stmt(node);
+        fprintf(output, ";\n");
+    }
+    for (int i = block->deferred->len-1; i >= 0; i--) {
+        AstNode *node = block->deferred->nodes[i];
         fprintf(output, "    ");
         emit_c_for_stmt(node);
         fprintf(output, ";\n");

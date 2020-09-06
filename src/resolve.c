@@ -405,9 +405,14 @@ static void resolve_statement(Context *ctx, AstNode *stmt) {
     case Node_RETURN:
         resolve_expression(((AstReturn *)stmt)->expr, ctx);
         break;
-    case Node_DEFER:
-        resolve_statement(ctx, (AstNode *)((AstDefer *)stmt)->statement);
-        break;
+    case Node_DEFER: {
+        AstDefer *d = (AstDefer *)stmt;
+        AstBlock *current_block = stbds_arrlast(scope_stack);
+
+        ast_add(current_block->deferred, (AstNode *)d->statement);
+
+        resolve_statement(ctx, (AstNode *)d->statement);
+    } break;
     case Node_IF: {
         AstIf *iff = (AstIf *)stmt;
         resolve_expression(iff->condition, ctx);

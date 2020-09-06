@@ -325,6 +325,7 @@ static AstStmt *parse_block(Context *c) {
     AstNode *blocknode = ast_node(p, Node_BLOCK, open);
     blocknode->as.stmt.tag = Stmt_BLOCK;
     AstBlock *block = &blocknode->as.stmt.as.block;
+    block->deferred = make_subtree(p);
     sh_new_arena(block->symbols);
 
     p->current_scope = block;
@@ -961,7 +962,8 @@ void parser_init(Parser *p, const TokenList *l, const SourceStats *stats) {
     arena_init(&p->node_allocator, n, sizeof(AstNode), 8);
 
     /* Initialize the persistent storage for subtrees */
-    u64 num_trees = (stats->blocks) + stats->argument_lists;
+    /* blocks * 2 because there's two ASTs for each block */
+    u64 num_trees = (stats->blocks * 2) + stats->argument_lists;
     arena_init(&p->tree_allocator, num_trees, sizeof(Ast), 8);
 
     p->curr = l->tokens;

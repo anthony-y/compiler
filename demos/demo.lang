@@ -1,13 +1,22 @@
 proc main() {
 	msg           := "Hello, world!";
 	length_string := to_string(msg.length);
-	substring     := scuffed_substring(msg, 5);
 
+	substring := scuffed_substring(msg, 5);
+	defer free(substring.data);
+
+	defer_test();
+	
 	print(msg);
 	print(substring);
 	print(length_string);
 
-	free(substring.data);
+}
+
+proc defer_test() {
+	defer print("1");
+	defer print("2");
+	defer print("3");
 }
 
 proc scuffed_substring(s: string, up_to: int): string {

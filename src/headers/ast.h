@@ -235,6 +235,7 @@ typedef struct AstBlock {
     struct Ast *statements;
     struct SymbolTable *symbols;
     struct AstBlock *parent;
+    struct Ast *deferred;
 } AstBlock;
 
 typedef struct AstExpr {
