@@ -49,7 +49,8 @@ static bool do_types_match(Context *ctx, Type *a, Type *b) {
     }
 
     if (is_type_numeric(a) && is_type_numeric(b)) { // both types are integer types
-        return (a->data.signage == b->data.signage && a->size == b->size);
+        bool same_specific_type = (a->data.signage == b->data.signage && a->size == b->size);
+        return (a == ctx->type_int || b == ctx->type_int) || same_specific_type;
     }
 
     if (a->kind == Type_POINTER && b->kind == Type_POINTER) return do_pointer_types_match(ctx, a, b);
