@@ -35,6 +35,7 @@ typedef enum {
     Expr_CAST,
     Expr_CALL,
     Expr_INDEX,
+    Expr_VAR_ARGS_EXPAND,
 } ExprType;
 
 typedef enum {
@@ -74,6 +75,7 @@ typedef enum {
         Node_CAST,
         Node_CALL,
         Node_INDEX,
+        Node_VAR_ARGS_EXPAND,
         //Node_INITIALIZER,
 
     Node_EXPRESSIONS_END, // sentinal expressions end
@@ -105,13 +107,14 @@ typedef enum {
 enum {
     VAR_IS_INFERRED  = 1 << 0,
     VAR_IS_INITED    = 1 << 1,
+    VAR_IS_VARARGS   = 1 << 2,
 };
 
 struct AstExpr;
 struct AstStmt;
 struct AstDecl;
 
-typedef struct {
+typedef struct AstVar {
     struct AstNode *name;
     struct AstExpr *value;
     struct AstNode *typename;
@@ -122,11 +125,12 @@ enum {
     PROC_IS_FOREIGN        = 1 << 0,
     PROC_RET_VALUE_CHECKED = 1 << 1,
 };
-typedef struct {
+typedef struct AstProcedure {
     struct Ast *params;
     struct AstStmt *block;
     struct Name *name;
     struct AstNode *return_type;
+    struct AstVar *var_args;
     int flags;
     struct AstExpr *foreign_link_name;
 } AstProcedure;
@@ -230,6 +234,10 @@ typedef struct {
     struct AstStmt *statement;
 } AstDefer;
 
+typedef struct {
+    struct Name *name;
+} AstVarArgsExpand;
+
 struct SymbolTable;
 
 typedef struct AstBlock {
@@ -242,6 +250,7 @@ typedef struct AstBlock {
 typedef struct AstExpr {
     union {
         struct Name *name;
+        AstVarArgsExpand var_args_expand;
         AstLiteral literal;
         AstCast cast;
         AstBinary binary;
@@ -326,6 +335,7 @@ AstExpr *ast_selector(struct Parser *p, Token t, const AstSelector *sel);
 AstExpr *ast_paren(struct Parser *p, Token t, const AstParen *paren);
 AstExpr *ast_cast(struct Parser *p, Token t, const AstCast *cast);
 AstExpr *ast_index(struct Parser *p, Token t, const AstArrayIndex *index);
+AstExpr *ast_var_args_expand(struct Parser *p, Token t, const AstVarArgsExpand *expand);
 
 AstDecl *ast_proc(struct Parser *p, Token t, struct Name *name, const AstProcedure *proc);
 AstDecl *ast_var(struct Parser *p, Token t, struct Name *name, const AstVar *var);

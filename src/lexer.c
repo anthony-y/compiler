@@ -167,6 +167,9 @@ static Token tokenize_ident_or_keyword(Lexer *tz) {
     u64 len = (u64)(tz->curr-tz->start);
 
     switch (*tz->start) {
+    case 'a': {
+        if (len == 3 && strncmp(tz->start+1, "ny", 2) == 0) return token_new(tz, Token_RESERVED_TYPE);
+    } break;
     case 'c': {
         if (len == 4 && strncmp(tz->start+1, "ast", 3) == 0) return token_new(tz, Token_CAST);
     } break;
@@ -227,7 +230,7 @@ static Token tokenize_ident_or_keyword(Lexer *tz) {
 
     case 'd': {
         if (len == 5 && strncmp(tz->start+1, "efer", 4) == 0) return token_new(tz, Token_DEFER);
-    }
+    } break;
     }
 
     return token_new(tz, Token_IDENT);

@@ -32,6 +32,11 @@ typedef struct {
     void *data;
 } ArrayType;
 
+typedef struct {
+    void *data;
+    TypeKind kind;
+} AnyType;
+
 struct AstNode;
 
 typedef struct Type {

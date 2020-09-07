@@ -123,6 +123,19 @@ static AstExpr *parse_simple_expr(Context *c) {
         #endif
     }
 
+    case Token_DOT_DOT: {
+        Token dots = *p->curr;
+        parser_next(p);
+
+        AstVarArgsExpand ve;
+        if (!consume(p, Token_IDENT)) {
+            compile_error(c, dots, "var-args expansion expects a name");
+            return NULL;
+        }
+        ve.name = make_name(c, *p->prev);
+        return ast_var_args_expand(p, dots, &ve);
+    }
+
     case Token_CARAT:
     case Token_MINUS:
     case Token_STAR:
@@ -247,7 +260,7 @@ static AstExpr *parse_expression(Context *c, int min_prec) {
 
         AstExpr *postfix = parse_postfix_expr(c, left);
         if (postfix) {
-            if (postfix->tag == Expr_CALL)
+            if (postfix->tag == Expr_CALL && p->curr->type != Token_DOT)
                 return postfix;
             if (postfix->tag == Expr_INDEX && p->curr->type != Token_DOT)
                 return maybe_parse_array_assignment(c, postfix);
@@ -731,6 +744,7 @@ static AstNode *parse_proc(Context *c, bool in_typedef) {
 
     AstProcedure proc;
     proc.params = NULL;
+    proc.var_args = NULL;
 
     // Skip the "proc" keyword.
     if (!consume(p, Token_PROC)) {
@@ -758,7 +772,13 @@ static AstNode *parse_proc(Context *c, bool in_typedef) {
     // If the argument list isn't empty.
     if (!consume(p, Token_CLOSE_PAREN)) {
         proc.params = make_subtree(p);
+        bool got_var_args = false;
         while (!consume(p, Token_CLOSE_PAREN)) {
+            if (got_var_args) {
+                compile_error(c, *p->curr, "var-args argument must be the last one");
+                parser_recover(p, Token_CLOSE_PAREN);
+                break;
+            }
             if (p->curr->type == Token_OPEN_BRACE || 
                 p->curr->type == Token_SEMI_COLON ||
                 p->curr->type == Token_EOF        ||
@@ -783,12 +803,24 @@ static AstNode *parse_proc(Context *c, bool in_typedef) {
                 return NULL;
             }
             AstDecl *decl = &arg->as.decl;
-            if (decl->as.var.flags & VAR_IS_INITED) {
-                compile_error(c, arg->token, "this language does not (yet) have default call values; procedure parameters must be uninitialized");
-                parser_recover(p, Token_CLOSE_PAREN);
+            if (consume(p, Token_DOT_DOT)) {
+                AstVar *var = (AstVar *)decl;
+                if (got_var_args) {
+                    compile_error(c, arg->token, "multiple var-args arguments not allowed");
+                    parser_recover(p, Token_CLOSE_PAREN);
+                } else {
+                    if (var->typename->as.type->kind != Type_ARRAY) {
+                        compile_error(c, arg->token, "argument specified as var-args, but it's not an array");
+                        parser_recover(p, Token_CLOSE_PAREN);
+                    } else {
+                        var->flags |= VAR_IS_VARARGS;
+                        proc.var_args = &decl->as.var;
+                        got_var_args = true;
+                    }
+                }
+            } else {
+                ast_add(proc.params, arg);
             }
-
-            ast_add(proc.params, arg);
 
             consume(p, Token_COMMA);
         }

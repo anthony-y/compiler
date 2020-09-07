@@ -195,6 +195,13 @@ AstExpr *ast_index(Parser *p, Token t, const AstArrayIndex *index) {
     return &n->as.expr;
 }
 
+AstExpr *ast_var_args_expand(struct Parser *p, Token t, const AstVarArgsExpand *expand) {
+    AstNode *n = ast_node(p, Node_VAR_ARGS_EXPAND, t);
+    n->as.expr.tag = Expr_VAR_ARGS_EXPAND;
+    n->as.expr.as.var_args_expand = *expand;
+    return &n->as.expr;
+}
+
 AstDecl *ast_proc(Parser *p, Token t, Name *name, const AstProcedure *proc) {
     AstNode *n = ast_node(p, Node_PROCEDURE, t);
     n->as.decl.flags = 0;

@@ -62,7 +62,7 @@ void free_types(Context *ctx) {
 // Then, create some handles to internal types.
 // Uses a const SourceStats * to compute the type arenas allocation size.
 void init_types(Context *ctx, SourceStats *stats) {
-    const int num_builtins = 13;
+    const int num_builtins = 14;
 
     // We need room for two potential allocations per type;
     // one for the actual type, and an extra for its placeholder
@@ -91,6 +91,8 @@ void init_types(Context *ctx, SourceStats *stats) {
     ctx->type_bool = make_and_insert_primitive(ctx, "bool", sizeof(u8), Signage_NaN);
     ctx->type_void = make_and_insert_primitive(ctx, "void", 0, Signage_NaN);
     ctx->type_string = make_and_insert_primitive(ctx, "string", sizeof(StringType), Signage_NaN);
+
+    ctx->type_any = make_and_insert_primitive(ctx, "any", sizeof(AnyType), Signage_NaN);
 
     ctx->null_type = make_pointer_type(NULL);
 

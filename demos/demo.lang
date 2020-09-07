@@ -1,52 +1,35 @@
 proc main() {
-	msg           := "Hello, world!";
-	length_string := to_string(msg.length);
+	msg := "Hello, world!";
 
 	substring := scuffed_substring(msg, 5);
 	defer free(substring.data);
 	
 	print(msg);
 	print(substring);
-	print(length_string);
+
+	c_fmt := c_string("%s");
+	defer free(c_fmt);
+	printf(c_fmt, "printf kinda works\n".data);
 }
 
-type BIG: u64;
-
-proc scuffed_substring(s: string, up_to: int): string {
+proc scuffed_substring(s: string, up_to: u64): string {
 	sub: string;
-	up_to_big := cast(BIG)up_to;
-	sub.data = alloc(cast(BIG)(up_to_big+1));
-	mem_copy(sub.data, s.data, up_to_big);
+	sub.data = alloc(up_to+1);
+	mem_copy(sub.data, s.data, up_to);
 	sub.data[up_to] = 0;
-	sub.length = up_to_big;
+	sub.length = up_to;
 	return sub;
 }
 
-proc to_string(i: u64): string {
-	if i == 0 then  return "0";
-	if i == 1 then  return "1";
-	if i == 2 then  return "2";
-	if i == 3 then  return "3";
-	if i == 4 then  return "4";
-	if i == 5 then  return "5";
-	if i == 6 then  return "6";
-	if i == 7 then  return "7";
-	if i == 8 then  return "8";
-	if i == 9 then  return "9";
-	if i == 10 then return "10";
-	if i == 11 then return "11";
-	if i == 12 then return "12";
-	if i == 13 then return "13";
-	if i == 14 then return "14";
-	if i == 15 then return "15";
-	return "(bad)";
+proc c_string(s: string): ^u8 {
+	s2 := scuffed_substring(s, s.length);
+	return s2.data;
 }
 
-proc print(s: string) {
-	puts(s.data);
-}
+proc print(s: string) {puts(s.data);}
 
 proc mem_copy(dest: ^void, src: ^void, n: u64) #foreign "memcpy";
 proc alloc(_: u64): ^void #foreign "malloc";
+proc printf(_1: ^u8, _2: []any..) #foreign;
 proc free(_: ^void) #foreign;
 proc puts(s: ^u8) #foreign;

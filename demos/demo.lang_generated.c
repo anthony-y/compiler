@@ -21,84 +21,39 @@ static inline string __make_string(u8 *data, u64 length) {
 }
 
 void compiler_main();
-string scuffed_substring(string s, int up_to);
-string to_string(u64 i);
+string scuffed_substring(string s, u64 up_to);
+u8* c_string(string s);
 void print(string s);
 void memcpy(void* dest, void* src, u64 n);
 void* malloc(u64 _);
+void printf(u8* _1, ...);
 void free(void* _);
 void puts(u8* s);
 
 void __compiler_main() {
 __global_initializers();
 string msg = __make_string("Hello, world!", 13);
-string length_string = to_string(msg.length);
 string substring = scuffed_substring(msg, 5);
 // defer'd statement;
 print(msg);
 print(substring);
-print(length_string);
+u8* c_fmt = c_string(__make_string("%s", 2));
+// defer'd statement;
+printf(c_fmt, __make_string("printf kinda works\n", 20).data);
+free(c_fmt);
 free(substring.data);
 }
-string scuffed_substring(string s, int up_to) {
+string scuffed_substring(string s, u64 up_to) {
 string sub;
-u64 up_to_big = (cast(u64)up_to);
-sub.data = malloc((cast(u64)(up_to_big+1)));
-memcpy(sub.data, s.data, up_to_big);
+sub.data = malloc(up_to+1);
+memcpy(sub.data, s.data, up_to);
 sub.data[up_to] = 0;
-sub.length = up_to_big;
+sub.length = up_to;
 return sub;
 }
-string to_string(u64 i) {
-if (i==0) {
-return __make_string("0", 1);
-};
-if (i==1) {
-return __make_string("1", 1);
-};
-if (i==2) {
-return __make_string("2", 1);
-};
-if (i==3) {
-return __make_string("3", 1);
-};
-if (i==4) {
-return __make_string("4", 1);
-};
-if (i==5) {
-return __make_string("5", 1);
-};
-if (i==6) {
-return __make_string("6", 1);
-};
-if (i==7) {
-return __make_string("7", 1);
-};
-if (i==8) {
-return __make_string("8", 1);
-};
-if (i==9) {
-return __make_string("9", 1);
-};
-if (i==10) {
-return __make_string("10", 2);
-};
-if (i==11) {
-return __make_string("11", 2);
-};
-if (i==12) {
-return __make_string("12", 2);
-};
-if (i==13) {
-return __make_string("13", 2);
-};
-if (i==14) {
-return __make_string("14", 2);
-};
-if (i==15) {
-return __make_string("15", 2);
-};
-return __make_string("(bad)", 5);
+u8* c_string(string s) {
+string s2 = scuffed_substring(s, s.length);
+return s2.data;
 }
 void print(string s) {
 puts(s.data);

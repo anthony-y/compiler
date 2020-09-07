@@ -35,6 +35,8 @@ static bool do_pointer_types_match(Context *ctx, Type *a, Type *b) {
 }
 
 static bool do_types_match(Context *ctx, Type *a, Type *b) {
+    if (a == ctx->type_any || b == ctx->type_any) return true;
+
     if (a->kind == Type_ANON_STRUCT || b->kind == Type_ANON_STRUCT) return false;
     if (a->kind == Type_ALIAS && b->kind == Type_ALIAS) return (a == b);
 
@@ -69,22 +71,26 @@ static Type *maybe_unwrap_type_alias(Type *alias) {
 // Prints it's own errors.
 static bool check_call(Context *ctx, AstNode *callnode) {
     AstCall *call = (AstCall *)callnode;
-
     char *name = call->name->as.name->text;
-
     AstProcedure *proc = call->calling;
+
     int proc_arg_count = (proc->params ? proc->params->len : 0);
     if (!call->params) {
         if (proc_arg_count != 0) {
-            compile_error(ctx, callnode->token, "call to \"%s\" specifies no arguments, but it's defined to expect %d of them", name, proc_arg_count);
-            return false;
+            if (proc->var_args) {
+                compile_error(ctx, callnode->token, "call to \"%s\" specifies no arguments, but it's defined to expect at least %d of them", name, proc_arg_count);
+                return false;
+            } else {
+                compile_error(ctx, callnode->token, "call to \"%s\" specifies no arguments, but it's defined to expect %d of them", name, proc_arg_count);
+                return false;
+            }
         }
         return true;
     }
 
     int call_arg_count = call->params->len;
 
-    if (call_arg_count > proc_arg_count) {
+    if (call_arg_count > proc_arg_count && !proc->var_args) {
         int diff = call_arg_count - proc_arg_count;
         compile_error(ctx, callnode->token, "%d too many arguments in call to \"%s\"", diff, name);
         return false;
@@ -96,9 +102,8 @@ static bool check_call(Context *ctx, AstNode *callnode) {
         return false;
     }
 
-    assert(call_arg_count == proc_arg_count);
-
-    for (int i = 0; i < call_arg_count; i++) {
+    int i; // save this for later so we know when the optional arguments begin
+    for (i = 0; i < proc_arg_count; i++) {
         Type *caller_type = call->params->nodes[i]->as.expr.resolved_type;
         Type *defn_type = proc->params->nodes[i]->as.decl.as.var.typename->as.type;
         if (!do_types_match(ctx, caller_type, defn_type)) {
@@ -107,8 +112,28 @@ static bool check_call(Context *ctx, AstNode *callnode) {
             compile_error_add_line(ctx, " but caller provided argument of type ");
             print_type(caller_type);
             compile_error_end();
+            return true;
         }
     }
+
+    if (!proc->var_args) return true;
+
+    if (call_arg_count == proc_arg_count) return true;
+
+    // Loop from the end of the non-var-args arguments
+    Type *var_args_type = proc->var_args->typename->as.type->data.base;
+    for (int j = 0; j < call->params->len+i; j++) {
+        Type *caller_type = call->params->nodes[i]->as.expr.resolved_type;
+        if (!do_types_match(ctx, caller_type, var_args_type)) {
+            compile_error_start(ctx, callnode->token, "type mismatch: argument %d of procedure \"%s\" is defined as type ", i+1, name);
+            print_type(var_args_type);
+            compile_error_add_line(ctx, " but caller provided argument of type ");
+            print_type(caller_type);
+            compile_error_end();
+            return true;
+        }
+    }
+
     return true;
 }
 

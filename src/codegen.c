@@ -298,13 +298,19 @@ static void emit_c_for_proc_header(AstProcedure *proc) {
         fprintf(output, " %s(", proc->name->text);
     }
     if (proc->params) {
-        for (u64 i = 0; i < proc->params->len; i++) {
+        int params_length = proc->params->len;
+        for (u64 i = 0; i < params_length; i++) {
             AstDecl *p = (AstDecl *)proc->params->nodes[i];
+            if (((AstVar *)p)->flags & VAR_IS_VARARGS) {
+                fprintf(output, "...");
+                break;
+            }
             emit_c_for_var((AstVar *)p);
-            if (i < proc->params->len-1) {
+            if (i < params_length-1 || proc->var_args) {
                 fprintf(output, ", ");
             }
         }
+        if (proc->var_args) fprintf(output, "...");
     }
     fprintf(output, ")");
 }
