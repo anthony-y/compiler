@@ -10,13 +10,13 @@ typedef signed   long int s64;
 typedef unsigned long int u64;
 typedef float  f32;
 typedef double f64;
-typedef struct string {const u8 *data; u64 length;} string;
+typedef struct string {u8 *data; u64 length;} string;
 typedef enum bool {false, true} bool;
 #define cast 
 #define NULL (void *)0
 
 void __global_initializers();
-static inline string __make_string(const u8 *data, u64 length) {
+static inline string __make_string(u8 *data, u64 length) {
     return (string){.data=data, .length=length};
 }
 
@@ -29,27 +29,27 @@ u8* to_c_string(string s);
 void compiler_main();
 
 int c_str_length(u8* s) {
-    int len = 0;
-    return len;
+int len = 0;
+return len;
 }
 u8* to_c_string(string s) {
-    u8* c_str = (cast(u8*)malloc(s.length+1));
-    memcpy(c_str, s.data, s.length);
-    c_str[s.length] = 0;
-    return c_str;
+u8* c_str = (cast(u8*)malloc(s.length+1));
+memcpy(c_str, s.data, s.length);
+c_str[s.length] = 0;
+return c_str;
 }
 void __compiler_main() {
-    __global_initializers();
-    string name = __make_string("Anthony", 7);
-    string* i = &name;
-    u8* name_c = to_c_string(name);
-    int length = c_str_length(name_c);
-    puts(name_c);
-    free(name_c);
+__global_initializers();
+string name = __make_string("Anthony", 7);
+string* i = &name;
+u8* name_c = to_c_string(name);
+int length = c_str_length(name_c);
+puts(name_c);
+free(name_c);
 }
 
 void __global_initializers() {
 }
 int main(int __argcount, char *__args[]) {
-    __compiler_main();
+__compiler_main();
 }

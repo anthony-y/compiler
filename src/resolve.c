@@ -142,6 +142,7 @@ static Type *resolve_expression_1(AstExpr *expr, Context *ctx, AstDecl *target) 
     } break;
     case Expr_CAST: {
         AstCast *cast = (AstCast *)expr;
+        resolve_type(ctx, cast->typename->as.type, false);
         resolve_expression(cast->expr, ctx);
         return cast->typename->as.type;
     } break;

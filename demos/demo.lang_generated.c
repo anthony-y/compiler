@@ -21,7 +21,6 @@ static inline string __make_string(u8 *data, u64 length) {
 }
 
 void compiler_main();
-void defer_test();
 string scuffed_substring(string s, int up_to);
 string to_string(u64 i);
 void print(string s);
@@ -36,31 +35,10 @@ string msg = __make_string("Hello, world!", 13);
 string length_string = to_string(msg.length);
 string substring = scuffed_substring(msg, 5);
 // defer'd statement;
-defer_test();
 print(msg);
 print(substring);
 print(length_string);
 free(substring.data);
-}
-void defer_test() {
-// defer'd statement;
-// defer'd statement;
-// defer'd statement;
-if (true) {
-print(__make_string("3", 1));
-print(__make_string("2", 1));
-print(__make_string("1", 1));
-return;
-}else if (false) {
-print(__make_string("3", 1));
-print(__make_string("2", 1));
-print(__make_string("1", 1));
-return 1;
-};
-print(__make_string("ay", 2));
-print(__make_string("3", 1));
-print(__make_string("2", 1));
-print(__make_string("1", 1));
 }
 string scuffed_substring(string s, int up_to) {
 string sub;
