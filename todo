@@ -3,6 +3,10 @@
 //
 struct value initializers
 
+why does NOT using an imported function cause a segfault???
+
+variable cant be named the same as a procedure, causes error in C code
+
 Anon structs access arrays are broken (check.lang)
 Disallow pointers to anonymous struct types e.g:
     t: ^struct{a: int};

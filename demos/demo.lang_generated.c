@@ -21,29 +21,29 @@ static inline string __make_string(u8 *data, u64 length) {
 }
 
 void compiler_main();
-string scuffed_substring(string s, u64 up_to);
-u8* c_string(string s);
-void print(string s);
-void memcpy(void* dest, void* src, u64 n);
+void free(void* ptr);
 void* malloc(u64 size);
 void printf(u8* fmt, ...);
-void free(void* ptr);
-void puts(u8* s);
+void memcpy(void* dest, void* src, u64 n);
+u8* c_string(string s);
+string substring(string s, u64 up_to);
+void free_substring(string s);
 
 void __compiler_main() {
 __global_initializers();
 string msg = __make_string("Hello, world!", 13);
-string substring = scuffed_substring(msg, 5);
+string sub = substring(msg, __make_string("Hello", 5).length);
 // defer'd statement;
-print(msg);
-print(substring);
-u8* c_fmt = c_string(__make_string("The demo:\n\t%s", 15));
+u8* fmt_string = c_string(__make_string("%s\n%s\nThe demo:\n\t%s", 23));
 // defer'd statement;
-printf(c_fmt, __make_string("Wow printf works\n", 18).data);
-free(c_fmt);
-free(substring.data);
+printf(fmt_string, msg.data, sub.data, __make_string("Wow printf works\n", 18).data);
+free(fmt_string);
+free_substring(sub);
 }
-string scuffed_substring(string s, u64 up_to) {
+u8* c_string(string s) {
+return substring(s, s.length).data;
+}
+string substring(string s, u64 up_to) {
 string sub;
 sub.data = malloc(up_to+1);
 memcpy(sub.data, s.data, up_to);
@@ -51,12 +51,8 @@ sub.data[up_to] = 0;
 sub.length = up_to;
 return sub;
 }
-u8* c_string(string s) {
-string s2 = scuffed_substring(s, s.length);
-return s2.data;
-}
-void print(string s) {
-puts(s.data);
+void free_substring(string s) {
+free(s.data);
 }
 
 void __global_initializers() {

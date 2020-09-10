@@ -242,8 +242,6 @@ static AstExpr *parse_expression(Context *c, int min_prec) {
         int next_min_prec = info.prec;
         if (info.left_assoc) next_min_prec++;
 
-        AstExpr *right = NULL;
-
         AstExpr *postfix = parse_postfix_expr(c, left);
         if (postfix) {
             if (postfix->tag == Expr_CALL && p->curr->type != Token_DOT)
@@ -251,12 +249,14 @@ static AstExpr *parse_expression(Context *c, int min_prec) {
             if (postfix->tag == Expr_INDEX && p->curr->type != Token_DOT)
                 return maybe_parse_array_assignment(c, postfix);
 
+            if (p->curr->type == Token_DOT)
+                op = Token_DOT;
+
             left = postfix;
-            right = postfix;
-        } else {
-            parser_next(p);
-            right = parse_expression(c, next_min_prec);
         }
+
+        parser_next(p);
+        AstExpr *right = parse_expression(c, next_min_prec);
 
         AstBinary binary;
         binary.left  = left;

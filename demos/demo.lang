@@ -3,31 +3,11 @@
 proc main() {
 	msg := "Hello, world!";
 
-	substring := scuffed_substring(msg, 5);
-	defer free(substring.data);
-	
-	print(msg);
-	print(substring);
+	sub := substring(msg, "Hello".length);
+	defer free_substring(sub);
 
-	c_fmt := c_string("The demo:\n\t%s");
-	defer free(c_fmt);
-	printf(c_fmt, "Wow printf works\n".data);
-}
+	fmt_string := c_string("%s\n%s\nThe demo:\n\t%s");
+	defer free(fmt_string);
 
-proc scuffed_substring(s: string, up_to: u64): string {
-	sub: string;
-	sub.data = alloc(up_to+1);
-	mem_copy(sub.data, s.data, up_to);
-	sub.data[up_to] = 0;
-	sub.length = up_to;
-	return sub;
-}
-
-proc c_string(s: string): ^u8 {
-	s2 := scuffed_substring(s, s.length);
-	return s2.data;
-}
-
-proc print(s: string) {
-	puts(s.data);
+	print(fmt_string, msg.data, sub.data, "Wow printf works\n".data);
 }
