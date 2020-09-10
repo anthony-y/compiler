@@ -20,6 +20,16 @@ typedef struct Name {
 } Name;
 
 typedef struct SymbolTable {char *key; AstDecl *value;} SymbolTable;
+typedef struct {char *key; Type *value;} TypeTable;
+
+typedef struct Module {
+    AstImport **imports; // stb array
+    SymbolTable *symbol_table;
+    TypeTable *type_table;
+    Arena type_allocator;
+    char *file_path;
+    Ast ast;
+} Module;
 
 // Central compiler context, a reference to an instance of this struct is
 // passed to most functions in the compiler.
@@ -28,16 +38,21 @@ typedef struct Context {
 
     int error_count;
 
-    Lexer  lexer;
-    Parser parser;
-    Arena  scratch;
+    Parser *parser;
+
+    Module *current_module;
+
+    Arena scratch;
+    Arena module_allocator;
+
+    //AstImport **imports;
 
     AstProcedure *curr_checker_proc;
     AstDecl *decl_for_main;
 
     // stb hash tables
     SymbolTable *symbol_table;
-    struct {char *key; Type *value;} *type_table;
+    TypeTable *type_table;
     struct {char *key; Name *value;} *name_table;
     struct {char *key; AstLiteral *value;} *string_literal_pool;
 
@@ -72,9 +87,16 @@ void compile_warning(Context *ctx, Token t, const char *fmt, ...);
 void init_context(Context *c, const char *file_path);
 void free_context(Context *c);
 
+Module *create_module(Context *, char *file_path, SourceStats);
+void free_module(Module *);
+
+void import_symbols_from_module_into_module(Module *from, Module *to);
+
 // From types.c, couldn't declare in types.h because of a circular dependency with context.h
-void init_types(Context *, SourceStats *);
+void init_builtin_types(Context *);
 void free_types(Context *);
+
+void init_types_for_module(Module *, SourceStats *);
 
 Name *make_name(Context *, Token from);
 Name *make_namet(Context *, const char *txt);

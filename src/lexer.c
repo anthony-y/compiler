@@ -177,7 +177,6 @@ static Token tokenize_ident_or_keyword(Lexer *tz) {
         if (len == 3 && strncmp(tz->start+1, "nt", 2) == 0) return token_new(tz, Token_RESERVED_TYPE);
         if (len == 2 && strncmp(tz->start+1, "f", 1) == 0) return token_new(tz, Token_IF);
         if (len == 6 && strncmp(tz->start+1, "nline", 5) == 0) return token_new(tz, Token_INLINE);
-        if (len == 6 && strncmp(tz->start+1, "mport", 5) == 0) return token_new(tz, Token_IMPORT);
     } break;
 
     case 'f': {
@@ -331,8 +330,7 @@ Token next_token(Lexer *tz) {
     return token_new(tz, Token_UNKNOWN);
 }
 
-bool lexer_lex(Context *ctx, TokenList *list, SourceStats *stats) {
-    Lexer *l = &ctx->lexer;
+bool lexer_lex(Lexer *l, TokenList *list, SourceStats *stats) {
     TokenType last;
 
     u64 pointers = 0;

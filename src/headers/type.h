@@ -55,9 +55,13 @@ typedef struct Type {
     } data;
 } Type;
 
-Type *make_type(TypeKind kind, char *name, u64 size);
-Type *make_pointer_type(Type *base_type);
-Type *make_array_type(Type *base);
+struct Module;
+struct Context;
+
+Type *make_type(struct Module *, TypeKind kind, char *name, u64 size);
+Type *make_pointer_type(struct Module *, Type *base_type);
+Type *make_array_type(struct Module *, Type *base);
+Type *get_type(struct Context *, char *name);
 void print_type(Type *);
 Type *unwrap_pointer_type(Type *ptr, int *out_depth);
 bool is_type_numeric(Type *);

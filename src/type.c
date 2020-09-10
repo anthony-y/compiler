@@ -21,22 +21,22 @@ Type *type_from_expr(Context *ctx, AstNode *expr);
 
 // Allocates and initializes a Type from the type_arena,
 // and returns a reference to it.
-Type *make_type(TypeKind kind, char *name, u64 size) {
-    Type *t = arena_alloc(&type_arena, sizeof(Type));
+Type *make_type(Module *in, TypeKind kind, char *name, u64 size) {
+    Type *t = arena_alloc(&in->type_allocator, sizeof(Type));
     t->kind = kind;
     t->name = name;
     t->size = size;
     return t;
 }
 
-Type *make_pointer_type(Type *base) {
-    Type *out = make_type(Type_POINTER, NULL, sizeof(void*));
+Type *make_pointer_type(Module *in, Type *base) {
+    Type *out = make_type(in, Type_POINTER, NULL, sizeof(void*));
     out->data.base = base;
     return out;
 }
 
-Type *make_array_type(Type *base) {
-    Type *out = make_type(Type_ARRAY, NULL, sizeof(ArrayType));
+Type *make_array_type(Module *in, Type *base) {
+    Type *out = make_type(in, Type_ARRAY, NULL, sizeof(ArrayType));
     out->data.base = base;
     return out;
 }
@@ -45,9 +45,24 @@ inline bool is_type_numeric(Type *t) {
     return (t->kind == Type_PRIMITIVE && t->data.signage != Signage_NaN);
 }
 
+#if 0
+Type *get_type(Context *ctx, char *name) {
+    u64 found_builtin = shget(ctx->type_table, name);
+    if (found_builtin != -1) return ctx->type_table[found_builtin].value;
+
+    Module *in = ctx->current_module;
+    u64 found_user_type = shget(in->type_table, name);
+    if (found_user_type != -1) return in->type_table[found_user_type].value;
+    return NULL;
+}
+#endif
+
 // Allocates and initializes a primitive type, and returns it.
 static inline Type *make_and_insert_primitive(Context *ctx, char *name, u64 size, Signage signage) {
-    Type *t = make_type(Type_PRIMITIVE, name, size);
+    Type *t = arena_alloc(&type_arena, sizeof(Type));
+    t->kind = Type_PRIMITIVE;
+    t->name = name;
+    t->size = size;
     t->data.signage = signage;
     shput(ctx->type_table, name, t);
     return t;
@@ -61,16 +76,10 @@ void free_types(Context *ctx) {
 // Initialize the type table and add the primitive types to it.
 // Then, create some handles to internal types.
 // Uses a const SourceStats * to compute the type arenas allocation size.
-void init_types(Context *ctx, SourceStats *stats) {
+void init_builtin_types(Context *ctx) {
     const int num_builtins = 14;
 
-    // We need room for two potential allocations per type;
-    // one for the actual type, and an extra for its placeholder
-    // if it is used before its declaration.
-    stats->declared_types *= 2;
-
-    u64 total_types = (num_builtins + stats->pointer_types + (stats->declared_types * 2));
-    arena_init(&type_arena, total_types, sizeof(Type), 8);
+    arena_init(&type_arena, num_builtins, sizeof(Type), 8);
 
     sh_new_arena(ctx->type_table); // initialize the type table as a string hash map
 
@@ -94,9 +103,21 @@ void init_types(Context *ctx, SourceStats *stats) {
 
     ctx->type_any = make_and_insert_primitive(ctx, "any", sizeof(AnyType), Signage_NaN);
 
-    ctx->null_type = make_pointer_type(NULL);
+    Type *null_type = arena_alloc(&type_arena, sizeof(Type));
+    null_type->kind = Type_POINTER;
+    null_type->name = NULL;
+    null_type->size = sizeof(void *);
+    ctx->null_type = null_type;
+}
 
-    //Type *string = make_type(Type_STRUCT, "string", sizeof(StringType));
+void init_types_for_module(Module *mod, SourceStats *stats) {
+    // We need room for two potential allocations per type;
+    // one for the actual type, and an extra for its placeholder
+    // if it is used before its declaration.
+    stats->declared_types *= 2;
+
+    u64 total_types = (stats->pointer_types + (stats->declared_types));
+    arena_init(&mod->type_allocator, total_types, sizeof(Type), 8);
 }
 
 // Utility function to unwrap a pointer to it's ultimate base type.

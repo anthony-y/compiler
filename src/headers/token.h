@@ -26,7 +26,6 @@ typedef enum {
     Token_VALUE_END,
 
     /* Keywords */
-    Token_IMPORT,
     Token_RETURN,
     Token_IF,
     Token_ELSE,

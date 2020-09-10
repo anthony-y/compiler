@@ -353,6 +353,8 @@ char *generate_and_write_c_code(Context *ctx, Ast *ast) {
     // Generate forward decls
     //
     for (u64 i = 0; i < ast->len; i++) {
+        if (ast->nodes[i]->tag == Node_IMPORT) continue;
+
         AstDecl *decl = (AstDecl *)ast->nodes[i];
         if (decl->status == Status_UNRESOLVED) continue; // Don't emit code for unused declarations
 
@@ -384,6 +386,8 @@ char *generate_and_write_c_code(Context *ctx, Ast *ast) {
     // Generate struct bodies
     //
     for (u64 i = 0; i < ast->len; i++) {
+        if (ast->nodes[i]->tag == Node_IMPORT) continue;
+
         AstDecl *decl = (AstDecl *)ast->nodes[i];
         if (decl->status == Status_UNRESOLVED) continue;
         if (decl->tag == Decl_TYPEDEF) {
@@ -401,6 +405,8 @@ char *generate_and_write_c_code(Context *ctx, Ast *ast) {
     // Generate procedure decls
     //
     for (u64 i = 0; i < ast->len; i++) {
+        if (ast->nodes[i]->tag == Node_IMPORT) continue;
+
         AstDecl *decl = (AstDecl *)ast->nodes[i];
 
         // Don't emit code for unused declarations

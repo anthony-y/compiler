@@ -25,9 +25,9 @@ string scuffed_substring(string s, u64 up_to);
 u8* c_string(string s);
 void print(string s);
 void memcpy(void* dest, void* src, u64 n);
-void* malloc(u64 _);
-void printf(u8* _1, ...);
-void free(void* _);
+void* malloc(u64 size);
+void printf(u8* fmt, ...);
+void free(void* ptr);
 void puts(u8* s);
 
 void __compiler_main() {
@@ -37,9 +37,9 @@ string substring = scuffed_substring(msg, 5);
 // defer'd statement;
 print(msg);
 print(substring);
-u8* c_fmt = c_string(__make_string("%s", 2));
+u8* c_fmt = c_string(__make_string("The demo:\n\t%s", 15));
 // defer'd statement;
-printf(c_fmt, __make_string("printf kinda works\n", 20).data);
+printf(c_fmt, __make_string("Wow printf works\n", 18).data);
 free(c_fmt);
 free(substring.data);
 }

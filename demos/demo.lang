@@ -1,3 +1,5 @@
+#import "std/basic.lang"
+
 proc main() {
 	msg := "Hello, world!";
 
@@ -7,9 +9,9 @@ proc main() {
 	print(msg);
 	print(substring);
 
-	c_fmt := c_string("%s");
+	c_fmt := c_string("The demo:\n\t%s");
 	defer free(c_fmt);
-	printf(c_fmt, "printf kinda works\n".data);
+	printf(c_fmt, "Wow printf works\n".data);
 }
 
 proc scuffed_substring(s: string, up_to: u64): string {
@@ -26,10 +28,6 @@ proc c_string(s: string): ^u8 {
 	return s2.data;
 }
 
-proc print(s: string) {puts(s.data);}
-
-proc mem_copy(dest: ^void, src: ^void, n: u64) #foreign "memcpy";
-proc alloc(_: u64): ^void #foreign "malloc";
-proc printf(_1: ^u8, _2: []any..) #foreign;
-proc free(_: ^void) #foreign;
-proc puts(s: ^u8) #foreign;
+proc print(s: string) {
+	puts(s.data);
+}

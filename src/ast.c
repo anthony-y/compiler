@@ -147,7 +147,7 @@ void ast_add(Ast *list, AstNode *node) {
 }
 
 AstExpr *ast_name(Context *c, Token t) {
-    AstNode *n = ast_node(&c->parser, Node_IDENT, t);
+    AstNode *n = ast_node(c->parser, Node_IDENT, t);
     n->as.expr.tag = Expr_NAME;
     n->as.expr.as.name = make_name(c, t);
     return &n->as.expr;

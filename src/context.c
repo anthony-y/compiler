@@ -58,11 +58,11 @@ Name *make_namet(Context *ctx, const char *txt) {
 
 inline void add_symbol(Context *c, AstDecl *n, char *name) {
     Token t = ((AstNode *)n)->token;
-    if (shgeti(c->symbol_table, name) != -1) {
-        compile_error(c, t, "Redefinition of symbol \"%s\" at global scope", name);
+    if (shgeti(c->current_module->symbol_table, name) != -1) {
+        compile_error(c, t, "Redefinition of symbol \"%s\" in module %s", name, c->current_module->file_path);
         return;
     }
-    shput(c->symbol_table, name, n);
+    shput(c->current_module->symbol_table, name, n);
 }
 
 void init_context(Context *c, const char *file_path) {
@@ -80,6 +80,39 @@ void free_context(Context *c) {
     arena_free(&c->scratch);
     shfree(c->string_literal_pool);
     shfree(c->symbol_table);
+    //stbds_arrfree(c->imports);
+}
+
+Module *create_module(Context *ctx, char *file_path, SourceStats stats) {
+    Module *module = malloc(sizeof(Module));
+    module->file_path = file_path;
+    module->imports = NULL;
+
+    init_types_for_module(module, &stats);
+
+    sh_new_arena(module->symbol_table);
+    sh_new_arena(module->type_table);
+
+    return module;
+}
+
+void free_module(Module *module) {
+    stbds_arrfree(module->imports);
+    arena_free(&module->type_allocator);
+    shfree(module->symbol_table);
+    shfree(module->type_table);
+    free(module);
+}
+
+void import_symbols_from_module_into_module(Module *from, Module *to) {
+    for (int i = 0; i < shlenu(from->symbol_table); i++) {
+        AstDecl *decl = from->symbol_table[i].value;
+        char *name = from->symbol_table[i].key;
+        shput(to->symbol_table, name, decl);
+    }
+    for (int i = 0; i < from->ast.len; i++) {
+        ast_add(&to->ast, from->ast.nodes[i]);
+    }
 }
 
 void compile_error(Context *ctx, Token t, const char *fmt, ...) {

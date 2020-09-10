@@ -1,0 +1,5 @@
+proc mem_copy(dest: ^void, src: ^void, n: u64) #foreign "memcpy";
+proc alloc(size: u64): ^void                   #foreign "malloc";
+proc printf(fmt: ^u8, args: []any..)           #foreign;
+proc free(ptr: ^void)                          #foreign;
+proc puts(s: ^u8)                              #foreign;

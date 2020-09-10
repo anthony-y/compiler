@@ -90,7 +90,7 @@ static inline BinaryOperator get_binary_op_info(TokenType tt) {
 }
 
 static AstExpr *parse_simple_expr(Context *c) {
-    Parser *p = &c->parser;
+    Parser *p = c->parser;
     switch (p->curr->type) {
     case Token_OPEN_PAREN: {
         Token start = *p->curr;
@@ -107,20 +107,6 @@ static AstExpr *parse_simple_expr(Context *c) {
         paren.sub_expr = sub_expr;
 
         return ast_paren(p, start, &paren);
-
-        #if 0
-        // This will account for if excess parentheses were given BEFORE the expression but not after
-        if (p->expr_depth != before) {
-            return make_error_node(p, start, "Uneven parentheses.");
-        }
-
-        // This will account for excess parens after. Without this, an unknown statement error
-        // will happen because the leftover parens were left in the token list.
-        if (p->curr->type == Token_CLOSE_PAREN) {
-            parser_recover(p, Token_SEMI_COLON);
-            return make_error_node(p, start, "Uneven parentheses.");
-        }
-        #endif
     }
 
     case Token_DOT_DOT: {
@@ -196,7 +182,7 @@ static AstExpr *parse_simple_expr(Context *c) {
 }
 
 static AstExpr *parse_postfix_expr(Context *c, AstExpr *left) {
-    Parser *p = &c->parser;
+    Parser *p = c->parser;
     Token start = *p->curr;
 
     switch (p->curr->type) {
@@ -221,7 +207,7 @@ static AstExpr *parse_postfix_expr(Context *c, AstExpr *left) {
 }
 
 static AstExpr *maybe_parse_array_assignment(Context *c, AstExpr *index) {
-    Parser *p = &c->parser;
+    Parser *p = c->parser;
     if (!(p->curr->type > Token_ASSIGNMENTS_START && p->curr->type < Token_ASSIGNMENTS_END)) {
         // Not an assignment
         return index;
@@ -239,7 +225,7 @@ static AstExpr *maybe_parse_array_assignment(Context *c, AstExpr *index) {
 }
 
 static AstExpr *parse_expression(Context *c, int min_prec) {
-    Parser *p = &c->parser;
+    Parser *p = c->parser;
     Token start = *p->curr;
 
     AstExpr *left = parse_simple_expr(c);
@@ -285,7 +271,7 @@ static AstExpr *parse_expression(Context *c, int min_prec) {
 }
 
 static AstCall parse_call(Context *c, AstExpr *name) {
-    Parser *p = &c->parser;
+    Parser *p = c->parser;
     parser_next(p); // (
 
     AstCall call;
@@ -330,7 +316,7 @@ static AstCall parse_call(Context *c, AstExpr *name) {
 // You need to consume the opening token of the brace
 // before you call this.
 static AstStmt *parse_block(Context *c) {
-    Parser *p = &c->parser;
+    Parser *p = c->parser;
     Token open = *p->prev;
 
     AstBlock *parent = p->current_scope;
@@ -381,7 +367,7 @@ static AstStmt *parse_block(Context *c) {
 }
 
 static AstStmt *parse_return(Context *c) {
-    Parser *p = &c->parser;
+    Parser *p = c->parser;
     parser_next(p);
 
     Token start = *p->curr;
@@ -398,7 +384,7 @@ static AstStmt *parse_return(Context *c) {
 }
 
 static AstStmt *parse_defer(Context *c) {
-    Parser *p = &c->parser;
+    Parser *p = c->parser;
     parser_next(p);
 
     Token start = *p->curr;
@@ -416,7 +402,7 @@ static AstStmt *parse_defer(Context *c) {
 }
 
 static AstStmt *parse_struct(Context *c) { // TODO SHOULD STRUCTS BE STATEMENTS?
-    Parser *p = &c->parser;
+    Parser *p = c->parser;
     if (!consume(p, Token_STRUCT)) {
         compile_error(c, *p->curr, "expected a struct declaration");
         parser_recover_to_declaration(p);
@@ -438,7 +424,7 @@ static AstStmt *parse_struct(Context *c) { // TODO SHOULD STRUCTS BE STATEMENTS?
 }
 
 static AstNode *parse_typedef(Context *c) {
-    Parser *p = &c->parser;
+    Parser *p = c->parser;
     parser_next(p);
 
     Token name = *p->curr;
@@ -469,7 +455,7 @@ static AstNode *parse_typedef(Context *c) {
     }
 
     AstNode *decl = NULL;
-    Type *type = make_type(0, name.text, 0); // NOTE size is wrong lol
+    Type *type = make_type(c->current_module, 0, name.text, 0); // NOTE size is wrong lol
 
     switch (p->curr->type) {
     case Token_STRUCT:
@@ -508,8 +494,8 @@ static AstNode *parse_typedef(Context *c) {
 }
 
 static AstNode *parse_typename(Context *c) {
-    Parser *p = &c->parser;
-    Token t = *c->parser.curr;
+    Parser *p = c->parser;
+    Token t = *c->parser->curr;
 
     AstNode *type_node = ast_node(p, Node_TYPENAME, t);
 
@@ -522,7 +508,7 @@ static AstNode *parse_typename(Context *c) {
         return type_node;
     } break;
     case Token_STRUCT: {
-        type_node->as.type = make_type(Type_ANON_STRUCT, "anonymous struct", 0);
+        type_node->as.type = make_type(c->current_module, Type_ANON_STRUCT, "anonymous struct", 0);
         type_node->as.type->data.user = parse_struct(c);
         return type_node;
     } break;
@@ -531,6 +517,7 @@ static AstNode *parse_typename(Context *c) {
 
         if (shgeti(c->type_table, t.text) == -1) { // type doesn't exist (or not appeared in program text yet)
             type_node->as.type = make_type(
+                c->current_module,
                 Type_UNRESOLVED,
                 t.text,
                 0
@@ -552,7 +539,7 @@ static AstNode *parse_typename(Context *c) {
         AstNode *base = parse_typename(c);
         if (!base) return NULL;
 
-        type_node->as.type = make_pointer_type(base->as.type);
+        type_node->as.type = make_pointer_type(c->current_module, base->as.type);
 
         return type_node;
     } break;
@@ -568,7 +555,7 @@ static AstNode *parse_typename(Context *c) {
 
         // TODO array size
 
-        type_node->as.type = make_type(Type_ARRAY, "[]", sizeof(ArrayType));
+        type_node->as.type = make_type(c->current_module, Type_ARRAY, "[]", sizeof(ArrayType));
         type_node->as.type->data.base = base->as.type;
 
         return type_node;
@@ -581,7 +568,7 @@ static AstNode *parse_typename(Context *c) {
 }
 
 static AstStmt *parse_if(Context *c) {
-    Parser *p = &c->parser;
+    Parser *p = c->parser;
 
     Token start = *p->curr;
     parser_next(p); // skip keyword
@@ -631,7 +618,7 @@ static AstStmt *parse_if(Context *c) {
 }
 
 static AstStmt *parse_while(Context *c) {
-    Parser *p = &c->parser;
+    Parser *p = c->parser;
     Token start = *p->curr;
     parser_next(p);
 
@@ -651,7 +638,7 @@ static AstStmt *parse_while(Context *c) {
 }
 
 static AstNode *parse_var_as_decl(Context *c, bool top_level) {
-    Parser *p = &c->parser;
+    Parser *p = c->parser;
     Token start = *p->curr;
 
     AstVar var;
@@ -667,7 +654,7 @@ static AstNode *parse_var_as_decl(Context *c, bool top_level) {
 }
 
 static bool parse_var(Context *c, bool top_level, AstVar *out) {
-    Parser *p = &c->parser;
+    Parser *p = c->parser;
 
     if (p->curr->type != Token_IDENT) {
         parser_recover(p, Token_SEMI_COLON);
@@ -726,7 +713,7 @@ static bool parse_var(Context *c, bool top_level, AstVar *out) {
 }
 
 static int parse_proc_mod(Context *c, AstExpr **out_maybe_foreign_link_name) {
-    Parser *p = &c->parser;
+    Parser *p = c->parser;
     if (strcmp(p->curr->text, "foreign")==0) {
         parser_next(p);
         if (p->curr->type == Token_STRING_LIT) {
@@ -739,7 +726,7 @@ static int parse_proc_mod(Context *c, AstExpr **out_maybe_foreign_link_name) {
 
 // Parse a procuedure declaration.
 static AstNode *parse_proc(Context *c, bool in_typedef) {
-    Parser *p = &c->parser;
+    Parser *p = c->parser;
     Token start = *p->curr;
 
     AstProcedure proc;
@@ -883,12 +870,43 @@ static AstNode *parse_proc(Context *c, bool in_typedef) {
     return (AstNode *)procnode;
 }
 
+static AstNode *parse_top_level_directive(Context *c) {
+    Parser *p = c->parser;
+    parser_next(p); // #
+    if (p->curr->type != Token_IDENT) {
+        compile_error(c, *p->curr, "expected an identifier after #");
+        parser_recover_to_declaration(p);
+        return NULL;
+    }
+    Name *name = make_name(c, *p->curr);
+    parser_next(p);
+    if (name == make_namet(c, "import")) {
+        if (!consume(p, Token_STRING_LIT)) {
+            compile_error(c, *p->curr, "expected a path in the form of a string literal after import");
+            return NULL;
+        }
+
+        // TODO fix at lexer level
+        char *path_buffer = malloc(p->prev->length-2);
+        strncpy(path_buffer, p->prev->text+1, p->prev->length-2);
+
+        AstImport import;
+        import.path = path_buffer;
+
+        AstStmt *node = ast_import(p, *p->prev, &import);
+        stbds_arrpush(c->current_module->imports, (AstImport *)node);
+        return (AstNode *)node;
+    }
+    return NULL;
+}
+
 static AstNode *parse_top_level(Context *c) {
-    Parser *p = &c->parser;
+    Parser *p = c->parser;
     switch (p->curr->type) {
     case Token_PROC: return parse_proc(c, false);
     case Token_IDENT: return parse_var_as_decl(c, /*top_level=*/true);
     case Token_TYPEDEF: return parse_typedef(c);
+    case Token_HASH: return parse_top_level_directive(c);
     }
     compile_error(c, *p->curr, "unknown top level statement");
     parser_recover_to_declaration(p);
@@ -896,7 +914,7 @@ static AstNode *parse_top_level(Context *c) {
 }
 
 static AstNode *parse_statement(Context *c) {
-    Parser *p = &c->parser;
+    Parser *p = c->parser;
     Token start = *p->curr;
     switch (start.type) {
     case Token_IF:         return (AstNode *)parse_if(c);
@@ -937,7 +955,7 @@ static AstNode *parse_statement(Context *c) {
 }
 
 Ast parse(Context *c) {
-    Parser *p = &c->parser;
+    Parser *p = c->parser;
 
     Ast nodes;
     ast_init(&nodes, 100);

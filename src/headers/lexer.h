@@ -44,8 +44,7 @@ void lexer_free(Lexer *);
 
 struct SourceStats;
 
-struct Context;
-bool lexer_lex(struct Context *, TokenList *list, struct SourceStats *);
+bool lexer_lex(Lexer *, TokenList *list, struct SourceStats *);
 ///void *lexer_lex(void *);
 
 #endif

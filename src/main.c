@@ -35,8 +35,17 @@ static void print_unused_symbol_warnings(Context *);
 
 // THINK: for imports, just lex, parse and resolve all the files and then merge their scopes into one scope, then generate code for the symbols, symbols that are Sym_UNRESOLVED, can be ignored.
 
-bool process_file(const char *file_path) {
-    char *file_data = read_file(file_path); // read the file into a zero-terminated buffer.
+Module *do_front_end_for_file(Context *ctx, char *file_path) {
+    #define NEXT_STAGE_OR_QUIT() if (ctx->error_count > 0) goto end;
+
+    char *file_data = read_file(file_path);
+    ctx->current_file_path = file_path;
+
+    Ast ast;
+    Lexer lexer;
+    Parser parser;
+    TokenList tokens;
+    SourceStats stats = (SourceStats){10}; // initialize all the fields to 10
 
     u64 lexer_delta    = 0;
     u64 parser_delta   = 0;
@@ -45,37 +54,61 @@ bool process_file(const char *file_path) {
     u64 interp_delta   = 0;
     u64 code_gen_delta = 0;
 
-    SourceStats stats = (SourceStats){10}; // initialize all the fields to 10
-    TokenList tokens;
-    Context context;
-    Ast ast;
-
-    #define NEXT_STAGE_OR_QUIT() if (context.error_count > 0) goto end;
-
-    init_context(&context, file_path);
+    lexer_init(&lexer, file_path, file_data);
     token_list_init(&tokens);
-    lexer_init(&context.lexer, file_path, file_data);
 
     PROFILE(lexer, {
-        if (!lexer_lex(&context, &tokens, &stats)) {
-            lexer_free(&context.lexer);
+        if (!lexer_lex(&lexer, &tokens, &stats)) {
+            lexer_free(&lexer);
             token_list_free(&tokens);
-            free_context(&context);
             free(file_data);
-            return 1;
+            return NULL;
         }
     });
 
-    if (tokens.len == 1) return 0;
+    if (tokens.len == 1) return NULL;
 
-    init_types(&context, &stats);
-    parser_init(&context.parser, &tokens, &stats);
+    Module *module = create_module(ctx, file_path, stats);
 
-    PROFILE(parser, {
-        ast = parse(&context);
-    });
+    parser_init(&parser, &tokens, &stats);
+    ctx->parser = &parser;
+    ctx->current_module = module;
 
-    token_list_free(&tokens);
+    ast = parse(ctx);
+    module->ast = ast;
+
+    for (int i = 0; i < stbds_arrlen(module->imports); i++) {
+        Module *imported = do_front_end_for_file(ctx, module->imports[i]->path);
+        ctx->current_module = module;
+        if (imported) {
+            import_symbols_from_module_into_module(imported, module);
+        } else {
+            break;
+        }
+    }
+
+    #undef NEXT_STAGE_OR_QUIT
+end:
+    return module;
+}
+
+bool do_compilation(const char *file_path) {
+    char *file_data = read_file(file_path); // read the file into a zero-terminated buffer.
+
+    u64 checker_delta  = 0;
+    u64 bc_gen_delta   = 0;
+    u64 interp_delta   = 0;
+    u64 code_gen_delta = 0;
+
+    Context context;
+    #define NEXT_STAGE_OR_QUIT() if (context.error_count > 0) goto end;
+
+    init_context(&context, file_path);
+    init_builtin_types(&context);
+
+    Module *main = do_front_end_for_file(&context, file_path);
+
+    NEXT_STAGE_OR_QUIT();
 
     if (!context.decl_for_main)
         compile_error(&context, (Token){0}, "No entry point found. Please declare \"main\"");
@@ -86,17 +119,17 @@ bool process_file(const char *file_path) {
     else if (((AstProcedure *)context.decl_for_main)->return_type->as.type != context.type_void)
         compile_error(&context, decl_tok(context.decl_for_main), "Entry point \"main\" must return void");
 
-    NEXT_STAGE_OR_QUIT();
-
     PROFILE(checker, {
         resolve_program(&context);
         NEXT_STAGE_OR_QUIT();
-        check_ast(&context, &ast); // type and semantic checking
+        check_ast(&context, &main->ast); // type and semantic checking
         NEXT_STAGE_OR_QUIT();
     });
 
     PROFILE(code_gen, {
-        char *output_path = generate_and_write_c_code(&context, &ast);
+        context.current_file_path = file_path;
+        char *output_path = generate_and_write_c_code(&context, &main->ast);
+
         u64 len = strlen("gcc -std=c99") + strlen(output_path) + strlen("-o ") + strlen("-Wno-discarded-qualifiers ") + strlen("-Wno-return-local-addr") + strlen("-Wno-builtin-declaration-mismatch") + 1;
         char *command = arena_alloc(&context.scratch, len);
         sprintf(command, "gcc -std=c99 %s -Wno-return-local-addr -Wno-discarded-qualifiers -Wno-builtin-declaration-mismatch -o output_bin", output_path);
@@ -116,20 +149,20 @@ end:
         }
 
         printf("Error count: %d\n", context.error_count);
-        printf("Total time: %ldus\n", lexer_delta + parser_delta + checker_delta + code_gen_delta);
-        printf("\tLexing took %ldus\n", lexer_delta);
-        printf("\tParsing took %ldus\n", parser_delta);
-        printf("\t\tParser used %lu/%lu nodes\n", context.parser.node_count, context.parser.node_allocator.capacity);
+        //printf("Total time: %ldus\n", lexer_delta + parser_delta + checker_delta + code_gen_delta);
+        //printf("\tLexing took %ldus\n", lexer_delta);
+        //printf("\tParsing took %ldus\n", parser_delta);
+        printf("\t\tParser used %lu/%lu nodes\n", context.parser->node_count, context.parser->node_allocator.capacity);
         printf("\tInferring, resolving and checking took %ldus\n", checker_delta);
         printf("\tCodegen took %ldus\n", code_gen_delta);
         printf("\tBytecode generation took %ldus\n", bc_gen_delta);
         printf("\tCompile time execution took %ldus\n", interp_delta);
 
         //interp_free(&interp);
-        free_subtrees_and_blocks(&ast);
+        //free_subtrees_and_blocks(&ast);
         free_types(&context);
-        parser_free(&context.parser, &ast);
-        lexer_free(&context.lexer);
+        //parser_free(&parser, &ast);
+        //lexer_free(&lexer);
         free_context(&context);
         free(file_data);
 
@@ -143,7 +176,7 @@ int main(int arg_count, char *args[]) {
         return 1;
     }
 
-    return !process_file(args[1]); // 0 means good, which is false
+    return !do_compilation(args[1]); // 0 means success, which is false, so flip it
 }
 
 static void print_unused_symbol_warnings(Context *ctx) {
