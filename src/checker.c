@@ -272,7 +272,7 @@ bool does_type_describe_expr(Context *ctx, Type *type, AstExpr *expr) {
             compile_error(ctx, expr_token, "operands of arithmetic expressions need to be numeric");
             return FAILED_BUT_DONT_ERROR_AT_CALL_SITE;
         }
-        return is_type_numeric(type);
+        return is_type_numeric(type) || type->kind == Type_POINTER;
     } break;
     case Expr_UNARY: {
         return check_unary_against_type(ctx, (AstUnary *)expr, type, expr_token);
@@ -403,7 +403,7 @@ bool check_var(Context *ctx, AstDecl *node) {
 
 void check_if(Context *ctx, AstStmt *node) {
     AstIf *iff = &node->as._if;
-    if (iff->condition->resolved_type != ctx->type_bool) {
+    if (!does_type_describe_expr(ctx, ctx->type_bool, iff->condition)) {
         compile_error_start(ctx, stmt_tok(node), "'If' statement requires a condition which evaluates to a boolean, this one evaluates to ");
         print_type(iff->condition->resolved_type);
         compile_error_end();

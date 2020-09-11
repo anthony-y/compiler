@@ -89,11 +89,6 @@ type L: struct {
 
 Token_EOF := 0
 
-type String: struct {
-    data: ^u8;
-    length: u64;
-}
-
 proc make_lexer(l: ^Lexer, s: string): bool {
     l.curr = s.data
     l.start = s.data

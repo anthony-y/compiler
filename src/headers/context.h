@@ -25,12 +25,9 @@ typedef struct {char *key; Type *value;} TypeTable;
 // Central compiler context, a reference to an instance of this struct is
 // passed to most functions in the compiler.
 typedef struct Context {
-    const char *current_file_path;
-
     int error_count;
-
+    const char *current_file_path;
     Parser parser;
-
     Arena scratch;
 
     AstProcedure *curr_checker_proc;

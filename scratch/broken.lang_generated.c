@@ -24,6 +24,8 @@ void free(void* p);
 void printf(string s);
 void compiler_main();
 struct Lexer;
+void __Lexer_initer(struct Lexer*);
+;
 bool lexer_init(struct Lexer* l, string ss);
 int Token_EOF;
 struct Lexer {

@@ -1,9 +1,6 @@
 //
 // Codegen
 //
-struct value initializers
-
-why does NOT using an imported function cause a segfault???
 
 variable cant be named the same as a procedure, causes error in C code
 

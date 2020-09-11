@@ -263,7 +263,7 @@ static void emit_c_for_struct(AstStruct *def, char *name) {
         emit_c_for_var(var);
         fprintf(output, ";\n");
     }
-    fprintf(output, "} ");
+    fprintf(output, "}");
 }
 
 static void emit_c_for_var(AstVar *var) {
@@ -278,6 +278,8 @@ static void emit_c_for_var(AstVar *var) {
     fprintf(output, " %s", name->text);
     if (type->kind == Type_ARRAY) {
         fprintf(output, "[1024]"); // TODO dynamic array abstraction, plus store size info on Type
+    } else if (type->kind == Type_STRUCT) {
+        fprintf(output, ";\n__%s_initer(&%s)", type->name, name->text);
     }
 }
 
@@ -366,7 +368,8 @@ char *generate_and_write_c_code(Context *ctx, Ast *ast) {
             AstTypedef *def = (AstTypedef *)decl;
             char *name = def->name->as.name->text;
             if (def->of->tag == Node_STRUCT) {
-                fprintf(output, "struct %s", name);
+                fprintf(output, "struct %s;\n", name);
+                fprintf(output, "void __%s_initer(struct %s*)", name, name);
                 break;
             } else {
                 continue;
@@ -397,6 +400,32 @@ char *generate_and_write_c_code(Context *ctx, Ast *ast) {
                 fprintf(output, ";\n");
             }
         }
+    }
+
+    fprintf(output, "\n");
+
+    for (u64 i = 0; i < ast->len; i++) {
+        if (ast->nodes[i]->tag == Node_IMPORT) continue;
+
+        AstDecl *decl = (AstDecl *)ast->nodes[i];
+        if (decl->status == Status_UNRESOLVED) continue;
+        if (decl->tag != Decl_TYPEDEF) {
+            continue;
+        }
+        AstTypedef *def = (AstTypedef *)decl;
+        if (def->of->tag != Node_STRUCT) continue;
+
+        char *name = def->name->as.name->text;
+        AstBlock *members = &def->of->as.stmt.as._struct.members->as.block;
+        fprintf(output, "void __%s_initer(struct %s* s) {\n", name, name);
+        for (int i = 0; i < members->statements->len; i++) {
+            AstVar *var = (AstVar *)members->statements->nodes[i];
+            if (!(var->flags & VAR_IS_INITED)) continue;
+            fprintf(output, "s->%s = ", var->name->as.expr.as.name->text);
+            emit_c_for_expr(var->value);
+            fprintf(output, ";\n");
+        }
+        fprintf(output, "}\n");
     }
 
     fprintf(output, "\n");

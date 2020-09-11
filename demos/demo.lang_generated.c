@@ -29,6 +29,7 @@ u8* c_string(string s);
 string substring(string s, u64 up_to);
 void free_substring(string s);
 
+
 void __compiler_main() {
 __global_initializers();
 string msg = __make_string("Hello, world!", 13);

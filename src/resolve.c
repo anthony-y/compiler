@@ -160,6 +160,8 @@ static Type *resolve_expression_1(AstExpr *expr, Context *ctx, AstDecl *target) 
             return resolve_selector(ctx, bin);
         }
         if (is_binary_comparison(*bin)) {
+            resolve_expression(bin->left, ctx);
+            resolve_expression(bin->right, ctx);
             return ctx->type_bool;
         }
         if (is_assignment(*bin)) {
@@ -174,6 +176,8 @@ static Type *resolve_expression_1(AstExpr *expr, Context *ctx, AstDecl *target) 
 
         Type *left_type = resolve_expression(bin->left, ctx);
         Type *right_type = resolve_expression(bin->right, ctx);
+
+        if (!left_type || !right_type) return NULL;
 
         // You can add and substract to/from pointers
         if (bin->op == Token_PLUS || bin->op == Token_MINUS) {
