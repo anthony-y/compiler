@@ -5,15 +5,19 @@ type Arena: struct {
 	capacity := 1024;
 }
 
+msg := "Arena allocator\n";
+len := msg.length;
+
 proc main() {
 	arena: Arena;
 	arena.mem = alloc(arena.capacity);
 	defer free(arena.mem);
 
-	c_string := arena_alloc(^arena, 8);
-	mem_copy(c_string, "%s".data, "%s".length);
+	bytes := arena_alloc(^arena, len+1);
+	mem_copy(bytes, msg.data, len);
+	bytes[len] = 0;
 
-	print(c_string, "Anthony\n".data);
+	print("%s".data, bytes);
 }
 
 proc arena_alloc(a: ^Arena, size: u64): ^u8 {
@@ -24,15 +28,17 @@ proc arena_alloc(a: ^Arena, size: u64): ^u8 {
 }
 
 proc arena_maybe_grow(a: ^Arena, desired_size: u64): bool {
+	if a.fixed {
+		puts("Out of space :(".data);
+		return false;
+	}
+
 	if (a.cursor + desired_size) > a.capacity {
-		if a.fixed {
-			puts("Out of space :(".data);
-			return false;
-		}
 		a.capacity *= 2;
 		realloc(a.mem, a.capacity);
-		return true;
 	}
+
+	return true;
 }
 
 proc puts(s: ^u8) #foreign;

@@ -22,6 +22,8 @@ static inline string __make_string(u8 *data, u64 length) {
 
 struct Arena;
 void __Arena_initer(struct Arena*);
+string msg;
+u64 len;
 void compiler_main();
 u8* arena_alloc(struct Arena* a, u64 size);
 bool arena_maybe_grow(struct Arena* a, u64 desired_size);
@@ -31,11 +33,12 @@ void* malloc(u64 size);
 void realloc(void* ptr, u64 size);
 void printf(u8* fmt, ...);
 void memcpy(void* dest, void* src, u64 n);
+
 struct Arena {
-u8* mem;
-bool fixed;
-int cursor;
-int capacity;
+	u8* mem;
+	bool fixed;
+	int cursor;
+	int capacity;
 };
 
 void __Arena_initer(struct Arena* s) {
@@ -50,11 +53,13 @@ struct Arena arena;
 __Arena_initer(&arena);
 arena.mem = malloc(arena.capacity);
 // defer'd statement;
-u8* c_string = arena_alloc(&arena, 8);
-memcpy(c_string, __make_string("%s", 2).data, __make_string("%s", 2).length);
-printf(c_string, __make_string("Anthony\n", 9).data);
+u8* bytes = arena_alloc(&arena, len+1);
+memcpy(bytes, msg.data, len);
+bytes[len] = 0;
+printf(__make_string("%s", 2).data, bytes);
 free(arena.mem);
 }
+
 u8* arena_alloc(struct Arena* a, u64 size) {
 if (!arena_maybe_grow(a, size)) {
 return NULL;
@@ -63,21 +68,24 @@ u8* ret = a->mem+a->cursor;
 a->cursor += size;
 return ret;
 }
+
 bool arena_maybe_grow(struct Arena* a, u64 desired_size) {
-if ((a->cursor+desired_size)>a->capacity) {
 if (a->fixed) {
 puts(__make_string("Out of space :(", 15).data);
 return false;
 ;
 };
+if ((a->cursor+desired_size)>a->capacity) {
 a->capacity *= 2;
 realloc(a->mem, a->capacity);
-return true;
 ;
 };
+return true;
 }
 
 void __global_initializers() {
+msg = __make_string("Arena allocator\n", 17);
+len = msg.length;
 }
 int main(int __argcount, char *__args[]) {
 __compiler_main();

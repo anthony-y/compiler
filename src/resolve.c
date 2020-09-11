@@ -17,34 +17,12 @@ static Type *resolve_selector(Context *ctx, AstBinary *accessor);
 static Type *resolve_expression(AstExpr *expr, Context *ctx);
 static Type *resolve_type(Context *ctx, Type *type, bool cyclic_allowed);
 static void resolve_block(Context *ctx, AstBlock *block);
+static void resolve_assignment_expr(AstExpr *assign, Context *ctx);
+static void resolve_assignment(AstNode *ass, Context *ctx);
 
 // stbds arrays
 static AstProcedure **proc_stack = NULL;
 static AstBlock **scope_stack = NULL;
-
-static void resolve_assignment_expr(AstExpr *assign, Context *ctx) {
-    if (assign->tag == Expr_UNARY) {
-        AstUnary *unary = (AstUnary *)assign;
-        resolve_assignment_expr(unary->expr, ctx);
-    } else if (assign->tag == Expr_BINARY) {
-        AstBinary *bin = (AstBinary *)assign;
-        if (!is_assignment(*bin)) {
-            compile_error(ctx, expr_tok(assign), "expected assignment"); // TODO maybe bad
-            return;
-        }
-        resolve_expression(bin->left, ctx);
-        resolve_expression(bin->right, ctx);
-    } else {
-        compile_error(ctx, expr_tok(assign), "expected assignment");
-    }
-}
-
-// Resolves the dependencies of an assignment statement,
-static void resolve_assignment(AstNode *ass, Context *ctx) {
-    assert(ass->tag == Node_ASSIGN);
-    AstStmt *stmt = (AstStmt *)ass;
-    resolve_assignment_expr(&stmt->as.assign, ctx);
-}
 
 static AstProcedure *resolve_call(AstNode *callnode, Context *ctx) {
     Token tok = callnode->token;
@@ -356,6 +334,30 @@ static Type *resolve_selector(Context *ctx, AstBinary *accessor) { // TODO renam
     }
     assert(field->tag == Decl_VAR); // should have been checked by now
     return field->as.var.typename->as.type;
+}
+
+static void resolve_assignment_expr(AstExpr *assign, Context *ctx) {
+    if (assign->tag == Expr_UNARY) {
+        AstUnary *unary = (AstUnary *)assign;
+        resolve_assignment_expr(unary->expr, ctx);
+    } else if (assign->tag == Expr_BINARY) {
+        AstBinary *bin = (AstBinary *)assign;
+        if (!is_assignment(*bin)) {
+            compile_error(ctx, expr_tok(assign), "expected assignment"); // TODO maybe bad
+            return;
+        }
+        resolve_expression(bin->left, ctx);
+        resolve_expression(bin->right, ctx);
+    } else {
+        compile_error(ctx, expr_tok(assign), "expected assignment");
+    }
+}
+
+// Resolves the dependencies of an assignment statement,
+static void resolve_assignment(AstNode *ass, Context *ctx) {
+    assert(ass->tag == Node_ASSIGN);
+    AstStmt *stmt = (AstStmt *)ass;
+    resolve_assignment_expr(&stmt->as.assign, ctx);
 }
 
 // Resolves the dependencies and type of a variable declaration,

@@ -260,6 +260,7 @@ static void emit_c_for_struct(AstStruct *def, char *name) {
     fprintf(output, " {\n");
     for (int i = 0; i < block->statements->len; i++) {
         AstVar *var = (AstVar *)block->statements->nodes[i];
+        fprintf(output, "\t");
         emit_c_for_var(var);
         fprintf(output, ";\n");
     }
@@ -385,6 +386,8 @@ char *generate_and_write_c_code(Context *ctx, Ast *ast) {
         fprintf(output, ";\n");
     }
 
+    fprintf(output, "\n");
+
     //
     // Generate struct bodies
     //
@@ -444,13 +447,14 @@ char *generate_and_write_c_code(Context *ctx, Ast *ast) {
             AstProcedure *proc = (AstProcedure *)decl;
             if (proc->flags & PROC_IS_FOREIGN) continue;
             emit_c_for_proc(proc, (decl == ctx->decl_for_main));
+            fprintf(output, "\n");
         }
     }
 
     //
     // Generate initialization code for global variables
     //
-    fprintf(output, "\nvoid __global_initializers() {\n");
+    fprintf(output, "void __global_initializers() {\n");
     for (u64 i = 0; i < shlenu(ctx->symbol_table); i++) {
         AstDecl *decl = ctx->symbol_table[i].value;
         if (decl->tag != Decl_VAR) continue;
