@@ -486,7 +486,7 @@ bool check_assignment(Context *ctx, AstExpr *expr, bool lhs_must_be_pointer) {
 void check_block(Context *ctx, AstBlock *block, AstNodeType restriction) {
     u64 num_decls = shlenu(block->symbols);
     for (int i = 0; i < num_decls; i++) {
-        check_var(ctx, block->symbols[i].value); // TODO local procs
+        check_var(ctx, block->symbols[i].value); // NOTE modify for local procs
     }
     for (int i = 0; i < block->statements->len; i++) {
         AstNode *stmt = block->statements->nodes[i];
@@ -525,7 +525,7 @@ void check_statement(Context *ctx, AstStmt *node) {
     }
 }
 
-void check_struct(Context *ctx, AstStruct *s) { // TODO default struct values
+void check_struct(Context *ctx, AstStruct *s) {
     u64 struct_len = shlenu(s->members->as.block.symbols);
     for (int i = 0; i < struct_len; i++) {
         AstDecl *d = s->members->as.block.symbols[i].value;

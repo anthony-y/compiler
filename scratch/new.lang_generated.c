@@ -10,61 +10,75 @@ typedef signed   long int s64;
 typedef unsigned long int u64;
 typedef float  f32;
 typedef double f64;
-typedef struct string {const u8 *data; u64 length;} string;
+typedef struct string {u8 *data; u64 length;} string;
 typedef enum bool {false, true} bool;
 #define cast 
 #define NULL (void *)0
 
 void __global_initializers();
-static inline string __make_string(const u8 *data, u64 length) {
+static inline string __make_string(u8 *data, u64 length) {
     return (string){.data=data, .length=length};
 }
 
 struct a;
+void __a_initer(struct a*);
 struct Fun;
+void __Fun_initer(struct Fun*);
 bool*** test(string* xyz);
 struct Fun have_fun();
 void compiler_main();
+
 struct a {
-    string my_s;
+	string my_s;
 };
 struct Fun {
-    u64 big_number;
-    string* string_ptr;
-    struct a my_a;
+	u64 big_number;
+	string* string_ptr;
+	struct a my_a;
+__a_initer(&my_a);
 };
 
+void __a_initer(struct a* s) {
+}
+void __Fun_initer(struct Fun* s) {
+}
+
 bool*** test(string* xyz) {
-    bool z = true;
-    struct Fun x = have_fun();
-    z = false;
-    bool* w = &z;
-    bool** w2 = &w;
-    return &w2;
+bool z = true;
+struct Fun x;
+__Fun_initer(&x) = have_fun();
+z = false;
+bool* w = &z;
+bool** w2 = &w;
+return &w2;
 }
+
 struct Fun have_fun() {
-    struct Fun f;
-    f.big_number = 10;
-    string sum_string = __make_string("Hi", 2);
-    f.string_ptr = &sum_string;
-    f.my_a.my_s = __make_string("", 0);
-    string* a = f.string_ptr;
-    return f;
+struct Fun f;
+__Fun_initer(&f);
+f.big_number = 10;
+string sum_string = __make_string("Hi", 4);
+f.string_ptr = &sum_string;
+f.my_a.my_s = __make_string("", 2);
+string* a = f.string_ptr;
+return f;
 }
+
 void __compiler_main() {
-    __global_initializers();
-    struct Fun f;
-    string my_string;
-    f.string_ptr = &my_string;
-    bool*** val = test(f.string_ptr);
-    bool a = true;
-    bool b = false;
-    bool c = true;
-    c = (a)&&(b)||(c);
+__global_initializers();
+struct Fun f;
+__Fun_initer(&f);
+string my_string;
+f.string_ptr = &my_string;
+bool*** val = test(f.string_ptr);
+bool a = true;
+bool b = false;
+bool c = true;
+c = (a)&&(b)||(c);
 }
 
 void __global_initializers() {
 }
 int main(int __argcount, char *__args[]) {
-    __compiler_main();
+__compiler_main();
 }

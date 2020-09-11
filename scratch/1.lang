@@ -27,7 +27,7 @@ type Field: struct {
     not_ptr: int
 }
 
-// TODO
+// 
 // for modules, could just load all the symbols from the files into
 // memory and then generate an imports struct with all the variables and function pointers inside.
 

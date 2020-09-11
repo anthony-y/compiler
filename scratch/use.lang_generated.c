@@ -28,20 +28,25 @@ int c_str_length(u8* s);
 u8* to_c_string(string s);
 void compiler_main();
 
+
+
 int c_str_length(u8* s) {
 int len = 0;
 return len;
 }
+
 u8* to_c_string(string s) {
 u8* c_str = (cast(u8*)malloc(s.length+1));
 memcpy(c_str, s.data, s.length);
 c_str[s.length] = 0;
 return c_str;
 }
+
 void __compiler_main() {
 __global_initializers();
-string name = __make_string("Anthony", 7);
+string name = __make_string("Anthony", 9);
 string* i = &name;
+bool a = !i;
 u8* name_c = to_c_string(name);
 int length = c_str_length(name_c);
 puts(name_c);

@@ -125,7 +125,6 @@ static Token tokenize_string(Lexer *tz) {
         next_character(tz);
     }
     next_character(tz);
-
     return token_new(tz, Token_STRING_LIT);
 }
 

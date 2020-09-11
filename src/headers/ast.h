@@ -266,7 +266,7 @@ typedef struct AstExpr {
 
 typedef struct AstStmt {
     union {
-        AstExpr assign; // TODO replace with real assignment
+        AstExpr assign;
         AstImport _import;
         AstBlock block;
         AstIf _if;

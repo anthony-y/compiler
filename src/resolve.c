@@ -15,7 +15,7 @@ static void resolve_procedure(AstDecl *procsym, Context *ctx);
 static Type *resolve_var(AstDecl *varsym, Context *ctx);
 static Type *resolve_selector(Context *ctx, AstBinary *accessor);
 static Type *resolve_expression(AstExpr *expr, Context *ctx);
-static Type *resolve_type(Context *ctx, Type *type, bool cyclic_allowed);
+static Type *resolve_type(Context *ctx, Type *type, AstNode *site, bool cyclic_allowed);
 static void resolve_block(Context *ctx, AstBlock *block);
 static void resolve_assignment_expr(AstExpr *assign, Context *ctx);
 static void resolve_assignment(AstNode *ass, Context *ctx);
@@ -66,6 +66,9 @@ static Type *resolve_expression_1(AstExpr *expr, Context *ctx, AstDecl *target) 
     case Expr_UNARY: {
         AstUnary *unary = (AstUnary *)expr;
         Type *expr_type = resolve_expression(unary->expr, ctx);
+        if (unary->op == Token_BANG) {
+            return ctx->type_bool;
+        }
         if (unary->op == Token_STAR) {
             if (expr_type->kind != Type_POINTER) {
                 compile_error(ctx, t, "expected pointer operand to dereference");
@@ -120,7 +123,7 @@ static Type *resolve_expression_1(AstExpr *expr, Context *ctx, AstDecl *target) 
     } break;
     case Expr_CAST: {
         AstCast *cast = (AstCast *)expr;
-        resolve_type(ctx, cast->typename->as.type, false);
+        resolve_type(ctx, cast->typename->as.type, (AstNode *)expr, false);
         resolve_expression(cast->expr, ctx);
         return cast->typename->as.type;
     } break;
@@ -204,9 +207,7 @@ void resolve_struct(AstStruct *def, Context *ctx) {
 }
 
 // Resolves an unresolved type to it's "real" type
-static Type *resolve_type(Context *ctx, Type *type, bool cyclic_allowed) {
-    Token t = ((AstNode *)type)->token; // TODO doesnt work lol
-
+static Type *resolve_type(Context *ctx, Type *type, AstNode *site, bool cyclic_allowed) {
     if (type->kind == Type_PRIMITIVE) return type;
     if (type->kind == Type_ANON_STRUCT) {
         resolve_struct(&type->data.user->as._struct, ctx);
@@ -218,10 +219,10 @@ static Type *resolve_type(Context *ctx, Type *type, bool cyclic_allowed) {
     // We resolve those and wrap them back up each time.
     //
     if (type->kind == Type_POINTER)
-        return make_pointer_type(resolve_type(ctx, type->data.base, true)); // ... cyclic_allowed should only be passed as true here and below
+        return make_pointer_type(resolve_type(ctx, type->data.base, site, true)); // ... cyclic_allowed should only be passed as true here and below
 
     if (type->kind == Type_ARRAY)
-        return make_array_type(resolve_type(ctx, type->data.base, true));
+        return make_array_type(resolve_type(ctx, type->data.base, site, true));
 
     #if 0
     if (type->kind != Type_UNRESOLVED) {
@@ -240,7 +241,7 @@ static Type *resolve_type(Context *ctx, Type *type, bool cyclic_allowed) {
     // ...
     u64 i = shgeti(ctx->type_table, type->name);
     if (i == -1) {
-        compile_error(ctx, t, "undeclared type \"%s\"", type->name);
+        compile_error(ctx, site->token, "undeclared type \"%s\"", type->name);
         return NULL;
     }
 
@@ -269,7 +270,7 @@ static Type *resolve_type(Context *ctx, Type *type, bool cyclic_allowed) {
     sym->status = Status_RESOLVING; // the above if statements works because of this
 
     if (sym->tag != Decl_TYPEDEF) {
-        compile_error(ctx, t, "\"%s\" is not a type", type->name);
+        compile_error(ctx, site->token, "\"%s\" is not a type", type->name);
         return NULL;
     }
 
@@ -284,7 +285,7 @@ static Type *resolve_type(Context *ctx, Type *type, bool cyclic_allowed) {
 }
 
 // Resolves the dependencies of a selector and returns the type of the field it selects.
-static Type *resolve_selector(Context *ctx, AstBinary *accessor) { // TODO rename to resolve_selector
+static Type *resolve_selector(Context *ctx, AstBinary *accessor) {
     assert(accessor->op == Token_DOT);
 
     Name *rhs = accessor->right->as.name;
@@ -293,11 +294,10 @@ static Type *resolve_selector(Context *ctx, AstBinary *accessor) { // TODO renam
     if (!lhs_type) return NULL; // resolve_expression will have already errored, so we can just exit
 
     if (lhs_type->kind == Type_UNRESOLVED) {
-        lhs_type = resolve_type(ctx, lhs_type, false);
+        lhs_type = resolve_type(ctx, lhs_type, (AstNode *)accessor, false);
         assert(lhs_type);
     }
 
-    // TODO kinda rough
     if (lhs_type == ctx->type_string || (lhs_type->kind == Type_POINTER && lhs_type->data.base == ctx->type_string)) {
         if (rhs == make_namet(ctx, "data")) {
             static Type *data_type;
@@ -343,13 +343,13 @@ static void resolve_assignment_expr(AstExpr *assign, Context *ctx) {
     } else if (assign->tag == Expr_BINARY) {
         AstBinary *bin = (AstBinary *)assign;
         if (!is_assignment(*bin)) {
-            compile_error(ctx, expr_tok(assign), "expected assignment"); // TODO maybe bad
+            compile_error(ctx, expr_tok(assign), "expected an assignment");
             return;
         }
         resolve_expression(bin->left, ctx);
         resolve_expression(bin->right, ctx);
     } else {
-        compile_error(ctx, expr_tok(assign), "expected assignment");
+        compile_error(ctx, expr_tok(assign), "expected an assignment");
     }
 }
 
@@ -372,7 +372,7 @@ static Type *resolve_var(AstDecl *decl, Context *ctx) {
         if (var->typename->as.type->kind == Type_ANON_STRUCT) {
             resolve_struct(&var->typename->as.type->data.user->as._struct, ctx);
         } else {
-            *specified_type = resolve_type(ctx, *specified_type, false);
+            *specified_type = resolve_type(ctx, *specified_type, (AstNode *)decl, false);
         }
     }
 
@@ -462,7 +462,7 @@ static void resolve_procedure(AstDecl *procsym, Context *ctx) {
     }
 
     Type **return_type = &proc->return_type->as.type;
-    *return_type = resolve_type(ctx, *return_type, false);
+    *return_type = resolve_type(ctx, *return_type, (AstNode *)procsym, false);
 
     if (proc->flags & PROC_IS_FOREIGN) {
         procsym->status = Status_RESOLVED;
@@ -505,7 +505,7 @@ void resolve_program(Context *ctx) {
             AstTypedef *def = (AstTypedef *)decl;
             if (def->of->tag == Node_STRUCT) {
                 resolve_struct((AstStruct *)def->of, ctx);
-                // TODO (maybe) types that are only used inside unused structs
+                // NOTE types that are only used inside unused structs
                 // will still be set as Status_RESOLVED. Maybe this shouldn't be the case?
             }
         } break;

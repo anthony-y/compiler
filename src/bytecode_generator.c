@@ -42,9 +42,7 @@ static void compile_expression_to_bytecode(Interp *interp, AstExpr *expr) {
             // TODO how do I do this properly?
             char *data = literal->data.string;
 
-            // -2 for the quotes
-            // TODO: hack: fix this at lexer level
-            u64 len = expr_tok((AstExpr *)literal).length-2;
+            u64 len = expr_tok((AstExpr *)literal).length;
 
             emit_instruction(interp, IPUSH, len);
             emit_instruction(interp, PPUSH, (u64)data);

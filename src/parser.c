@@ -221,7 +221,7 @@ static AstExpr *maybe_parse_array_assignment(Context *c, AstExpr *index) {
     binary.right = parse_expression(c, 1);
     binary.left = index;
     binary.op = op.type;
-    return ast_binary(p, op, &binary); // TODO stmt assigns are broken
+    return ast_binary(p, op, &binary);
 }
 
 static AstExpr *parse_expression(Context *c, int min_prec) {
@@ -400,7 +400,7 @@ static AstStmt *parse_defer(Context *c) {
     return ast_defer(p, start, &defer);
 }
 
-static AstStmt *parse_struct(Context *c) { // TODO SHOULD STRUCTS BE STATEMENTS?
+static AstStmt *parse_struct(Context *c) {
     Parser *p = &c->parser;
     if (!consume(p, Token_STRUCT)) {
         compile_error(c, *p->curr, "expected a struct declaration");
@@ -884,9 +884,8 @@ static AstNode *parse_top_level_directive(Context *c) {
             return NULL;
         }
 
-        // TODO fix at lexer level
-        char *path_buffer = malloc(p->prev->length-2);
-        strncpy(path_buffer, p->prev->text+1, p->prev->length-2);
+        char *path_buffer = malloc(p->prev->length);
+        strncpy(path_buffer, p->prev->text+1, p->prev->length);
 
         AstImport import;
         import.path = path_buffer;
@@ -995,7 +994,7 @@ static void parser_recover(Parser *p, TokenType tt) {
     }
 }
 
-// TODO if new top levels are added then they need to be on here
+// NOTE if new top levels are added then they need to be on here
 static void parser_recover_to_declaration(Parser *p) {
     while (p->curr->type != Token_EOF &&
            p->curr->type != Token_TYPEDEF &&

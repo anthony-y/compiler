@@ -107,7 +107,7 @@ static void emit_c_for_expr(AstExpr *expr) {
     Token t = expr_tok(expr);
     switch (expr->tag) {
     case Expr_STRING:
-        fprintf(output, "__make_string(%s, %d)", t.text, t.length-2 /*-2 for the quotes, TODO fix in lexer*/);
+        fprintf(output, "__make_string(%s, %d)", t.text, t.length);
         return;
     case Expr_NULL:
         fprintf(output, "NULL");

@@ -56,7 +56,7 @@ arena.mem = malloc(arena.capacity);
 u8* bytes = arena_alloc(&arena, len+1);
 memcpy(bytes, msg.data, len);
 bytes[len] = 0;
-printf(__make_string("%s", 2).data, bytes);
+printf(__make_string("%s", 4).data, bytes);
 free(arena.mem);
 }
 
@@ -71,7 +71,7 @@ return ret;
 
 bool arena_maybe_grow(struct Arena* a, u64 desired_size) {
 if (a->fixed) {
-puts(__make_string("Out of space :(", 15).data);
+puts(__make_string("Out of space :(", 17).data);
 return false;
 ;
 };
@@ -84,7 +84,7 @@ return true;
 }
 
 void __global_initializers() {
-msg = __make_string("Arena allocator\n", 17);
+msg = __make_string("Arena allocator\n", 19);
 len = msg.length;
 }
 int main(int __argcount, char *__args[]) {
