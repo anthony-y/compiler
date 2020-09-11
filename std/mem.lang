@@ -1,0 +1,17 @@
+//#import "std/basic.lang"
+
+type Arena: struct {
+	mem: ^u8;
+	len: u64;
+	cap: u64;
+}
+
+proc arena_init(a: ^Arena, size: u64) {
+	//a.mem = alloc(size);
+	a.len = 0;
+	a.cap = 0;
+}
+
+proc arena_free(a: ^Arena) {
+	//free(a.mem);
+}

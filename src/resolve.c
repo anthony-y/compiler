@@ -50,7 +50,7 @@ static AstProcedure *resolve_call(AstNode *callnode, Context *ctx) {
     Token tok = callnode->token;
     AstCall *call = (AstCall *)callnode;
     char *str_name = call->name->as.name->text;
-    u64 symbol_index = shgeti(ctx->current_module->symbol_table, str_name);
+    u64 symbol_index = shgeti(ctx->symbol_table, str_name);
     if (symbol_index == -1) {
         compile_error(ctx, tok, "call to undeclared procedure \"%s\"", str_name);
         return NULL;
@@ -59,7 +59,7 @@ static AstProcedure *resolve_call(AstNode *callnode, Context *ctx) {
         AstExpr *arg = (AstExpr *)call->params->nodes[i];
         resolve_expression(arg, ctx);
     }
-    AstDecl *hopefully_proc = ctx->current_module->symbol_table[symbol_index].value;
+    AstDecl *hopefully_proc = ctx->symbol_table[symbol_index].value;
     if (hopefully_proc->tag != Decl_PROC) {
         compile_error(ctx, tok, "attempted to call \"%s\", but it's not a procedure", str_name);
         return NULL;
@@ -96,7 +96,7 @@ static Type *resolve_expression_1(AstExpr *expr, Context *ctx, AstDecl *target) 
             return expr_type->data.base;
         }
         if (unary->op == Token_CARAT) {
-            return make_pointer_type(ctx->current_module, expr_type);
+            return make_pointer_type(expr_type);
         }
         return expr_type;
     } break;
@@ -236,10 +236,10 @@ static Type *resolve_type(Context *ctx, Type *type, bool cyclic_allowed) {
     // We resolve those and wrap them back up each time.
     //
     if (type->kind == Type_POINTER)
-        return make_pointer_type(ctx->current_module, resolve_type(ctx, type->data.base, true)); // ... cyclic_allowed should only be passed as true here and below
+        return make_pointer_type(resolve_type(ctx, type->data.base, true)); // ... cyclic_allowed should only be passed as true here and below
 
     if (type->kind == Type_ARRAY)
-        return make_array_type(ctx->current_module, resolve_type(ctx, type->data.base, true));
+        return make_array_type(resolve_type(ctx, type->data.base, true));
 
     #if 0
     if (type->kind != Type_UNRESOLVED) {
@@ -265,7 +265,7 @@ static Type *resolve_type(Context *ctx, Type *type, bool cyclic_allowed) {
     // ... if it was we store it here
     Type *real_type = ctx->type_table[i].value;
 
-    SymbolTable *current_table = ctx->current_module->symbol_table;
+    SymbolTable *current_table = ctx->symbol_table;
 
     // Next we'll look up the actual declaration of the type.
     u64 type_i = shgeti(current_table, type->name);
@@ -319,7 +319,7 @@ static Type *resolve_selector(Context *ctx, AstBinary *accessor) { // TODO renam
     if (lhs_type == ctx->type_string || (lhs_type->kind == Type_POINTER && lhs_type->data.base == ctx->type_string)) {
         if (rhs == make_namet(ctx, "data")) {
             static Type *data_type;
-            data_type = make_pointer_type(ctx->current_module, ctx->type_u8);
+            data_type = make_pointer_type(ctx->type_u8);
             return data_type;
         } else if (rhs == make_namet(ctx, "length")) {
             return ctx->type_u64;

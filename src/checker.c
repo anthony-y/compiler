@@ -199,11 +199,11 @@ static bool check_unary_against_type(Context *ctx, AstUnary *unary, Type *agains
         // Both of these start out as the same value, but by the end
         // resulting_type will still point to the outer pointer type,
         // and inner_type will point to the inner-most pointer.
-        Type *resulting_type = make_pointer_type(ctx->current_module, NULL);
+        Type *resulting_type = make_pointer_type(NULL);
         Type *inner_type = resulting_type;
 
         for (int i = 1; i < addressof_depth; i++) { // i starts at 1 because we're already 1 deep
-            Type *inner_ptr = make_pointer_type(ctx->current_module, NULL);
+            Type *inner_ptr = make_pointer_type(NULL);
             inner_type->data.base = inner_ptr;
             inner_type = inner_ptr;
         }

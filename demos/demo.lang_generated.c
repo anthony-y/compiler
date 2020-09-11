@@ -20,11 +20,11 @@ static inline string __make_string(u8 *data, u64 length) {
     return (string){.data=data, .length=length};
 }
 
-void compiler_main();
 void free(void* ptr);
 void* malloc(u64 size);
 void printf(u8* fmt, ...);
 void memcpy(void* dest, void* src, u64 n);
+void compiler_main();
 u8* c_string(string s);
 string substring(string s, u64 up_to);
 void free_substring(string s);
@@ -34,14 +34,15 @@ __global_initializers();
 string msg = __make_string("Hello, world!", 13);
 string sub = substring(msg, __make_string("Hello", 5).length);
 // defer'd statement;
-u8* fmt_string = c_string(__make_string("%s\n%s\nThe demo:\n\t%s", 23));
+u8* fmt_string = c_string(__make_string("%s\n%s\nThe demo:\n\t%s\nI will now print a number: %d\n", 56));
 // defer'd statement;
-printf(fmt_string, msg.data, sub.data, __make_string("Wow printf works\n", 18).data);
+printf(fmt_string, msg.data, sub.data, __make_string("Wow printf works", 16).data, 10);
 free(fmt_string);
 free_substring(sub);
 }
 u8* c_string(string s) {
-return substring(s, s.length).data;
+string s2 = substring(s, s.length);
+return s2.data;
 }
 string substring(string s, u64 up_to) {
 string sub;

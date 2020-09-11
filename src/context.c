@@ -58,11 +58,11 @@ Name *make_namet(Context *ctx, const char *txt) {
 
 inline void add_symbol(Context *c, AstDecl *n, char *name) {
     Token t = ((AstNode *)n)->token;
-    if (shgeti(c->current_module->symbol_table, name) != -1) {
-        compile_error(c, t, "Redefinition of symbol \"%s\" in module %s", name, c->current_module->file_path);
+    if (shgeti(c->symbol_table, name) != -1) {
+        compile_error(c, t, "Redefinition of symbol \"%s\" in module %s", name, c->current_file_path);
         return;
     }
-    shput(c->current_module->symbol_table, name, n);
+    shput(c->symbol_table, name, n);
 }
 
 void init_context(Context *c, const char *file_path) {
@@ -83,6 +83,7 @@ void free_context(Context *c) {
     //stbds_arrfree(c->imports);
 }
 
+#if 0
 Module *create_module(Context *ctx, char *file_path, SourceStats stats) {
     Module *module = malloc(sizeof(Module));
     module->file_path = file_path;
@@ -114,6 +115,7 @@ void import_symbols_from_module_into_module(Module *from, Module *to) {
         ast_add(&to->ast, from->ast.nodes[i]);
     }
 }
+#endif
 
 void compile_error(Context *ctx, Token t, const char *fmt, ...) {
     va_list args;
