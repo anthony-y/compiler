@@ -288,6 +288,13 @@ AstStmt *ast_defer(Parser *p, Token t, const AstDefer *d) {
     return &n->as.stmt;
 }
 
+AstStmt *ast_using(struct Parser *p, Token t, const AstUsing *u) {
+    AstNode *n = ast_node(p, Node_USING, t);
+    n->as.stmt.tag = Stmt_USING;
+    n->as.stmt.as.using = *u;
+    return &n->as.stmt;
+}
+
 AstExpr *ast_call_expr(Parser *p, Token t, const AstCall *call) {
     AstNode *n = ast_node(p, Node_CALL, t);
     n->as.expr.tag = Expr_CALL;

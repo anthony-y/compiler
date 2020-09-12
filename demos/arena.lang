@@ -1,8 +1,8 @@
 type Arena: struct {
-	mem: ^u8;
-	fixed := false;
-	cursor := 0;
+	fixed    := false;
+	cursor   := 0;
 	capacity := 1024;
+	mem: ^u8;
 }
 
 msg := "Arena allocator\n";

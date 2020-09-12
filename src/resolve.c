@@ -50,6 +50,45 @@ static AstProcedure *resolve_call(AstNode *callnode, Context *ctx) {
     return calling;
 }
 
+static Type *resolve_name(Context *ctx, Name *name, Token site) {
+    AstProcedure *in = stbds_arrlast(proc_stack);
+    AstBlock *scope = stbds_arrlast(scope_stack);
+
+    AstDecl *var = NULL;
+
+    if (!scope) var = shget(ctx->symbol_table, name->text); // global scope
+    else var = lookup_local(ctx, in, name, scope);
+
+    if (!var) {
+        compile_error(ctx, site, "undeclared identifier \"%s\"", name->text);
+        return NULL;
+    }
+
+    if (var->tag != Decl_VAR) {
+        compile_error(ctx, site, "\"%s\" was used like a variable, but it isn't one", name->text);
+        return NULL;
+    }
+
+    assert(var->name == name);
+
+    name->resolved_decl = var;
+
+    if (var->status == Status_UNRESOLVED) {
+        if (!(var->flags & DECL_IS_TOP_LEVEL)) {
+            compile_error(ctx, site, "local variable \"%s\" was used before it was declared", name->text);
+            return NULL;
+        }
+        Type *resolved_type = resolve_var(var, ctx);
+        return resolved_type;
+    }
+
+    else if (var->status == Status_RESOLVING) {
+        compile_error(ctx, site, "initial instantiation of variable \"%s\" mentions itself", name->text);
+        return NULL;
+    }
+    return var->as.var.typename->as.type;
+}
+
 static Type *resolve_expression_1(AstExpr *expr, Context *ctx, AstDecl *target) {
     Token t = expr_tok(expr);
     switch (expr->tag) {
@@ -83,43 +122,7 @@ static Type *resolve_expression_1(AstExpr *expr, Context *ctx, AstDecl *target) 
     } break;
     case Expr_NAME: {
         Name *name = expr->as.name;
-
-        AstProcedure *in = stbds_arrlast(proc_stack);
-        AstBlock *scope = stbds_arrlast(scope_stack);
-
-        AstDecl *var = NULL;
-
-        if (!scope) var = shget(ctx->symbol_table, name->text); // global scope
-        else var = lookup_local(ctx, in, name, scope);
-
-        if (!var) {
-            compile_error(ctx, t, "undeclared identifier \"%s\"", name->text);
-            return NULL;
-        }
-
-        if (var->tag != Decl_VAR) {
-            compile_error(ctx, t, "\"%s\" was used like a variable, but it isn't one", name->text);
-            return NULL;
-        }
-
-        assert(var->name == name);
-
-        name->resolved_decl = var;
-
-        if (var->status == Status_UNRESOLVED) {
-            if (!(var->flags & DECL_IS_TOP_LEVEL)) {
-                compile_error(ctx, t, "local variable \"%s\" was used before it was declared", name->text);
-                return NULL;
-            }
-            Type *resolved_type = resolve_var(var, ctx);
-            return resolved_type;
-        }
-
-        else if (var->status == Status_RESOLVING) {
-            compile_error(ctx, t, "initial instantiation of variable \"%s\" mentions itself", name->text);
-            return NULL;
-        }
-        return var->as.var.typename->as.type;
+        return resolve_name(ctx, name, t);
     } break;
     case Expr_CAST: {
         AstCast *cast = (AstCast *)expr;
@@ -423,6 +426,21 @@ static void resolve_statement(Context *ctx, AstNode *stmt) {
         ast_add(current_block->deferred, (AstNode *)d->statement);
 
         resolve_statement(ctx, (AstNode *)d->statement);
+    } break;
+    case Node_USING: {
+        AstUsing *using = (AstUsing *)stmt;
+        Type *decl_type = resolve_name(ctx, using->what, stmt->token);
+        if (decl_type->kind != Type_STRUCT && decl_type->kind != Type_ANON_STRUCT) {
+            compile_error(ctx, stmt->token, "invalid using: cannot 'use' declarations of non-struct declaration");
+            return;
+        }
+        AstBlock *source_scope = &decl_type->data.user->as._struct.members->as.block;
+        AstBlock *target_scope = stbds_arrlast(scope_stack);
+        for (int i = 0; i < source_scope->statements->len; i++) {
+            AstDecl *decl = (AstDecl *)source_scope->statements->nodes[i];
+            shput(target_scope->symbols, decl->name->text, decl);
+            ast_add(target_scope->statements, (AstNode *)decl);
+        }
     } break;
     case Node_IF: {
         AstIf *iff = (AstIf *)stmt;

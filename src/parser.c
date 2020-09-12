@@ -868,6 +868,22 @@ static AstNode *parse_proc(Context *c, bool in_typedef) {
     return (AstNode *)procnode;
 }
 
+static AstStmt *parse_using(Context *c) {
+    Parser *p = &c->parser;
+    Token start = *p->curr;
+    parser_next(p);
+
+    if (!consume(p, Token_IDENT)) {
+        compile_error(c, *p->curr, "expected a name after 'using'");
+        parser_recover_to_declaration(p);
+        return NULL;
+    }
+
+    AstUsing using;
+    using.what = make_name(c, *p->prev);
+    return ast_using(p, start, &using);
+}
+
 static AstNode *parse_top_level_directive(Context *c) {
     Parser *p = &c->parser;
     parser_next(p); // #
@@ -919,6 +935,7 @@ static AstNode *parse_statement(Context *c) {
     case Token_RETURN:     return (AstNode *)parse_return(c);
     case Token_DEFER:      return (AstNode *)parse_defer(c);
     case Token_OPEN_BRACE: return (AstNode *)parse_block(c);
+    case Token_USING:      return (AstNode *)parse_using(c);
 
     case Token_IDENT: {
         // Function call

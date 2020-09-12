@@ -249,6 +249,7 @@ static void emit_c_for_stmt(AstNode *stmt) {
             emit_c_for_expr(ret->expr);
         }
     } break;
+    case Node_USING: return;
     default: assert(false);
     }
 }

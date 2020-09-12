@@ -184,6 +184,10 @@ static Token tokenize_ident_or_keyword(Lexer *tz) {
         if (len == 3 && strncmp(tz->start+1, "or", 2) == 0) return token_new(tz, Token_FALSE);
     } break;
 
+    case 'u': {
+        if (len == 5 && strncmp(tz->start+1, "sing", 4) == 0) return token_new(tz, Token_USING);
+    } break;
+
     case 's': {
         if (tz->start[1] == 't') {
             if (len == 6 && strncmp(tz->start+2, "ring", 4) == 0) return token_new(tz, Token_RESERVED_TYPE);

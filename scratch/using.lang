@@ -1,0 +1,10 @@
+proc main() {
+	mine: MyStruct;
+	using mine;
+
+	i := seventeen;
+}
+
+type MyStruct: struct {
+	seventeen := 17;
+}

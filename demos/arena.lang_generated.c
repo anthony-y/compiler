@@ -35,10 +35,10 @@ void printf(u8* fmt, ...);
 void memcpy(void* dest, void* src, u64 n);
 
 struct Arena {
-	u8* mem;
 	bool fixed;
 	int cursor;
 	int capacity;
+	u8* mem;
 };
 
 void __Arena_initer(struct Arena* s) {

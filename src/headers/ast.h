@@ -49,6 +49,7 @@ typedef enum {
     Stmt_RETURN,
     Stmt_DEFER,
     Stmt_CALL,
+    Stmt_USING,
 } StmtType;
 
 typedef enum {
@@ -100,14 +101,15 @@ typedef enum {
         Node_STRUCT,
         Node_RETURN,
         Node_DEFER,
+        Node_USING,
 
     Node_STATEMENTS_END, // sentinal expressions end
 } AstNodeType;
 
 enum {
-    VAR_IS_INFERRED  = 1 << 0,
-    VAR_IS_INITED    = 1 << 1,
-    VAR_IS_VARARGS   = 1 << 2,
+    VAR_IS_INFERRED = 1 << 0,
+    VAR_IS_INITED   = 1 << 1,
+    VAR_IS_VARARGS  = 1 << 2,
 };
 
 struct AstExpr;
@@ -176,6 +178,10 @@ typedef struct {
     struct AstExpr *expr;
     struct AstBlock *owning;
 } AstReturn;
+
+typedef struct AstUsing {
+    struct Name *what;
+} AstUsing;
 
 typedef struct AstLiteral {
     union {
@@ -275,13 +281,14 @@ typedef struct AstStmt {
         AstReturn _return;
         AstDefer defer;
         AstCall call;
+        AstUsing using;
     } as;
     StmtType tag;
 } AstStmt;
 
 enum {
-    DECL_IS_TOP_LEVEL = 1 << 0,
-    DECL_IS_PROC_ARGUMENT = 1 << 1,
+    DECL_IS_TOP_LEVEL      = 1 << 0,
+    DECL_IS_PROC_ARGUMENT  = 1 << 1,
 };
 
 typedef struct AstDecl {
@@ -349,6 +356,7 @@ AstStmt *ast_while(struct Parser *p, Token t, const AstWhile *w);
 AstStmt *ast_struct(struct Parser *p, Token t, const AstStruct *s);
 AstStmt *ast_return(struct Parser *p, Token t, const AstReturn *r);
 AstStmt *ast_defer(struct Parser *p, Token t, const AstDefer *d);
+AstStmt *ast_using(struct Parser *p, Token t, const AstUsing *u);
 
 AstExpr *ast_call_expr(struct Parser *p, Token t, const AstCall *call);
 AstStmt *ast_call_stmt(struct Parser *p, Token t, const AstCall *call);
