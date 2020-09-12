@@ -643,7 +643,7 @@ static AstNode *parse_var_as_decl(Context *c, bool top_level) {
     if (!parse_var(c, top_level, &var)) {
         return NULL;
     }
-    AstDecl *decl = ast_var(p, start, var.name->as.expr.as.name, &var);
+    AstDecl *decl = ast_var(p, start, var.name, &var);
     if (top_level) {
         decl->flags |= DECL_IS_TOP_LEVEL;
         add_symbol(c, decl, decl->name->text);
@@ -665,7 +665,7 @@ static bool parse_var(Context *c, bool top_level, AstVar *out) {
 
     AstVar var;
     var.flags    = 0;
-    var.name     = (AstNode *)ast_name(c, name); // probs remove AstDecl names from their actual nodes
+    var.name     = make_name(c, name); // probs remove AstDecl names from their actual nodes
     var.typename = ast_node(p, Node_TYPENAME, *p->curr);
 
     if (!consume(p, Token_COLON)) {

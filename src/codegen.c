@@ -269,7 +269,7 @@ static void emit_c_for_struct(AstStruct *def, char *name) {
 }
 
 static void emit_c_for_var(AstVar *var) {
-    Name *name = var->name->as.expr.as.name; // TODO probs make AstVar name a Name*
+    Name *name = var->name;
     Type *type = NULL;
     if (var->flags & VAR_IS_INFERRED) {
         type = var->value->resolved_type;
@@ -425,7 +425,7 @@ char *generate_and_write_c_code(Context *ctx, Ast *ast) {
         for (int i = 0; i < members->statements->len; i++) {
             AstVar *var = (AstVar *)members->statements->nodes[i];
             if (!(var->flags & VAR_IS_INITED)) continue;
-            fprintf(output, "s->%s = ", var->name->as.expr.as.name->text);
+            fprintf(output, "s->%s = ", var->name->text);
             emit_c_for_expr(var->value);
             fprintf(output, ";\n");
         }
@@ -462,7 +462,7 @@ char *generate_and_write_c_code(Context *ctx, Ast *ast) {
         AstVar *var = (AstVar *)decl;
         if (!(var->flags & VAR_IS_INITED)) continue;
 
-        fprintf(output, "%s = ", var->name->as.expr.as.name->text);
+        fprintf(output, "%s = ", var->name->text);
         emit_c_for_expr(var->value);
         fprintf(output, ";\n");
     }

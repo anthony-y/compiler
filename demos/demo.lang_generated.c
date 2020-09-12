@@ -30,21 +30,24 @@ string substring(string s, u64 up_to);
 void free_substring(string s);
 
 
+
 void __compiler_main() {
 __global_initializers();
-string msg = __make_string("Hello, world!", 13);
-string sub = substring(msg, __make_string("Hello", 5).length);
+string msg = __make_string("Hello, world!", 15);
+string sub = substring(msg, __make_string("Hello", 7).length);
 // defer'd statement;
-u8* fmt_string = c_string(__make_string("%s\n%s\nThe demo:\n\t%s\nI will now print a number: %d\n", 56));
+u8* fmt_string = c_string(__make_string("%s\n%s\nThe demo:\n\t%s\nI will now print a number: %d\n", 58));
 // defer'd statement;
-printf(fmt_string, msg.data, sub.data, __make_string("Wow printf works", 16).data, 10);
+printf(fmt_string, msg.data, sub.data, __make_string("Wow printf works", 18).data, 10);
 free(fmt_string);
 free_substring(sub);
 }
+
 u8* c_string(string s) {
 string s2 = substring(s, s.length);
 return s2.data;
 }
+
 string substring(string s, u64 up_to) {
 string sub;
 sub.data = malloc(up_to+1);
@@ -53,6 +56,7 @@ sub.data[up_to] = 0;
 sub.length = up_to;
 return sub;
 }
+
 void free_substring(string s) {
 free(s.data);
 }

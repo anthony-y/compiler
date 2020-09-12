@@ -117,7 +117,7 @@ struct AstStmt;
 struct AstDecl;
 
 typedef struct AstVar {
-    struct AstNode *name;
+    struct Name *name;
     struct AstExpr *value;
     struct AstNode *typename;
     int flags;
