@@ -95,6 +95,7 @@ static Type *resolve_expression_1(AstExpr *expr, Context *ctx, AstDecl *target) 
     case Expr_STRING: return ctx->type_string;
     case Expr_INT:    return ctx->type_int;
     case Expr_BOOL:   return ctx->type_bool;
+    case Expr_FLOAT:  return ctx->type_f64;
     case Expr_NULL:   return ctx->null_type;
 
     case Expr_CALL: {

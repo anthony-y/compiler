@@ -40,6 +40,7 @@ typedef enum {
     Token_THEN,
     Token_INLINE,
     Token_USING,
+    Token_CONST,
 
     Token_CLOSE_PAREN,
     Token_OPEN_BRACE,

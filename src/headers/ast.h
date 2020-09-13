@@ -110,6 +110,7 @@ enum {
     VAR_IS_INFERRED = 1 << 0,
     VAR_IS_INITED   = 1 << 1,
     VAR_IS_VARARGS  = 1 << 2,
+    VAR_IS_CONST    = 1 << 3,
 };
 
 struct AstExpr;

@@ -25,10 +25,10 @@ static AstCall  parse_call(Context *, AstExpr *name);
 static AstExpr *parse_expression(Context *, int min_precedence);
 static AstNode *parse_statement(Context *);
 static AstNode *parse_proc(Context *c, bool in_typedef);
-static AstNode *parse_var_as_decl(Context *c, bool top_level);
+static AstNode *parse_var_as_decl(Context *c, bool top_level, bool is_const);
 static AstNode *parse_typename(Context *);
 static AstNode *parse_top_level(Context *);
-static bool parse_var(Context *, bool top_level, AstVar *out);
+static bool parse_var(Context *, bool top_level, bool is_const, AstVar *out);
 
 // These are implemented at the very bottom of the file
 static inline AstExpr *int_literal(Parser *);
@@ -635,12 +635,12 @@ static AstStmt *parse_while(Context *c) {
     return ast_while(p, start, &w);
 }
 
-static AstNode *parse_var_as_decl(Context *c, bool top_level) {
+static AstNode *parse_var_as_decl(Context *c, bool top_level, bool is_const) {
     Parser *p = &c->parser;
     Token start = *p->curr;
 
     AstVar var;
-    if (!parse_var(c, top_level, &var)) {
+    if (!parse_var(c, top_level, is_const, &var)) {
         return NULL;
     }
     AstDecl *decl = ast_var(p, start, var.name, &var);
@@ -651,7 +651,7 @@ static AstNode *parse_var_as_decl(Context *c, bool top_level) {
     return (AstNode *)decl;
 }
 
-static bool parse_var(Context *c, bool top_level, AstVar *out) {
+static bool parse_var(Context *c, bool top_level, bool is_const, AstVar *out) {
     Parser *p = &c->parser;
 
     if (p->curr->type != Token_IDENT) {
@@ -667,6 +667,10 @@ static bool parse_var(Context *c, bool top_level, AstVar *out) {
     var.flags    = 0;
     var.name     = make_name(c, name); // probs remove AstDecl names from their actual nodes
     var.typename = ast_node(p, Node_TYPENAME, *p->curr);
+
+    if (is_const) {
+        var.flags |= VAR_IS_CONST;
+    }
 
     if (!consume(p, Token_COLON)) {
         parser_recover(p, Token_SEMI_COLON);
@@ -774,15 +778,17 @@ static AstNode *parse_proc(Context *c, bool in_typedef) {
                 return NULL;
             }
 
-            if (p->curr->type != Token_IDENT) {
+            if (p->curr->type != Token_IDENT && p->curr->type != Token_CONST) {
                 Token t = *p->curr;
                 compile_error(c, t, "procedure parameter list must only contain variable declarations");
                 parser_recover_to_declaration(p);
                 return NULL;
             }
 
+            bool is_const = consume(p, Token_CONST);
+
             // Each parameter is just a variable declaration.
-            AstNode *arg = parse_var_as_decl(c, /*top_level=*/false);
+            AstNode *arg = parse_var_as_decl(c, /*top_level=*/false, is_const);
             if (!arg) {
                 parser_recover(p, Token_CLOSE_PAREN);
                 return NULL;
@@ -917,7 +923,11 @@ static AstNode *parse_top_level(Context *c) {
     Parser *p = &c->parser;
     switch (p->curr->type) {
     case Token_PROC: return parse_proc(c, false);
-    case Token_IDENT: return parse_var_as_decl(c, /*top_level=*/true);
+    case Token_IDENT: return parse_var_as_decl(c, /*top_level=*/true, /*is_const=*/false);
+    case Token_CONST: {
+        parser_next(p);
+        return parse_var_as_decl(c, true, true);
+    }
     case Token_TYPEDEF: return parse_typedef(c);
     case Token_HASH: return parse_top_level_directive(c);
     }
@@ -936,6 +946,10 @@ static AstNode *parse_statement(Context *c) {
     case Token_DEFER:      return (AstNode *)parse_defer(c);
     case Token_OPEN_BRACE: return (AstNode *)parse_block(c);
     case Token_USING:      return (AstNode *)parse_using(c);
+    case Token_CONST: {
+        parser_next(p);
+        return parse_var_as_decl(c, false, true);
+    }
 
     case Token_IDENT: {
         // Function call
@@ -948,7 +962,7 @@ static AstNode *parse_statement(Context *c) {
 
         // Variable declaration
         if (p->curr[1].type == Token_COLON) {
-            return parse_var_as_decl(c, false);
+            return parse_var_as_decl(c, /*top_level=*/false, /*is_const=*/false);
         }
     }
     }

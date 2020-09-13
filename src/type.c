@@ -88,6 +88,9 @@ void init_types(Context *ctx, SourceStats *stats) {
     ctx->type_s8 = make_and_insert_primitive(ctx, "s8", sizeof(s8), Signage_SIGNED);
     ctx->type_u8 = make_and_insert_primitive(ctx, "u8", sizeof(u8), Signage_UNSIGNED);
 
+    ctx->type_f64 = make_and_insert_primitive(ctx, "f64", sizeof(double), Signage_SIGNED_FLOATING);
+    ctx->type_f32 = make_and_insert_primitive(ctx, "f32", sizeof(float), Signage_SIGNED_FLOATING);
+
     ctx->type_bool = make_and_insert_primitive(ctx, "bool", sizeof(u8), Signage_NaN);
     ctx->type_void = make_and_insert_primitive(ctx, "void", 0, Signage_NaN);
     ctx->type_string = make_and_insert_primitive(ctx, "string", sizeof(StringType), Signage_NaN);

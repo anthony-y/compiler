@@ -44,6 +44,8 @@ typedef struct Context {
     Type *type_int, *type_s64, *type_u64, *type_u32, *type_s32,
         *type_u16, *type_s16, *type_u8, *type_s8;
 
+    Type *type_f32, *type_f64;
+
     Type *type_string, *type_void, *type_bool; // non-integer types
     Type *null_type; // type of "null" literal
     Type *type_any; // any

@@ -19,6 +19,7 @@ typedef enum {
 typedef enum {
     Signage_UNSIGNED,
     Signage_SIGNED,
+    Signage_SIGNED_FLOATING,
     Signage_NaN,
 } Signage;
 

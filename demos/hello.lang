@@ -1,5 +1,5 @@
-proc print(fmt: ^u8, args: []any..) #foreign "printf";
+proc printf(fmt: ^u8, args: []any..) #foreign;
 
 proc main() {
-	print("Hello, world\n".data);
+	printf("Hello, world\n".data);
 }

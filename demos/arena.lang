@@ -35,7 +35,7 @@ proc arena_maybe_grow(a: ^Arena, desired_size: u64): bool {
 
 	if (a.cursor + desired_size) > a.capacity {
 		a.capacity *= 2;
-		realloc(a.mem, a.capacity);
+		a.mem = realloc(a.mem, a.capacity);
 	}
 
 	return true;
@@ -44,6 +44,6 @@ proc arena_maybe_grow(a: ^Arena, desired_size: u64): bool {
 proc puts(s: ^u8) #foreign;
 proc free(ptr: ^void) #foreign;
 proc alloc(size: u64): ^void #foreign "malloc";
-proc realloc(ptr: ^void, size: u64) #foreign;
+proc realloc(ptr: ^void, size: u64): ^void #foreign;
 proc print(fmt: ^u8, args: []any..) #foreign "printf";
 proc mem_copy(dest: ^void, src: ^void, n: u64) #foreign "memcpy";

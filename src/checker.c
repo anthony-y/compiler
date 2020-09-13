@@ -310,6 +310,8 @@ bool does_type_describe_expr(Context *ctx, Type *type, AstExpr *expr) {
         return (type->kind == Type_POINTER);
     case Expr_INT:
         return is_type_numeric(type);
+    case Expr_FLOAT:
+        return (type->kind == Type_PRIMITIVE && (type->data.signage != Signage_UNSIGNED && type->data.signage != Signage_NaN));
     case Expr_STRING:
         return (type == ctx->type_string);
     case Expr_BOOL:
@@ -480,6 +482,18 @@ bool check_assignment(Context *ctx, AstExpr *expr, bool lhs_must_be_pointer) {
         compile_error_end();
         return false;
     }
+
+    if (binary->left->tag == Expr_NAME) {
+        Name *left_name = binary->left->as.name;
+        if (left_name->resolved_decl->tag == Decl_VAR) {
+            AstVar *var = (AstVar *)left_name->resolved_decl;
+            if (var->flags & VAR_IS_CONST) {
+                compile_error(ctx, tok, "attempt to modify a const value");
+                return false;
+            }
+        }
+    }
+
     return true;
 }
 

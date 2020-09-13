@@ -30,7 +30,7 @@ bool arena_maybe_grow(struct Arena* a, u64 desired_size);
 void puts(u8* s);
 void free(void* ptr);
 void* malloc(u64 size);
-void realloc(void* ptr, u64 size);
+void* realloc(void* ptr, u64 size);
 void printf(u8* fmt, ...);
 void memcpy(void* dest, void* src, u64 n);
 
@@ -77,7 +77,7 @@ return false;
 };
 if ((a->cursor+desired_size)>a->capacity) {
 a->capacity *= 2;
-realloc(a->mem, a->capacity);
+a->mem = realloc(a->mem, a->capacity);
 ;
 };
 return true;

@@ -171,6 +171,7 @@ static Token tokenize_ident_or_keyword(Lexer *tz) {
     } break;
     case 'c': {
         if (len == 4 && strncmp(tz->start+1, "ast", 3) == 0) return token_new(tz, Token_CAST);
+        if (len == 5 && strncmp(tz->start+1, "onst", 4) == 0) return token_new(tz, Token_CONST);
     } break;
     case 'i': {
         if (len == 3 && strncmp(tz->start+1, "nt", 2) == 0) return token_new(tz, Token_RESERVED_TYPE);
