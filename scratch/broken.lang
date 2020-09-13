@@ -4,6 +4,10 @@
 proc free(p: ^void){}
 proc printf(s: string){}
 
+type TokenType: enum {
+    EOF=0,
+}
+
 proc main() {
     i := 2
     a := true
@@ -33,7 +37,7 @@ type Lexer: struct {
     start: ^u8
     line: u64
     column: u32
-    last: int
+    last: TokenType
     string_allocator: struct {
         block: ^u8;
         cap: int;
@@ -47,7 +51,7 @@ proc lexer_init(l: ^Lexer, ss: string): bool {
     l.start = ss.data
     l.line = 1
     l.column = 1
-    l.last = Token_EOF
+    l.last = TokenType.EOF;
     return true
 }
 
@@ -78,7 +82,7 @@ type L: struct {
     start: ^u8
     line: u64
     column: u32
-    last: int
+    last: TokenType
     string_allocator: struct {
         block: ^u8;
         cap: int;
@@ -87,14 +91,12 @@ type L: struct {
     //string_allocator: mem.Pool
 }
 
-Token_EOF := 0
-
 proc make_lexer(l: ^Lexer, s: string): bool {
     l.curr = s.data
     l.start = s.data
     l.line = 1
     l.column = 1
-    l.last = Token_EOF
+    l.last = TokenType.EOF
     return true
 }
 

@@ -125,6 +125,7 @@ void print_type(Type *type) {
 
     switch (type->kind) {
     case Type_PRIMITIVE:
+    case Type_ENUM:
     case Type_STRUCT:
         fprintf(stream, "%s", type->name);
         return;

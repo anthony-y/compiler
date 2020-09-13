@@ -25,32 +25,39 @@ void printf(string s);
 void compiler_main();
 struct Lexer;
 void __Lexer_initer(struct Lexer*);
-;
 bool lexer_init(struct Lexer* l, string ss);
-int Token_EOF;
+
+enum TokenType {
+	TokenType__EOF = 0,
+};
 struct Lexer {
-u8* curr;
-u8* start;
-u64 line;
-u32 column;
-int last;
-struct {
-u8* block;
-int cap;
-int len;
-}  string_allocator;
-} ;
+	u8* curr;
+	u8* start;
+	u64 line;
+	u32 column;
+	enum TokenType last;
+	struct {
+	u8* block;
+	int cap;
+	int len;
+} string_allocator;
+};
+
+void __Lexer_initer(struct Lexer* s) {
+}
 
 void free(void* p) {
 }
+
 void printf(string s) {
 }
+
 void __compiler_main() {
 __global_initializers();
 int i = 2;
 bool a = true;
 if (!a) {
-printf(__make_string("Incorrect number of arguments.\n", 32));
+printf(__make_string("Incorrect number of arguments.\n", 34));
 return;
 ;
 }else if (true) {
@@ -58,23 +65,23 @@ return;
 ;
 }else {
 };
-string file_data = __make_string("", 0);
+string file_data = __make_string("", 2);
 struct Lexer* lexer = NULL;
 lexer_init(lexer, file_data);
 free(lexer);
 return;
 }
+
 bool lexer_init(struct Lexer* l, string ss) {
 l->curr = ss.data;
 l->start = ss.data;
 l->line = 1;
 l->column = 1;
-l->last = Token_EOF;
+l->last = TokenType__EOF;
 return true;
 }
 
 void __global_initializers() {
-Token_EOF = 0;
 }
 int main(int __argcount, char *__args[]) {
 __compiler_main();
