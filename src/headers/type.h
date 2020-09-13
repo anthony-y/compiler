@@ -7,6 +7,7 @@
 typedef enum {
     Type_PRIMITIVE,
     Type_STRUCT,
+    Type_ENUM,
     Type_ANON_STRUCT,
     Type_POINTER,
     Type_ARRAY,

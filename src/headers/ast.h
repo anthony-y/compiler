@@ -46,6 +46,7 @@ typedef enum {
     Stmt_FOR,
     Stmt_WHILE,
     Stmt_STRUCT,
+    Stmt_ENUM,
     Stmt_RETURN,
     Stmt_DEFER,
     Stmt_CALL,
@@ -99,6 +100,7 @@ typedef enum {
         Node_FOR,
         Node_WHILE,
         Node_STRUCT,
+        Node_ENUM,
         Node_RETURN,
         Node_DEFER,
         Node_USING,
@@ -141,6 +143,11 @@ typedef struct AstProcedure {
 typedef struct {
     struct AstStmt *members;
 } AstStruct;
+
+typedef struct {
+    struct SymbolTable *fields;
+    Type *base_type;
+} AstEnum;
 
 typedef struct {
     struct AstExpr *name;
@@ -279,6 +286,7 @@ typedef struct AstStmt {
         AstIf _if;
         AstWhile _while;
         AstStruct _struct;
+        AstEnum _enum;
         AstReturn _return;
         AstDefer defer;
         AstCall call;
@@ -355,6 +363,7 @@ AstStmt *ast_block(struct Parser *p, Token t, const AstBlock *blk);
 AstStmt *ast_if(struct Parser *p, Token t, const AstIf *i);
 AstStmt *ast_while(struct Parser *p, Token t, const AstWhile *w);
 AstStmt *ast_struct(struct Parser *p, Token t, const AstStruct *s);
+AstStmt *ast_enum(struct Parser *p, Token t, const AstEnum *e);
 AstStmt *ast_return(struct Parser *p, Token t, const AstReturn *r);
 AstStmt *ast_defer(struct Parser *p, Token t, const AstDefer *d);
 AstStmt *ast_using(struct Parser *p, Token t, const AstUsing *u);

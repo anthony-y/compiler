@@ -50,7 +50,7 @@ static AstProcedure *resolve_call(AstNode *callnode, Context *ctx) {
     return calling;
 }
 
-static Type *resolve_name(Context *ctx, Name *name, Token site) {
+static Type *resolve_name(Context *ctx, Name *name, AstNode *site) {
     AstProcedure *in = stbds_arrlast(proc_stack);
     AstBlock *scope = stbds_arrlast(scope_stack);
 
@@ -59,13 +59,23 @@ static Type *resolve_name(Context *ctx, Name *name, Token site) {
     if (!scope) var = shget(ctx->symbol_table, name->text); // global scope
     else var = lookup_local(ctx, in, name, scope);
 
+    if (var->tag == Decl_TYPEDEF) {
+        Type *maybe_enum = shget(ctx->type_table, name->text);
+        resolve_type(ctx, maybe_enum, site, false);
+        if (!maybe_enum || maybe_enum->kind != Type_ENUM) {
+            compile_error(ctx, site->token, "undeclared identifier \"%s\"", name->text);
+            return NULL;
+        }
+        return maybe_enum;
+    }
+
     if (!var) {
-        compile_error(ctx, site, "undeclared identifier \"%s\"", name->text);
+        compile_error(ctx, site->token, "undeclared identifier \"%s\"", name->text);
         return NULL;
     }
 
     if (var->tag != Decl_VAR) {
-        compile_error(ctx, site, "\"%s\" was used like a variable, but it isn't one", name->text);
+        compile_error(ctx, site->token, "\"%s\" was used like a variable, but it isn't one", name->text);
         return NULL;
     }
 
@@ -75,7 +85,7 @@ static Type *resolve_name(Context *ctx, Name *name, Token site) {
 
     if (var->status == Status_UNRESOLVED) {
         if (!(var->flags & DECL_IS_TOP_LEVEL)) {
-            compile_error(ctx, site, "local variable \"%s\" was used before it was declared", name->text);
+            compile_error(ctx, site->token, "local variable \"%s\" was used before it was declared", name->text);
             return NULL;
         }
         Type *resolved_type = resolve_var(var, ctx);
@@ -83,7 +93,7 @@ static Type *resolve_name(Context *ctx, Name *name, Token site) {
     }
 
     else if (var->status == Status_RESOLVING) {
-        compile_error(ctx, site, "initial instantiation of variable \"%s\" mentions itself", name->text);
+        compile_error(ctx, site->token, "initial instantiation of variable \"%s\" mentions itself", name->text);
         return NULL;
     }
     return var->as.var.typename->as.type;
@@ -123,7 +133,7 @@ static Type *resolve_expression_1(AstExpr *expr, Context *ctx, AstDecl *target) 
     } break;
     case Expr_NAME: {
         Name *name = expr->as.name;
-        return resolve_name(ctx, name, t);
+        return resolve_name(ctx, name, (AstNode *)expr);
     } break;
     case Expr_CAST: {
         AstCast *cast = (AstCast *)expr;
@@ -302,6 +312,17 @@ static Type *resolve_selector(Context *ctx, AstBinary *accessor) {
         assert(lhs_type);
     }
 
+    if (lhs_type->kind == Type_ENUM) {
+        AstEnum *enum_def = &lhs_type->data.user->as._enum;
+        u64 member_idx = shgeti(enum_def->fields, rhs->text);
+        if (member_idx == -1) {
+            compile_error(ctx, expr_tok(accessor->left), "enum has no field \"%s\"", rhs->text);
+            return NULL;
+        }
+        accessor->right->resolved_type = enum_def->base_type;
+        return lhs_type;
+    }
+
     if (lhs_type == ctx->type_string || (lhs_type->kind == Type_POINTER && lhs_type->data.base == ctx->type_string)) {
         if (rhs == make_namet(ctx, "data")) {
             static Type *data_type;
@@ -430,7 +451,7 @@ static void resolve_statement(Context *ctx, AstNode *stmt) {
     } break;
     case Node_USING: {
         AstUsing *using = (AstUsing *)stmt;
-        Type *decl_type = resolve_name(ctx, using->what, stmt->token);
+        Type *decl_type = resolve_name(ctx, using->what, stmt);
         if (decl_type->kind != Type_STRUCT && decl_type->kind != Type_ANON_STRUCT) {
             compile_error(ctx, stmt->token, "invalid using: cannot 'use' declarations of non-struct declaration");
             return;

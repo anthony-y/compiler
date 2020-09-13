@@ -220,7 +220,9 @@ static Token tokenize_ident_or_keyword(Lexer *tz) {
     } break;
 
     case 'e': {
-        if (len == 4 && strncmp(tz->start+1, "lse", 3) == 0) return token_new(tz, Token_ELSE);
+        if (len != 4) break;
+        if (strncmp(tz->start+1, "lse", 3) == 0) return token_new(tz, Token_ELSE);
+        if (strncmp(tz->start+1, "num", 3) == 0) return token_new(tz, Token_ENUM);
     } break;
 
     case 'n': {

@@ -422,6 +422,75 @@ static AstStmt *parse_struct(Context *c) {
     return ast_struct(p, start, &s);
 }
 
+static AstStmt *parse_enum(Context *c) {
+    Parser *p = &c->parser;
+    if (!consume(p, Token_ENUM)) {
+        compile_error(c, *p->curr, "expected an enum declaration");
+        parser_recover_to_declaration(p);
+        return NULL;
+    }
+
+    Token start = *p->curr;
+    AstEnum e;
+    e.fields = NULL;
+    e.base_type = c->type_int;
+
+    if (!consume(p, Token_OPEN_BRACE)) {
+        compile_error(c, *p->curr, "expected a list of enum members");
+        parser_recover_to_declaration(p);
+        return NULL;
+    }
+
+    sh_new_arena(e.fields);
+
+    while (p->curr->type == Token_IDENT) {
+        Token start = *p->curr;
+        AstExpr *expr = parse_expression(c, 1);
+        Name *decl_name = NULL;
+        AstExpr *value = NULL;
+        if (expr->tag == Expr_NAME) {
+            decl_name = expr->as.name;
+            value = expr;
+        }
+        else if (expr->tag == Expr_BINARY) {
+            AstBinary *binary = (AstBinary *)expr;
+            if (binary->left->tag != Expr_NAME || binary->op != Token_EQUAL) {
+                compile_error(c, *p->curr, "enum declarations can only contain assignments");
+                parser_recover(p, Token_CLOSE_BRACE);
+                return NULL;
+            }
+            decl_name = binary->left->as.name;
+            if (binary->right->tag != Expr_NAME && binary->right->tag != Expr_INT) {
+                compile_error(c, *p->curr, "enum field can only be an int or other field");
+                parser_recover(p, Token_CLOSE_BRACE);
+                return NULL;
+            }
+            value = binary->right;
+        } else {
+            compile_error(c, *p->curr, "enum declarations can only contain assignments");
+            parser_recover(p, Token_CLOSE_BRACE);
+            return NULL;
+        }
+
+        AstVar var;
+        var.name = decl_name;
+        var.typename = NULL;
+        var.value = value;
+        var.flags = 0;
+        AstDecl *decl = ast_var(p, start, decl_name, &var);
+        shput(e.fields, decl_name->text, decl);
+        consume(p, Token_COMMA);
+    }
+
+    if (!consume(p, Token_CLOSE_BRACE)) {
+        compile_error(c, *p->curr, "expected a close brace");
+        parser_recover_to_declaration(p);
+        return NULL;
+    }
+
+    return ast_enum(p, start, &e);
+}
+
 static AstNode *parse_typedef(Context *c) {
     Parser *p = &c->parser;
     parser_next(p);
@@ -460,6 +529,11 @@ static AstNode *parse_typedef(Context *c) {
     case Token_STRUCT:
         decl = (AstNode *)parse_struct(c);
         type->kind      = Type_STRUCT;
+        type->data.user = (AstStmt *)decl;
+        break;
+    case Token_ENUM:
+        decl = (AstNode *)parse_enum(c);
+        type->kind = Type_ENUM;
         type->data.user = (AstStmt *)decl;
         break;
     case Token_PROC:

@@ -34,6 +34,7 @@ typedef enum {
     Token_TO,
     Token_PROC,
     Token_STRUCT,
+    Token_ENUM,
     Token_TYPEDEF,
     Token_CAST,
     Token_DEFER,

@@ -1,0 +1,8 @@
+proc main() {
+	d := Day.Monday;
+}
+
+type Day: enum {
+	Monday=0,
+	Tuesday,
+}

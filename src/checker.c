@@ -561,7 +561,7 @@ void check_typedef(Context *ctx, AstDecl *node) {
         }
         return;
     }
-    assert(false);
+    assert(td->of->tag == Node_ENUM);
 }
 
 // Recursively perform semantic analysis and type-checking on an Ast.

@@ -34,6 +34,9 @@ static void emit_c_for_type(Type *type) {
     case Type_STRUCT:
         fprintf(output, "struct %s", type->name);
         return;
+    case Type_ENUM:
+        fprintf(output, "enum %s", type->name);
+        return;
     case Type_ANON_STRUCT:
         emit_c_for_struct(&type->data.user->as._struct, NULL);
         return;
@@ -129,6 +132,10 @@ static void emit_c_for_expr(AstExpr *expr) {
     } break;
     case Expr_BINARY: {
         AstBinary *binary = (AstBinary *)expr;
+        if (binary->left->resolved_type->kind == Type_ENUM) {
+            fprintf(output, "%s__%s", binary->left->resolved_type->name, binary->right->as.name->text);
+            return;
+        }
         emit_c_for_expr(binary->left);
         switch (binary->op) {
         case Token_AMP_AMP: fprintf(output, "&&"); break;
@@ -268,6 +275,19 @@ static void emit_c_for_struct(AstStruct *def, char *name) {
     fprintf(output, "}");
 }
 
+static void emit_c_for_enum(AstEnum *def, char *name) {
+    fprintf(output, "enum");
+    if (name) fprintf(output, " %s", name);
+    fprintf(output, " {\n");
+    for (int i = 0; i < shlenu(def->fields); i++) {
+        AstVar *var = (AstVar *)def->fields[i].value;
+        fprintf(output, "\t");
+        fprintf(output, "%s__%s = %d", name, var->name->text, i);
+        fprintf(output, ",\n");
+    }
+    fprintf(output, "}");
+}
+
 static void emit_c_for_var(AstVar *var) {
     Name *name = var->name;
     Type *type = NULL;
@@ -390,7 +410,7 @@ char *generate_and_write_c_code(Context *ctx, Ast *ast) {
     fprintf(output, "\n");
 
     //
-    // Generate struct bodies
+    // Generate struct and enum bodies
     //
     for (u64 i = 0; i < ast->len; i++) {
         if (ast->nodes[i]->tag == Node_IMPORT) continue;
@@ -401,6 +421,9 @@ char *generate_and_write_c_code(Context *ctx, Ast *ast) {
             AstTypedef *def = (AstTypedef *)decl;
             if (def->of->tag == Node_STRUCT) {
                 emit_c_for_struct((AstStruct *)def->of, def->name->as.name->text);
+                fprintf(output, ";\n");
+            } else if (def->of->tag == Node_ENUM) {
+                emit_c_for_enum((AstEnum *)def->of, def->name->as.name->text);
                 fprintf(output, ";\n");
             }
         }

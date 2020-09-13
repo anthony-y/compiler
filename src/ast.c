@@ -274,6 +274,13 @@ AstStmt *ast_struct(Parser *p, Token t, const AstStruct *s) {
     return &n->as.stmt;
 }
 
+AstStmt *ast_enum(struct Parser *p, Token t, const AstEnum *e) {
+    AstNode *n = ast_node(p, Node_ENUM, t);
+    n->as.stmt.tag = Stmt_ENUM;
+    n->as.stmt.as._enum = *e;
+    return &n->as.stmt;
+}
+
 AstStmt *ast_return(Parser *p, Token t, const AstReturn *r) {
     AstNode *n = ast_node(p, Node_RETURN, t);
     n->as.stmt.tag = Stmt_RETURN;
