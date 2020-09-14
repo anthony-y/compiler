@@ -59,6 +59,11 @@ static Type *resolve_name(Context *ctx, Name *name, AstNode *site) {
     if (!scope) var = shget(ctx->symbol_table, name->text); // global scope
     else var = lookup_local(ctx, in, name, scope);
 
+    if (!var) {
+        compile_error(ctx, site->token, "undeclared identifier \"%s\"", name->text);
+        return NULL;
+    }
+
     if (var->tag == Decl_TYPEDEF) {
         Type *maybe_enum = shget(ctx->type_table, name->text);
         resolve_type(ctx, maybe_enum, site, false);
@@ -67,11 +72,6 @@ static Type *resolve_name(Context *ctx, Name *name, AstNode *site) {
             return NULL;
         }
         return maybe_enum;
-    }
-
-    if (!var) {
-        compile_error(ctx, site->token, "undeclared identifier \"%s\"", name->text);
-        return NULL;
     }
 
     if (var->tag != Decl_VAR) {

@@ -1,0 +1,13 @@
+#import "demos/arena.lang"
+
+proc main() {
+	arena: Arena;
+	arena.mem = alloc(arena.capacity);
+	defer free(arena.mem);
+
+	bytes := arena_alloc(^arena, len+1);
+	mem_copy(bytes, msg.data, len);
+	bytes[len] = 0;
+
+	print("%s".data, bytes);
+}

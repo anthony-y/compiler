@@ -20,11 +20,11 @@ static inline string __make_string(u8 *data, u64 length) {
     return (string){.data=data, .length=length};
 }
 
+void compiler_main();
 void free(void* ptr);
 void* malloc(u64 size);
 void printf(u8* fmt, ...);
 void memcpy(void* dest, void* src, u64 n);
-void compiler_main();
 u8* c_string(string s);
 string substring(string s, u64 up_to);
 void free_substring(string s);

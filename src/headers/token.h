@@ -26,6 +26,7 @@ typedef enum {
     Token_VALUE_END,
 
     /* Keywords */
+    Token_IMPORT,
     Token_RETURN,
     Token_IF,
     Token_ELSE,
@@ -110,6 +111,11 @@ typedef struct TokenList {
     u64 len;
     u64 cap;
 } TokenList;
+
+typedef struct TokenRange {
+    Token *start;
+    Token *end;
+} TokenRange;
 
 void token_list_init(TokenList *list);
 void token_list_add(TokenList *list, Token token);

@@ -70,31 +70,29 @@ void free_subtrees_and_blocks(Ast *ast) {
     }
 }
 
-inline AstNode *ast_node(Parser *p, AstNodeType tag, Token t) {
-    AstNode *node = arena_alloc(&p->node_allocator, sizeof(AstNode));
+inline AstNode *ast_node(Context *c, AstNodeType tag, Token t) {
+    AstNode *node = arena_alloc(&c->node_allocator, sizeof(AstNode));
 
     node->tag = tag;
     node->token = t;
 
-    p->node_count++;
-
     return node;
 }
 
-AstNode *ast_decl(Parser *p, AstNodeType tag, Token t, const AstDecl *decl) {
-    AstNode *node = ast_node(p, tag, t);
+AstNode *ast_decl(Context *c, AstNodeType tag, Token t, const AstDecl *decl) {
+    AstNode *node = ast_node(c, tag, t);
     node->as.decl = *decl;
     return node;
 }
 
-AstNode *ast_expr(Parser *p, AstNodeType tag, Token t, const AstExpr *expr) {
-    AstNode *node = ast_node(p, tag, t);
+AstNode *ast_expr(Context *c, AstNodeType tag, Token t, const AstExpr *expr) {
+    AstNode *node = ast_node(c, tag, t);
     node->as.expr = *expr;
     return node;
 }
 
-AstNode *ast_stmt(Parser *p, AstNodeType tag, Token t, const AstStmt *stmt) {
-    AstNode *node = ast_node(p, tag, t);
+AstNode *ast_stmt(Context *c, AstNodeType tag, Token t, const AstStmt *stmt) {
+    AstNode *node = ast_node(c, tag, t);
     node->as.stmt = *stmt;
     return node;
 }
@@ -147,63 +145,63 @@ void ast_add(Ast *list, AstNode *node) {
 }
 
 AstExpr *ast_name(Context *c, Token t) {
-    AstNode *n = ast_node(&c->parser, Node_IDENT, t);
+    AstNode *n = ast_node(c, Node_IDENT, t);
     n->as.expr.tag = Expr_NAME;
     n->as.expr.as.name = make_name(c, t);
     return &n->as.expr;
 }
 
-AstExpr *ast_binary(Parser *p, Token t, const AstBinary *binary) {
-    AstNode *n = ast_node(p, Node_BINARY, t);
+AstExpr *ast_binary(Context *c, Token t, const AstBinary *binary) {
+    AstNode *n = ast_node(c, Node_BINARY, t);
     n->as.expr.tag = Expr_BINARY;
     n->as.expr.as.binary = *binary;
     return &n->as.expr;
 }
 
-AstExpr *ast_unary(Parser *p, Token t, const AstUnary *unary) {
-    AstNode *n = ast_node(p, Node_UNARY, t);
+AstExpr *ast_unary(Context *c, Token t, const AstUnary *unary) {
+    AstNode *n = ast_node(c, Node_UNARY, t);
     n->as.expr.tag = Expr_UNARY;
     n->as.expr.as.unary = *unary;
     return &n->as.expr;
 }
 
-AstExpr *ast_selector(Parser *p, Token t, const AstSelector *sel) {
-    AstNode *n = ast_node(p, Node_SELECTOR, t);
+AstExpr *ast_selector(Context *c, Token t, const AstSelector *sel) {
+    AstNode *n = ast_node(c, Node_SELECTOR, t);
     n->as.expr.tag = Expr_SELECTOR;
     n->as.expr.as.selector = *sel;
     return &n->as.expr;
 }
 
-AstExpr *ast_paren(Parser *p, Token t, const AstParen *paren) {
-    AstNode *n = ast_node(p, Node_PAREN, t);
+AstExpr *ast_paren(Context *c, Token t, const AstParen *paren) {
+    AstNode *n = ast_node(c, Node_PAREN, t);
     n->as.expr.tag = Expr_PAREN;
     n->as.expr.as.paren = *paren;
     return &n->as.expr;
 }
 
-AstExpr *ast_cast(Parser *p, Token t, const AstCast *cast) {
-    AstNode *n = ast_node(p, Node_CAST, t);
+AstExpr *ast_cast(Context *c, Token t, const AstCast *cast) {
+    AstNode *n = ast_node(c, Node_CAST, t);
     n->as.expr.tag = Expr_CAST;
     n->as.expr.as.cast = *cast;
     return &n->as.expr;
 }
 
-AstExpr *ast_index(Parser *p, Token t, const AstArrayIndex *index) {
-    AstNode *n = ast_node(p, Node_INDEX, t);
+AstExpr *ast_index(Context *c, Token t, const AstArrayIndex *index) {
+    AstNode *n = ast_node(c, Node_INDEX, t);
     n->as.expr.tag = Expr_INDEX;
     n->as.expr.as.index = *index;
     return &n->as.expr;
 }
 
-AstExpr *ast_var_args_expand(struct Parser *p, Token t, const AstVarArgsExpand *expand) {
-    AstNode *n = ast_node(p, Node_VAR_ARGS_EXPAND, t);
+AstExpr *ast_var_args_expand(struct Context *c, Token t, const AstVarArgsExpand *expand) {
+    AstNode *n = ast_node(c, Node_VAR_ARGS_EXPAND, t);
     n->as.expr.tag = Expr_VAR_ARGS_EXPAND;
     n->as.expr.as.var_args_expand = *expand;
     return &n->as.expr;
 }
 
-AstDecl *ast_proc(Parser *p, Token t, Name *name, const AstProcedure *proc) {
-    AstNode *n = ast_node(p, Node_PROCEDURE, t);
+AstDecl *ast_proc(Context *c, Token t, Name *name, const AstProcedure *proc) {
+    AstNode *n = ast_node(c, Node_PROCEDURE, t);
     n->as.decl.flags = 0;
     n->as.decl.status = Status_UNRESOLVED;
     n->as.decl.tag = Decl_PROC;
@@ -212,8 +210,8 @@ AstDecl *ast_proc(Parser *p, Token t, Name *name, const AstProcedure *proc) {
     return &n->as.decl;
 }
 
-AstDecl *ast_var(Parser *p, Token t, Name *name, const AstVar *var) {
-    AstNode *n = ast_node(p, Node_VAR, t);
+AstDecl *ast_var(Context *c, Token t, Name *name, const AstVar *var) {
+    AstNode *n = ast_node(c, Node_VAR, t);
     n->as.decl.flags = 0;
     n->as.decl.status = Status_UNRESOLVED;
     n->as.decl.tag = Decl_VAR;
@@ -222,8 +220,8 @@ AstDecl *ast_var(Parser *p, Token t, Name *name, const AstVar *var) {
     return &n->as.decl;
 }
 
-AstDecl *ast_typedefi(Parser *p, Token t, Name *name, const AstTypedef *td) {
-    AstNode *n = ast_node(p, Node_TYPEDEF, t);
+AstDecl *ast_typedefi(Context *c, Token t, Name *name, const AstTypedef *td) {
+    AstNode *n = ast_node(c, Node_TYPEDEF, t);
     n->as.decl.flags = 0;
     n->as.decl.status = Status_UNRESOLVED;
     n->as.decl.tag = Decl_TYPEDEF;
@@ -232,85 +230,85 @@ AstDecl *ast_typedefi(Parser *p, Token t, Name *name, const AstTypedef *td) {
     return &n->as.decl;
 }
 
-AstStmt *ast_assignment(Parser *p, Token t, const AstExpr *ass) {
-    AstNode *n = ast_node(p, Node_ASSIGN, t);
+AstStmt *ast_assignment(Context *c, Token t, const AstExpr *ass) {
+    AstNode *n = ast_node(c, Node_ASSIGN, t);
     n->as.stmt.tag = Stmt_ASSIGN;
     n->as.stmt.as.assign = *ass;
     return &n->as.stmt;
 }
 
-AstStmt *ast_import(Parser *p, Token t, const AstImport *imp) {
-    AstNode *n = ast_node(p, Node_IMPORT, t);
+AstStmt *ast_import(Context *c, Token t, const AstImport *imp) {
+    AstNode *n = ast_node(c, Node_IMPORT, t);
     n->as.stmt.tag = Stmt_IMPORT;
     n->as.stmt.as._import = *imp;
     return &n->as.stmt;
 }
 
-AstStmt *ast_block(Parser *p, Token t, const AstBlock *blk) {
-    AstNode *n = ast_node(p, Node_BLOCK, t);
+AstStmt *ast_block(Context *c, Token t, const AstBlock *blk) {
+    AstNode *n = ast_node(c, Node_BLOCK, t);
     n->as.stmt.tag = Stmt_BLOCK;
     n->as.stmt.as.block = *blk;
     return &n->as.stmt;
 }
 
-AstStmt *ast_if(Parser *p, Token t, const AstIf *i) {
-    AstNode *n = ast_node(p, Node_IF, t);
+AstStmt *ast_if(Context *c, Token t, const AstIf *i) {
+    AstNode *n = ast_node(c, Node_IF, t);
     n->as.stmt.tag = Stmt_IF;
     n->as.stmt.as._if = *i;
     return &n->as.stmt;
 }
 
-AstStmt *ast_while(Parser *p, Token t, const AstWhile *w) {
-    AstNode *n = ast_node(p, Node_WHILE, t);
+AstStmt *ast_while(Context *c, Token t, const AstWhile *w) {
+    AstNode *n = ast_node(c, Node_WHILE, t);
     n->as.stmt.tag = Stmt_WHILE;
     n->as.stmt.as._while = *w;
     return &n->as.stmt;
 }
 
-AstStmt *ast_struct(Parser *p, Token t, const AstStruct *s) {
-    AstNode *n = ast_node(p, Node_STRUCT, t);
+AstStmt *ast_struct(Context *c, Token t, const AstStruct *s) {
+    AstNode *n = ast_node(c, Node_STRUCT, t);
     n->as.stmt.tag = Stmt_STRUCT;
     n->as.stmt.as._struct = *s;
     return &n->as.stmt;
 }
 
-AstStmt *ast_enum(struct Parser *p, Token t, const AstEnum *e) {
-    AstNode *n = ast_node(p, Node_ENUM, t);
+AstStmt *ast_enum(struct Context *c, Token t, const AstEnum *e) {
+    AstNode *n = ast_node(c, Node_ENUM, t);
     n->as.stmt.tag = Stmt_ENUM;
     n->as.stmt.as._enum = *e;
     return &n->as.stmt;
 }
 
-AstStmt *ast_return(Parser *p, Token t, const AstReturn *r) {
-    AstNode *n = ast_node(p, Node_RETURN, t);
+AstStmt *ast_return(Context *c, Token t, const AstReturn *r) {
+    AstNode *n = ast_node(c, Node_RETURN, t);
     n->as.stmt.tag = Stmt_RETURN;
     n->as.stmt.as._return = *r;
     return &n->as.stmt;
 }
 
-AstStmt *ast_defer(Parser *p, Token t, const AstDefer *d) {
-    AstNode *n = ast_node(p, Node_DEFER, t);
+AstStmt *ast_defer(Context *c, Token t, const AstDefer *d) {
+    AstNode *n = ast_node(c, Node_DEFER, t);
     n->as.stmt.tag = Stmt_DEFER;
     n->as.stmt.as.defer = *d;
     return &n->as.stmt;
 }
 
-AstStmt *ast_using(struct Parser *p, Token t, const AstUsing *u) {
-    AstNode *n = ast_node(p, Node_USING, t);
+AstStmt *ast_using(struct Context *c, Token t, const AstUsing *u) {
+    AstNode *n = ast_node(c, Node_USING, t);
     n->as.stmt.tag = Stmt_USING;
     n->as.stmt.as.using = *u;
     return &n->as.stmt;
 }
 
-AstExpr *ast_call_expr(Parser *p, Token t, const AstCall *call) {
-    AstNode *n = ast_node(p, Node_CALL, t);
+AstExpr *ast_call_expr(Context *c, Token t, const AstCall *call) {
+    AstNode *n = ast_node(c, Node_CALL, t);
     n->as.expr.tag = Expr_CALL;
     n->as.expr.as.call = *call;
     return &n->as.expr;
 }
 
-AstStmt *ast_call_stmt(Parser *p, Token t, const AstCall *call) {
-    AstNode *n = ast_node(p, Node_CALL, t);
+AstStmt *ast_call_stmt(Context *c, Token t, const AstCall *call) {
+    AstNode *n = ast_node(c, Node_CALL, t);
     n->as.stmt.tag = Stmt_CALL;
     n->as.stmt.as.call = *call;
     return &n->as.stmt;

@@ -4,7 +4,8 @@ proc print(fmt: ^u8, args: []any..)            #foreign "printf";
 proc mem_copy(dest: ^void, src: ^void, n: u64) #foreign "memcpy";
 
 proc c_string(s: string): ^u8 {
-	return substring(s, s.length).data;
+	s2 := substring(s, s.length);
+	return s2.data;
 }
 
 proc substring(s: string, up_to: u64): string {

@@ -45,6 +45,7 @@ Name *make_name(Context *ctx, Token token) {
 }
 
 Name *make_namet(Context *ctx, const char *txt) {
+    assert(ctx->name_table);
     u64 i = shgeti(ctx->name_table, txt);
     if (i == -1) { // not in the table yet
         Name *n = malloc(sizeof(Name));
@@ -67,9 +68,17 @@ inline void add_symbol(Context *c, AstDecl *n, char *name) {
 
 void init_context(Context *c, const char *file_path) {
     *c = (Context){0};
+    arena_init(&c->string_allocator, 1024 * 20, sizeof(char), 1);
     c->current_file_path = file_path;
     arena_init(&c->scratch, CONTEXT_SCRATCH_SIZE, sizeof(u8), 1);
     sh_new_arena(c->string_literal_pool);
+    sh_new_arena(c->name_table);
+    sh_new_arena(c->symbol_table);
+}
+
+void context_init_modules(Context *ctx, const SourceStats *stats) {
+    // +1 for main module
+    ctx->modules = malloc(stats->number_of_imports+1 * sizeof(Module));
 }
 
 void free_context(Context *c) {
@@ -80,42 +89,9 @@ void free_context(Context *c) {
     arena_free(&c->scratch);
     shfree(c->string_literal_pool);
     shfree(c->symbol_table);
-    //stbds_arrfree(c->imports);
+    arena_free(&c->node_allocator);
+    free(c->modules);
 }
-
-#if 0
-Module *create_module(Context *ctx, char *file_path, SourceStats stats) {
-    Module *module = malloc(sizeof(Module));
-    module->file_path = file_path;
-    module->imports = NULL;
-
-    init_types_for_module(module, &stats);
-
-    sh_new_arena(module->symbol_table);
-    sh_new_arena(module->type_table);
-
-    return module;
-}
-
-void free_module(Module *module) {
-    stbds_arrfree(module->imports);
-    arena_free(&module->type_allocator);
-    shfree(module->symbol_table);
-    shfree(module->type_table);
-    free(module);
-}
-
-void import_symbols_from_module_into_module(Module *from, Module *to) {
-    for (int i = 0; i < shlenu(from->symbol_table); i++) {
-        AstDecl *decl = from->symbol_table[i].value;
-        char *name = from->symbol_table[i].key;
-        shput(to->symbol_table, name, decl);
-    }
-    for (int i = 0; i < from->ast.len; i++) {
-        ast_add(&to->ast, from->ast.nodes[i]);
-    }
-}
-#endif
 
 void compile_error(Context *ctx, Token t, const char *fmt, ...) {
     va_list args;

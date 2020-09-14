@@ -35,7 +35,7 @@ typedef struct Lexer {
     u32 column;
 
     TokenType last;
-    Arena string_allocator;
+    Arena *string_allocator; // pointer to the string allocator in Context
 } Lexer;
 
 //void lexer_init(Lexer *, char *start, u64 line);
@@ -43,8 +43,10 @@ void lexer_init(Lexer *, const char *path, char *data);
 void lexer_free(Lexer *);
 
 struct SourceStats;
+struct Module;
 
-bool lexer_lex(Lexer *, TokenList *list, struct SourceStats *);
+bool lexer_lex(Lexer *l, TokenList *list, struct SourceStats *stats, TokenList *import_paths);
+void divide_tokens_into_modules(struct Module *modules, struct SourceStats stats, const TokenList *all_tokens);
 ///void *lexer_lex(void *);
 
 #endif

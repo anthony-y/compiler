@@ -1,10 +1,5 @@
 //#import "std/mem.lang"
-//#import "std/basic.lang"
-
-proc free(ptr: ^void)                          #foreign;
-proc alloc(size: u64): ^void                   #foreign "malloc";
-proc print(fmt: ^u8, args: []any..)            #foreign "printf";
-proc mem_copy(dest: ^void, src: ^void, n: u64) #foreign "memcpy";
+#import "std/basic.lang"
 
 proc main() {
 	msg := "Hello, world!";
@@ -16,22 +11,4 @@ proc main() {
 	defer free(fmt_string);
 
 	print(fmt_string, msg.data, sub.data, "Wow printf works".data, 10);
-}
-
-proc c_string(s: string): ^u8 {
-	s2 := substring(s, s.length);
-	return s2.data;
-}
-
-proc substring(s: string, up_to: u64): string {
-	sub: string;
-	sub.data = alloc(up_to+1);
-	mem_copy(sub.data, s.data, up_to);
-	sub.data[up_to] = 0;
-	sub.length = up_to;
-	return sub;
-}
-
-proc free_substring(s: string) {
-	free(s.data);
 }

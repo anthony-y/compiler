@@ -1,5 +1,5 @@
-proc printf(fmt: ^u8, args: []any..) #foreign;
+#import "std/basic.lang"
 
 proc main() {
-	printf("Hello, world\n".data);
+	print("Hello, world\n".data);
 }

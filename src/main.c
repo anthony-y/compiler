@@ -21,7 +21,7 @@
 #include "headers/stb/stretchy_buffer.h"
 
 static char *read_file(const char *path);
-static void print_unused_symbol_warnings(Context *);
+static void print_unused_symbol_warnings(Context *, Module *);
 
 // Roughly time the execution of "code" in microseconds
 // There must be a variable called "id"_delta in the scope that you use this in
@@ -35,122 +35,131 @@ static void print_unused_symbol_warnings(Context *);
 
 // THINK: for imports, just lex, parse and resolve all the files and then merge their scopes into one scope, then generate code for the symbols, symbols that are Sym_UNRESOLVED, can be ignored.
 
-bool process_file(const char *file_path) {
-    char *file_data = read_file(file_path); // read the file into a zero-terminated buffer.
-
-    u64 lexer_delta    = 0;
-    u64 parser_delta   = 0;
-    u64 checker_delta  = 0;
-    u64 bc_gen_delta   = 0;
-    u64 interp_delta   = 0;
-    u64 code_gen_delta = 0;
-
-    SourceStats stats = (SourceStats){10}; // initialize all the fields to 10
-    TokenList tokens;
-    Context context;
-    Lexer lexer;
-    Ast ast;
-
-    #define NEXT_STAGE_OR_QUIT() if (context.error_count > 0) goto end;
-
-    init_context(&context, file_path);
-    token_list_init(&tokens);
-    lexer_init(&lexer, file_path, file_data);
-
-    PROFILE(lexer, {
-        if (!lexer_lex(&lexer, &tokens, &stats)) {
-            lexer_free(&lexer);
-            token_list_free(&tokens);
-            free_context(&context);
-            free(file_data);
-            return 1;
-        }
-    });
-
-    if (tokens.len == 1) return 0;
-
-    init_types(&context, &stats);
-    parser_init(&context.parser, &tokens, &stats);
-
-    PROFILE(parser, {
-        ast = parse(&context);
-    });
-
-    token_list_free(&tokens);
-
-    if (!context.decl_for_main)
-        compile_error(&context, (Token){0}, "No entry point found. Please declare \"main\"");
-    else if (context.decl_for_main->tag != Decl_PROC)
-        compile_error(&context, decl_tok(context.decl_for_main), "Entry point \"main\" must be a procedure");
-    else if (((AstProcedure *)context.decl_for_main)->params)
-        compile_error(&context, decl_tok(context.decl_for_main), "Entry point \"main\" must not take any arguments");
-    else if (((AstProcedure *)context.decl_for_main)->return_type->as.type != context.type_void)
-        compile_error(&context, decl_tok(context.decl_for_main), "Entry point \"main\" must return void");
-
-    NEXT_STAGE_OR_QUIT();
-
-    PROFILE(checker, {
-        resolve_program(&context);
-        NEXT_STAGE_OR_QUIT();
-        check_ast(&context, &ast); // type and semantic checking
-        NEXT_STAGE_OR_QUIT();
-    });
-
-    PROFILE(code_gen, {
-        char *output_path = generate_and_write_c_code(&context, &ast);
-        u64 len = strlen("gcc -std=c99") + strlen(output_path) + strlen("-o ") + strlen("-Wno-discarded-qualifiers ") + strlen("-Wno-return-local-addr") + strlen("-Wno-builtin-declaration-mismatch") + 1;
-        char *command = arena_alloc(&context.scratch, len);
-        sprintf(command, "gcc -std=c99 %s -Wno-return-local-addr -Wno-discarded-qualifiers -Wno-builtin-declaration-mismatch -o output_bin", output_path);
-        system(command);
-    });
-
-    NEXT_STAGE_OR_QUIT();
-
-    print_unused_symbol_warnings(&context);
-
-end:
-    {
-        bool ret = (context.error_count > 0);
-
-        if (ret) {
-            printf("\n");
-        }
-
-        printf("Error count: %d\n", context.error_count);
-        printf("Total time: %ldus\n", lexer_delta + parser_delta + checker_delta + code_gen_delta);
-        printf("\tLexing took %ldus\n", lexer_delta);
-        printf("\tParsing took %ldus\n", parser_delta);
-        printf("\t\tParser used %lu/%lu nodes\n", context.parser.node_count, context.parser.node_allocator.capacity);
-        printf("\tInferring, resolving and checking took %ldus\n", checker_delta);
-        printf("\tCodegen took %ldus\n", code_gen_delta);
-        printf("\tBytecode generation took %ldus\n", bc_gen_delta);
-        printf("\tCompile time execution took %ldus\n", interp_delta);
-
-        //interp_free(&interp);
-        free_subtrees_and_blocks(&ast);
-        free_types(&context);
-        parser_free(&context.parser, &ast);
-        lexer_free(&lexer);
-        free_context(&context);
-        free(file_data);
-
-        return ret;
-    }
-}
-
 int main(int arg_count, char *args[]) {
     if (arg_count < 2) {
         fprintf(stderr, "Error: expected a root compilation target (a file path).\n");
         return 1;
     }
 
-    return !process_file(args[1]); // 0 means good, which is false
+    Context context;
+    init_context(&context, args[1]);
+
+    char *data = read_file(args[1]);
+
+    SourceStats main_stats = (SourceStats){10};
+    SourceStats total_stats;
+
+    TokenList tokens;
+    TokenList import_paths;
+    Parser parser;
+
+    Lexer lexer;
+    lexer.string_allocator = &context.string_allocator;
+    lexer_init(&lexer, args[1], data);
+
+    token_list_init(&tokens);
+    token_list_init(&import_paths);
+
+    // Collect tokens, stats and import paths from the main module.
+    if (!lexer_lex(&lexer, &tokens, &main_stats, &import_paths)) {
+        return 1;
+    }
+
+    if (tokens.len == 1) return 0;
+
+    total_stats = main_stats;
+
+    // Tally up SourceStats for every file imported into the program
+    // This includes files imported indirectly.
+    for (u64 i = 0; i < total_stats.number_of_imports; i++) {
+        Token path_with_quotes = import_paths.tokens[i];
+        char *unquoted = arena_alloc(&context.scratch, path_with_quotes.length-1);
+        strncpy(unquoted, path_with_quotes.text+1, path_with_quotes.length-2);
+
+        char *tmp_file_data = read_file(unquoted);
+        lexer_init(&lexer, unquoted, tmp_file_data);
+        bool success = lexer_lex(&lexer, NULL, &total_stats, &import_paths);
+        free(tmp_file_data);
+
+        if (!success) goto end;
+    }
+
+    // At this point we know how much memory to allocate
+
+    const u64 max_nodes = (u64)(total_stats.number_of_lines * 5); // roughly 5 nodes for each line
+    arena_init(&context.node_allocator, max_nodes, sizeof(AstNode), 8);
+
+    // Ensure there is enough space for all modules plus the root module,
+    context_init_modules(&context, &total_stats); // and then reserve the space for them.
+    init_types(&context, &total_stats);
+
+    // Compile main module
+    Module main_module = (Module){0};
+    main_module.name = make_namet(&context, "main");
+    context.modules[0] = main_module;
+
+    parser_init(&parser, &tokens, &main_stats);
+    Ast ast = parse(&context, &parser);
+    if (context.error_count > 0) goto end;
+
+    // Compile imported modules
+    for (u64 i = 1; i <= total_stats.number_of_imports; i++) {
+        Module *module = &context.modules[i];
+
+        Token path_with_quotes = import_paths.tokens[i-1];
+        char *unquoted = arena_alloc(&context.scratch, path_with_quotes.length-1);
+        strncpy(unquoted, path_with_quotes.text+1, path_with_quotes.length-2);
+
+        char *module_data = read_file(unquoted);
+
+        SourceStats module_stats = (SourceStats){10};
+
+        TokenList module_tokens;
+        token_list_init(&module_tokens);
+
+        Lexer module_lexer;
+        module_lexer.string_allocator = &context.string_allocator;
+        lexer_init(&module_lexer, unquoted, module_data);
+
+        if (!lexer_lex(&module_lexer, &module_tokens, &module_stats, NULL)) {
+            free(module_data);
+            goto end;
+        }
+
+        Parser module_parser;
+        parser_init(&module_parser, &module_tokens, &module_stats);
+        Ast module_ast = parse(&context, &module_parser);
+        if (context.error_count > 0) goto end;
+        for (int i = 0; i < module_ast.len; i++) {
+            ast_add(&ast, module_ast.nodes[i]);
+        }
+    }
+
+    resolve_program(&context);
+    if (context.error_count > 0) goto end;
+    check_ast(&context, &ast);
+    if (context.error_count > 0) goto end;
+
+    char *output_path = generate_and_write_c_code(&context, &ast);
+    u64 len = strlen("gcc -std=c99") + strlen(output_path) + strlen("-o ") + strlen("-Wno-discarded-qualifiers ") + strlen("-Wno-return-local-addr") + strlen("-Wno-builtin-declaration-mismatch") + 1;
+    char *command = arena_alloc(&context.scratch, len);
+    sprintf(command, "gcc -std=c99 %s -Wno-return-local-addr -Wno-discarded-qualifiers -Wno-builtin-declaration-mismatch -o output_bin", output_path);
+    system(command);
+
+end:
+    parser_free(&parser, &ast);
+    token_list_free(&tokens);
+    token_list_free(&import_paths);
+    free_context(&context);
+    free(data);
+
+    return 0;
 }
 
-static void print_unused_symbol_warnings(Context *ctx) {
-    u64 len = shlenu(ctx->symbol_table);
+static void print_unused_symbol_warnings(Context *ctx, Module *module) {
+    u64 len = shlenu(module->symbols);
     for (int i = 0; i < len; i++) {
-        AstDecl *d = ctx->symbol_table[i].value;
+        AstDecl *d = module->symbols[i].value;
         char *name = d->name->text;
         Token t = decl_tok(d);
         if (d->status == Status_UNRESOLVED) {
@@ -166,7 +175,7 @@ static void print_unused_symbol_warnings(Context *ctx) {
 static char *read_file(const char *path) {
     FILE *f = fopen(path, "r");
     if (!f) {
-        fprintf(stderr, "Error: failed to open file \"%s\".\n", path);
+        fprintf(stderr, "Error: failed to open file %s.\n", path);
         exit(0);
     }
 

@@ -10,13 +10,11 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <assert.h>
 
 /* Initializes a Lexer */
 void lexer_init(Lexer *tz, const char *path, char *data) {
     tz->file_name = path;
-
-    /* Initialize buffer for token strings */
-    arena_init(&tz->string_allocator, 1024 * 10, sizeof(char), 1);
 
     tz->line = 1;
     tz->column = 1;
@@ -28,7 +26,7 @@ void lexer_init(Lexer *tz, const char *path, char *data) {
 }
 
 void lexer_free(Lexer *tz) {
-    arena_free(&tz->string_allocator);
+    arena_free(tz->string_allocator);
     tz->curr = NULL;
     tz->line = 0;
 }
@@ -83,7 +81,7 @@ Token token_new(Lexer *tz, TokenType type) {
     tz->last = type;
 
     if (type == Token_IDENT || type == Token_INT_LIT || type == Token_STRING_LIT || type == Token_FLOAT_LIT || type == Token_RESERVED_TYPE) {
-        t.text = arena_alloc(&tz->string_allocator, t.length + 1);
+        t.text = arena_alloc(tz->string_allocator, t.length + 1);
         strncpy(t.text, tz->start, t.length);
         t.text[t.length] = 0;
     }
@@ -116,7 +114,7 @@ static inline void skip_whitespace(Lexer *tz) {
 }
 
 static Token tokenize_string(Lexer *tz) {
-    u64 start_line = tz->line;
+     u64 start_line = tz->line;
     while (*tz->curr != '"' && !is_end(tz)) {
         if (*tz->curr == '\n') {
             fprintf(stderr, "%s:%lu: Error: unterminated string.\n", tz->file_name, start_line);
@@ -176,7 +174,9 @@ static Token tokenize_ident_or_keyword(Lexer *tz) {
     case 'i': {
         if (len == 3 && strncmp(tz->start+1, "nt", 2) == 0) return token_new(tz, Token_RESERVED_TYPE);
         if (len == 2 && strncmp(tz->start+1, "f", 1) == 0) return token_new(tz, Token_IF);
-        if (len == 6 && strncmp(tz->start+1, "nline", 5) == 0) return token_new(tz, Token_INLINE);
+        if (len != 6) break;
+        if (strncmp(tz->start+1, "nline", 5) == 0) return token_new(tz, Token_INLINE);
+        if (strncmp(tz->start+1, "mport", 5) == 0) return token_new(tz, Token_IMPORT);
     } break;
 
     case 'f': {
@@ -336,17 +336,26 @@ Token next_token(Lexer *tz) {
     return token_new(tz, Token_UNKNOWN);
 }
 
-bool lexer_lex(Lexer *l, TokenList *list, SourceStats *stats) {
+bool lexer_lex(Lexer *l, TokenList *list, SourceStats *stats, TokenList *import_paths) {
     TokenType last;
 
     u64 pointers = 0;
     u64 args = 0;
     u64 blocks = 0;
     u64 types = 0;
+    u64 number_imports = 0;
 
     while (true) {
         last = l->last;
         Token t = next_token(l);
+
+        if (import_paths && (last == Token_IMPORT && t.type == Token_STRING_LIT)) {
+            number_imports++;
+            token_list_add(list, t);
+            if (t.type == Token_EOF) break;
+            token_list_add(import_paths, t);
+            continue;
+        }
 
         switch (t.type) {
         case Token_UNKNOWN:
@@ -355,7 +364,6 @@ bool lexer_lex(Lexer *l, TokenList *list, SourceStats *stats) {
         case Token_TYPEDEF:
             types++;
             break;
-
         case Token_IDENT:
         case Token_RESERVED_TYPE:
         case Token_CARAT:
@@ -369,12 +377,16 @@ bool lexer_lex(Lexer *l, TokenList *list, SourceStats *stats) {
             break;
         }
 
-        token_list_add(list, t);
+        if (list) token_list_add(list, t);
         if (t.type == Token_EOF) break;
     }
-    stats->blocks += blocks;
-    stats->pointer_types += pointers;
-    stats->argument_lists += args;
-    stats->declared_types += types;
+    if (stats) {
+        stats->blocks += blocks;
+        stats->pointer_types += pointers;
+        stats->argument_lists += args;
+        stats->declared_types += types;
+        stats->number_of_imports += number_imports;
+        stats->number_of_lines += l->line;
+    }
     return true;
 }

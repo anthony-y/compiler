@@ -296,8 +296,9 @@ typedef struct AstStmt {
 } AstStmt;
 
 enum {
-    DECL_IS_TOP_LEVEL      = 1 << 0,
-    DECL_IS_PROC_ARGUMENT  = 1 << 1,
+    DECL_IS_TOP_LEVEL     = 1 << 0,
+    DECL_IS_PROC_ARGUMENT = 1 << 1,
+    DECL_IS_EXPORTED      = 1 << 2,
 };
 
 typedef struct AstDecl {
@@ -339,37 +340,37 @@ void ast_init(Ast *, int);
 void ast_free(Ast *);
 void ast_add(Ast *, AstNode *);
 
-AstNode *ast_node(struct Parser *, AstNodeType tag, Token);
-AstNode *ast_decl(struct Parser *, AstNodeType tag, Token, const AstDecl *);
-AstNode *ast_expr(struct Parser *, AstNodeType tag, Token, const AstExpr *);
-AstNode *ast_stmt(struct Parser *, AstNodeType tag, Token, const AstStmt *);
+AstNode *ast_node(struct Context *, AstNodeType tag, Token);
+AstNode *ast_decl(struct Context *, AstNodeType tag, Token, const AstDecl *);
+AstNode *ast_expr(struct Context *, AstNodeType tag, Token, const AstExpr *);
+AstNode *ast_stmt(struct Context *, AstNodeType tag, Token, const AstStmt *);
 
 AstExpr *ast_name(struct Context *, Token t);
-AstExpr *ast_binary(struct Parser *p, Token t, const AstBinary *binary);
-AstExpr *ast_unary(struct Parser *p, Token t, const AstUnary *unary);
-AstExpr *ast_selector(struct Parser *p, Token t, const AstSelector *sel);
-AstExpr *ast_paren(struct Parser *p, Token t, const AstParen *paren);
-AstExpr *ast_cast(struct Parser *p, Token t, const AstCast *cast);
-AstExpr *ast_index(struct Parser *p, Token t, const AstArrayIndex *index);
-AstExpr *ast_var_args_expand(struct Parser *p, Token t, const AstVarArgsExpand *expand);
+AstExpr *ast_binary(struct Context *, Token t, const AstBinary *binary);
+AstExpr *ast_unary(struct Context *, Token t, const AstUnary *unary);
+AstExpr *ast_selector(struct Context *, Token t, const AstSelector *sel);
+AstExpr *ast_paren(struct Context *, Token t, const AstParen *paren);
+AstExpr *ast_cast(struct Context *, Token t, const AstCast *cast);
+AstExpr *ast_index(struct Context *, Token t, const AstArrayIndex *index);
+AstExpr *ast_var_args_expand(struct Context *, Token t, const AstVarArgsExpand *expand);
 
-AstDecl *ast_proc(struct Parser *p, Token t, struct Name *name, const AstProcedure *proc);
-AstDecl *ast_var(struct Parser *p, Token t, struct Name *name, const AstVar *var);
-AstDecl *ast_typedefi(struct Parser *p, Token t, struct Name *name, const AstTypedef *td);
+AstDecl *ast_proc(struct Context *, Token t, struct Name *name, const AstProcedure *proc);
+AstDecl *ast_var(struct Context *, Token t, struct Name *name, const AstVar *var);
+AstDecl *ast_typedefi(struct Context *, Token t, struct Name *name, const AstTypedef *td);
 
-AstStmt *ast_assignment(struct Parser *p, Token t, const AstExpr *ass);
-AstStmt *ast_import(struct Parser *p, Token t, const AstImport *imp);
-AstStmt *ast_block(struct Parser *p, Token t, const AstBlock *blk);
-AstStmt *ast_if(struct Parser *p, Token t, const AstIf *i);
-AstStmt *ast_while(struct Parser *p, Token t, const AstWhile *w);
-AstStmt *ast_struct(struct Parser *p, Token t, const AstStruct *s);
-AstStmt *ast_enum(struct Parser *p, Token t, const AstEnum *e);
-AstStmt *ast_return(struct Parser *p, Token t, const AstReturn *r);
-AstStmt *ast_defer(struct Parser *p, Token t, const AstDefer *d);
-AstStmt *ast_using(struct Parser *p, Token t, const AstUsing *u);
+AstStmt *ast_assignment(struct Context *, Token t, const AstExpr *ass);
+AstStmt *ast_import(struct Context *, Token t, const AstImport *imp);
+AstStmt *ast_block(struct Context *, Token t, const AstBlock *blk);
+AstStmt *ast_if(struct Context *, Token t, const AstIf *i);
+AstStmt *ast_while(struct Context *, Token t, const AstWhile *w);
+AstStmt *ast_struct(struct Context *, Token t, const AstStruct *s);
+AstStmt *ast_enum(struct Context *, Token t, const AstEnum *e);
+AstStmt *ast_return(struct Context *, Token t, const AstReturn *r);
+AstStmt *ast_defer(struct Context *, Token t, const AstDefer *d);
+AstStmt *ast_using(struct Context *, Token t, const AstUsing *u);
 
-AstExpr *ast_call_expr(struct Parser *p, Token t, const AstCall *call);
-AstStmt *ast_call_stmt(struct Parser *p, Token t, const AstCall *call);
+AstExpr *ast_call_expr(struct Context *, Token t, const AstCall *call);
+AstStmt *ast_call_stmt(struct Context *, Token t, const AstCall *call);
 
 struct Name *get_decl_name(AstNode *);
 

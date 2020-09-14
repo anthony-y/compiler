@@ -8,18 +8,6 @@ type Arena: struct {
 msg := "Arena allocator\n";
 len := msg.length;
 
-proc main() {
-	arena: Arena;
-	arena.mem = alloc(arena.capacity);
-	defer free(arena.mem);
-
-	bytes := arena_alloc(^arena, len+1);
-	mem_copy(bytes, msg.data, len);
-	bytes[len] = 0;
-
-	print("%s".data, bytes);
-}
-
 proc arena_alloc(a: ^Arena, size: u64): ^u8 {
 	if !arena_maybe_grow(a, size) then return null;
 	ret := a.mem + a.cursor;
