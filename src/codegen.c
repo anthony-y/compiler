@@ -78,7 +78,7 @@ static void emit_c_for_call(AstCall *call) {
     }
     if (call->calling->foreign_link_name) {
         Token t = expr_tok(call->calling->foreign_link_name);
-        fprintf(output, "%.*s(", t.length-2, t.text+1);
+        fprintf(output, "%s(", t.text);
     } else {
         fprintf(output, "%s(", call->name->as.name->text);
     }
@@ -110,7 +110,7 @@ static void emit_c_for_expr(AstExpr *expr) {
     Token t = expr_tok(expr);
     switch (expr->tag) {
     case Expr_STRING:
-        fprintf(output, "__make_string(%s, %d)", t.text, t.length);
+        fprintf(output, "__make_string(\"%s\", %d)", t.text, t.length);
         return;
     case Expr_NULL:
         fprintf(output, "NULL");
@@ -317,7 +317,7 @@ static void emit_c_for_proc_header(AstProcedure *proc) {
     emit_c_for_type(proc->return_type->as.type); // TODO arrays will be emitted as arrays on function signatures
     if (proc->flags & PROC_IS_FOREIGN && proc->foreign_link_name) {
         Token link_name = expr_tok(proc->foreign_link_name);
-        fprintf(output, " %.*s(", link_name.length-2, link_name.text+1);
+        fprintf(output, " %s(", link_name.text);
     } else {
         fprintf(output, " %s(", proc->name->text);
     }

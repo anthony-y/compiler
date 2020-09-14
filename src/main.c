@@ -72,12 +72,10 @@ int main(int arg_count, char *args[]) {
     // Tally up SourceStats for every file imported into the program
     // This includes files imported indirectly.
     for (u64 i = 0; i < total_stats.number_of_imports; i++) {
-        Token path_with_quotes = import_paths.tokens[i];
-        char *unquoted = arena_alloc(&context.scratch, path_with_quotes.length-1);
-        strncpy(unquoted, path_with_quotes.text+1, path_with_quotes.length-2);
+        Token path = import_paths.tokens[i];
 
-        char *tmp_file_data = read_file(unquoted);
-        lexer_init(&lexer, unquoted, tmp_file_data);
+        char *tmp_file_data = read_file(path.text);
+        lexer_init(&lexer, path.text, tmp_file_data);
         bool success = lexer_lex(&lexer, NULL, &total_stats, &import_paths);
         free(tmp_file_data);
 
@@ -98,19 +96,28 @@ int main(int arg_count, char *args[]) {
     main_module.name = make_namet(&context, "main");
     context.modules[0] = main_module;
 
+    context.current_module = &main_module;
+
     parser_init(&parser, &tokens, &main_stats);
     Ast ast = parse(&context, &parser);
     if (context.error_count > 0) goto end;
+
+    if (!context.decl_for_main)
+        compile_error(&context, (Token){0}, "No entry point found. Please declare \"main\"");
+    else if (context.decl_for_main->tag != Decl_PROC)
+        compile_error(&context, decl_tok(context.decl_for_main), "Entry point \"main\" must be a procedure");
+    else if (((AstProcedure *)context.decl_for_main)->params)
+        compile_error(&context, decl_tok(context.decl_for_main), "Entry point \"main\" must not take any arguments");
+    else if (((AstProcedure *)context.decl_for_main)->return_type->as.type != context.type_void)
+        compile_error(&context, decl_tok(context.decl_for_main), "Entry point \"main\" must return void");
 
     // Compile imported modules
     for (u64 i = 1; i <= total_stats.number_of_imports; i++) {
         Module *module = &context.modules[i];
 
-        Token path_with_quotes = import_paths.tokens[i-1];
-        char *unquoted = arena_alloc(&context.scratch, path_with_quotes.length-1);
-        strncpy(unquoted, path_with_quotes.text+1, path_with_quotes.length-2);
+        Token path = import_paths.tokens[i-1];
 
-        char *module_data = read_file(unquoted);
+        char *module_data = read_file(path.text);
 
         SourceStats module_stats = (SourceStats){10};
 
@@ -119,12 +126,14 @@ int main(int arg_count, char *args[]) {
 
         Lexer module_lexer;
         module_lexer.string_allocator = &context.string_allocator;
-        lexer_init(&module_lexer, unquoted, module_data);
+        lexer_init(&module_lexer, path.text, module_data);
 
         if (!lexer_lex(&module_lexer, &module_tokens, &module_stats, NULL)) {
             free(module_data);
             goto end;
         }
+
+        context.current_module = module;
 
         Parser module_parser;
         parser_init(&module_parser, &module_tokens, &module_stats);

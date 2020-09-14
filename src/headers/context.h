@@ -53,6 +53,7 @@ typedef struct Context {
     Arena node_allocator; // parser
 
     Module *modules;
+    Module *current_module;
 
     AstProcedure *curr_checker_proc;
     AstDecl *decl_for_main;

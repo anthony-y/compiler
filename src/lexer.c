@@ -81,6 +81,12 @@ Token token_new(Lexer *tz, TokenType type) {
     tz->last = type;
 
     if (type == Token_IDENT || type == Token_INT_LIT || type == Token_STRING_LIT || type == Token_FLOAT_LIT || type == Token_RESERVED_TYPE) {
+        if (type == Token_STRING_LIT) {
+            t.text = arena_alloc(tz->string_allocator, t.length-1);
+            strncpy(t.text, tz->start+1, t.length-2);
+            t.text[t.length] = 0;
+            return t;
+        }
         t.text = arena_alloc(tz->string_allocator, t.length + 1);
         strncpy(t.text, tz->start, t.length);
         t.text[t.length] = 0;
@@ -351,7 +357,7 @@ bool lexer_lex(Lexer *l, TokenList *list, SourceStats *stats, TokenList *import_
 
         if (import_paths && (last == Token_IMPORT && t.type == Token_STRING_LIT)) {
             number_imports++;
-            token_list_add(list, t);
+            if (list) token_list_add(list, t);
             if (t.type == Token_EOF) break;
             token_list_add(import_paths, t);
             continue;

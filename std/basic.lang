@@ -1,6 +1,8 @@
-proc free(ptr: ^void)                          #foreign;
-proc alloc(size: u64): ^void                   #foreign "malloc";
-proc print(fmt: ^u8, args: []any..)            #foreign "printf";
+proc puts(s: ^u8) #foreign;
+proc free(ptr: ^void) #foreign;
+proc alloc(size: u64): ^void #foreign "malloc";
+proc realloc(ptr: ^void, size: u64): ^void #foreign;
+proc print(fmt: ^u8, args: []any..) #foreign "printf";
 proc mem_copy(dest: ^void, src: ^void, n: u64) #foreign "memcpy";
 
 proc c_string(s: string): ^u8 {
