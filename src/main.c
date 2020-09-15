@@ -110,12 +110,9 @@ int main(int arg_count, char *args[]) {
     // Do front-end for files imported in main
     for (u64 i = 0; i < main_stats.number_of_imports; i++) {
         NEXT_STAGE_OR_QUIT();
-        Module *module = &main_module.imports[i];
-        context.current_module = module;
-
         Token path = import_paths.tokens[i];
         char *module_data = read_file(path.text);
-        do_front_end_for_module(&context, module, path.text, module_data, &main_module);
+        do_front_end_for_module(&context, &main_module.imports[i], path.text, module_data, &main_module);
     }
 
     // Reset the current module to main.
