@@ -13,6 +13,7 @@ AstDecl *lookup_in_block(AstBlock *block, Name *name) {
 }
 
 AstDecl *lookup_local(Context *ctx, AstProcedure *proc, Name *name, AstBlock *start_from) {
+    SymbolTable *table = ctx->current_module->symbols;
     if (proc->params) {
         for (int i = 0; i < proc->params->len; i++) {
             AstDecl *decl = (AstDecl *)proc->params->nodes[i];
@@ -28,8 +29,8 @@ AstDecl *lookup_local(Context *ctx, AstProcedure *proc, Name *name, AstBlock *st
             if (sym) return sym;
             parent = parent->parent;
         }
-        u64 global_i = shgeti(ctx->symbol_table, name->text);
-        if (global_i != -1) return ctx->symbol_table[global_i].value;
+        u64 global_i = shgeti(table, name->text);
+        if (global_i != -1) return table[global_i].value;
         return NULL;
     }
     return s;
@@ -59,11 +60,11 @@ Name *make_namet(Context *ctx, const char *txt) {
 
 inline void add_symbol(Context *c, AstDecl *n, char *name) {
     Token t = ((AstNode *)n)->token;
-    if (shgeti(c->symbol_table, name) != -1) {
+    if (shgeti(c->current_module->symbols, name) != -1) {
         compile_error(c, t, "Redefinition of symbol \"%s\" in module %s", name, c->current_file_path);
         return;
     }
-    shput(c->symbol_table, name, n);
+    shput(c->current_module->symbols, name, n);
 }
 
 void init_context(Context *c, const char *file_path) {
@@ -73,12 +74,6 @@ void init_context(Context *c, const char *file_path) {
     arena_init(&c->scratch, CONTEXT_SCRATCH_SIZE, sizeof(u8), 1);
     sh_new_arena(c->string_literal_pool);
     sh_new_arena(c->name_table);
-    sh_new_arena(c->symbol_table);
-}
-
-void context_init_modules(Context *ctx, const SourceStats *stats) {
-    // +1 for main module
-    ctx->modules = malloc(stats->number_of_imports+1 * sizeof(Module));
 }
 
 void free_context(Context *c) {
@@ -88,9 +83,14 @@ void free_context(Context *c) {
     shfree(c->name_table);
     arena_free(&c->scratch);
     shfree(c->string_literal_pool);
-    shfree(c->symbol_table);
     arena_free(&c->node_allocator);
-    free(c->modules);
+}
+
+void init_module(Context *ctx, Module *mod, SourceStats stats, char *path) {
+    mod->name = make_namet(ctx, path);
+    mod->imports = malloc(stats.number_of_imports * sizeof(Module));
+    ctx->current_module = mod;
+    sh_new_arena(mod->symbols);
 }
 
 void compile_error(Context *ctx, Token t, const char *fmt, ...) {
@@ -99,7 +99,7 @@ void compile_error(Context *ctx, Token t, const char *fmt, ...) {
 
     // The weird looking escape characters are to set the text color
     // to red, print "Error", and then reset the colour.
-    fprintf(stderr, "%s:%lu: \033[0;31mError\033[0m: ", ctx->current_file_path, t.line);
+    fprintf(stderr, "%s:%lu: \033[0;31mError\033[0m: ", ctx->current_module->name->text, t.line);
     vfprintf(stderr, fmt, args);
     fprintf(stderr, ".\n");
     va_end(args);
@@ -111,7 +111,7 @@ void compile_error_start(Context *ctx, Token t, const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
 
-    fprintf(stderr, "%s:%lu: \033[0;31mError\033[0m: ", ctx->current_file_path, t.line);
+    fprintf(stderr, "%s:%lu: \033[0;31mError\033[0m: ", ctx->current_module->name->text, t.line);
     vfprintf(stderr, fmt, args);
     va_end(args);
 
@@ -133,7 +133,7 @@ void compile_warning(Context *ctx, Token t, const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
 
-    fprintf(stderr, "%s:%lu: \033[0;33mWarning\033[0m: ", ctx->current_file_path, t.line);
+    fprintf(stderr, "%s:%lu: \033[0;33mWarning\033[0m: ", ctx->current_module->name->text, t.line);
     vfprintf(stderr, fmt, args);
     fprintf(stderr, ".\n");
     va_end(args);

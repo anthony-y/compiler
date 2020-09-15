@@ -21,7 +21,9 @@
 #include "headers/stb/stretchy_buffer.h"
 
 static char *read_file(const char *path);
+static void ensure_main_is_declared(Context *ctx);
 static void print_unused_symbol_warnings(Context *, Module *);
+static void do_front_end_for_module(Context *, Module *module, char *path, char *data, Module *imported_in);
 
 // Roughly time the execution of "code" in microseconds
 // There must be a variable called "id"_delta in the scope that you use this in
@@ -44,33 +46,34 @@ int main(int arg_count, char *args[]) {
     Context context;
     init_context(&context, args[1]);
 
+    #define NEXT_STAGE_OR_QUIT() if (context.error_count > 0) goto end
+
     char *data = read_file(args[1]);
 
-    SourceStats main_stats = (SourceStats){10};
-    SourceStats total_stats;
+    SourceStats main_stats = (SourceStats){10}; // stats for main module
+    SourceStats total_stats; // stats for all used modules
 
-    TokenList tokens;
-    TokenList import_paths;
-    Parser parser;
-
+    TokenList tokens; // tokens for main module
+    TokenList import_paths; // import paths for main module
+    Parser parser; // parser for main module
     Lexer lexer;
-    lexer.string_allocator = &context.string_allocator;
-    lexer_init(&lexer, args[1], data);
 
     token_list_init(&tokens);
     token_list_init(&import_paths);
+
+    lexer.string_allocator = &context.string_allocator;
+    lexer_init(&lexer, args[1], data);
 
     // Collect tokens, stats and import paths from the main module.
     if (!lexer_lex(&lexer, &tokens, &main_stats, &import_paths)) {
         return 1;
     }
 
-    if (tokens.len == 1) return 0;
-
-    total_stats = main_stats;
+    if (tokens.len == 1) return 0; // just an EOF token, so exit.
 
     // Tally up SourceStats for every file imported into the program
-    // This includes files imported indirectly.
+    // This includes files imported indirectly (imports inside imports).
+    total_stats = main_stats;
     for (u64 i = 0; i < total_stats.number_of_imports; i++) {
         Token path = import_paths.tokens[i];
 
@@ -82,72 +85,50 @@ int main(int arg_count, char *args[]) {
         if (!success) goto end;
     }
 
-    // At this point we know how much memory to allocate
+    //
+    // At this point we know how much memory to allocate.
+    //
 
+    // Allocate space for AST nodes for all modules.
     const u64 max_nodes = (u64)(total_stats.number_of_lines * 5); // roughly 5 nodes for each line
     arena_init(&context.node_allocator, max_nodes, sizeof(AstNode), 8);
-
-    // Ensure there is enough space for all modules plus the root module,
-    context_init_modules(&context, &total_stats); // and then reserve the space for them.
     init_types(&context, &total_stats);
 
-    // Compile main module
+    //
+    // Main module
+    //
     Module main_module = (Module){0};
-    main_module.name = make_namet(&context, "main");
-    context.modules[0] = main_module;
-
-    context.current_module = &main_module;
-
     parser_init(&parser, &tokens, &main_stats);
+    init_module(&context, &main_module, main_stats, args[1]);
     Ast ast = parse(&context, &parser);
-    if (context.error_count > 0) goto end;
+    main_module.ast = ast;
 
-    if (!context.decl_for_main)
-        compile_error(&context, (Token){0}, "No entry point found. Please declare \"main\"");
-    else if (context.decl_for_main->tag != Decl_PROC)
-        compile_error(&context, decl_tok(context.decl_for_main), "Entry point \"main\" must be a procedure");
-    else if (((AstProcedure *)context.decl_for_main)->params)
-        compile_error(&context, decl_tok(context.decl_for_main), "Entry point \"main\" must not take any arguments");
-    else if (((AstProcedure *)context.decl_for_main)->return_type->as.type != context.type_void)
-        compile_error(&context, decl_tok(context.decl_for_main), "Entry point \"main\" must return void");
+    NEXT_STAGE_OR_QUIT();
 
-    // Compile imported modules
-    for (u64 i = 1; i <= total_stats.number_of_imports; i++) {
-        Module *module = &context.modules[i];
+    ensure_main_is_declared(&context);
 
-        Token path = import_paths.tokens[i-1];
-
-        char *module_data = read_file(path.text);
-
-        SourceStats module_stats = (SourceStats){10};
-
-        TokenList module_tokens;
-        token_list_init(&module_tokens);
-
-        Lexer module_lexer;
-        module_lexer.string_allocator = &context.string_allocator;
-        lexer_init(&module_lexer, path.text, module_data);
-
-        if (!lexer_lex(&module_lexer, &module_tokens, &module_stats, NULL)) {
-            free(module_data);
-            goto end;
-        }
-
+    // Do front-end for files imported in main
+    for (u64 i = 0; i < main_stats.number_of_imports; i++) {
+        NEXT_STAGE_OR_QUIT();
+        Module *module = &main_module.imports[i];
         context.current_module = module;
 
-        Parser module_parser;
-        parser_init(&module_parser, &module_tokens, &module_stats);
-        Ast module_ast = parse(&context, &module_parser);
-        if (context.error_count > 0) goto end;
-        for (int i = 0; i < module_ast.len; i++) {
-            ast_add(&ast, module_ast.nodes[i]);
-        }
+        Token path = import_paths.tokens[i];
+        char *module_data = read_file(path.text);
+        do_front_end_for_module(&context, module, path.text, module_data, &main_module);
     }
 
-    resolve_program(&context);
-    if (context.error_count > 0) goto end;
+    // Reset the current module to main.
+    context.current_module = &main_module;
+
+    //
+    // Complete compilation pipeline for the main file.
+    //
+    NEXT_STAGE_OR_QUIT();
+    resolve_main_module(&context, &main_module);
+    NEXT_STAGE_OR_QUIT();
     check_ast(&context, &ast);
-    if (context.error_count > 0) goto end;
+    NEXT_STAGE_OR_QUIT();
 
     char *output_path = generate_and_write_c_code(&context, &ast);
     u64 len = strlen("gcc -std=c99") + strlen(output_path) + strlen("-o ") + strlen("-Wno-discarded-qualifiers ") + strlen("-Wno-return-local-addr") + strlen("-Wno-builtin-declaration-mismatch") + 1;
@@ -156,6 +137,7 @@ int main(int arg_count, char *args[]) {
     system(command);
 
 end:
+    free(main_module.imports);
     parser_free(&parser, &ast);
     token_list_free(&tokens);
     token_list_free(&import_paths);
@@ -163,6 +145,69 @@ end:
     free(data);
 
     return 0;
+}
+
+static void ensure_main_is_declared(Context *ctx) {
+    if (!ctx->decl_for_main) {
+        compile_error(ctx, (Token){0}, "No entry point found. Please declare \"main\"");
+    }
+    
+    Token main_decl_token = decl_tok(ctx->decl_for_main);
+    if (ctx->decl_for_main->tag != Decl_PROC) {
+        compile_error(ctx, main_decl_token, "Entry point \"main\" must be a procedure");
+    } else if (((AstProcedure *)ctx->decl_for_main)->params) {
+        compile_error(ctx, main_decl_token, "Entry point \"main\" must not take any arguments");
+    } else if (((AstProcedure *)ctx->decl_for_main)->return_type->as.type != ctx->type_void) {
+        compile_error(ctx, main_decl_token, "Entry point \"main\" must return void");
+    }
+}
+
+static void do_front_end_for_module(Context *ctx, Module *module, char *path, char *data, Module *imported_in) {
+
+    SourceStats module_stats = (SourceStats){10};
+    TokenList module_import_paths;
+    TokenList module_tokens;
+    Lexer module_lexer;
+    Parser module_parser;
+
+    token_list_init(&module_tokens);
+    token_list_init(&module_import_paths);
+    lexer_init(&module_lexer, path, data);
+    module_lexer.string_allocator = &ctx->string_allocator;
+
+    if (!lexer_lex(&module_lexer, &module_tokens, &module_stats, &module_import_paths)) {
+        free(data);
+        return;
+    }
+
+    init_module(ctx, module, module_stats, path);
+    parser_init(&module_parser, &module_tokens, &module_stats);
+
+    Ast module_ast = parse(ctx, &module_parser);
+    module->ast = module_ast;
+
+    if (ctx->error_count > 0) return;
+
+    for (u64 i = 0; i < module_stats.number_of_imports; i++) {
+        if (ctx->error_count > 0) return;
+        Token path = module_import_paths.tokens[i];
+        char *module_data = read_file(path.text);
+        do_front_end_for_module(ctx, &module->imports[i], path.text, module_data, module);
+    }
+    ctx->current_module = module;
+
+    for (u64 i = 0; i < module_ast.len; i++) {
+        ast_add(&imported_in->ast, module_ast.nodes[i]);
+    }
+
+    for (u64 i = 0; i < shlenu(module->symbols); i++) {
+        AstDecl *decl = module->symbols[i].value;
+        shput(imported_in->symbols, decl->name->text, decl);
+    }
+
+    resolve_module(ctx);
+    if (ctx->error_count > 0) return;
+    check_ast(ctx, &module_ast);
 }
 
 static void print_unused_symbol_warnings(Context *ctx, Module *module) {

@@ -24,7 +24,7 @@ typedef struct Name {
 
 typedef struct Module {
     Name *name;
-    // TokenList tokens;
+    struct Module *imports;
     SymbolTable *symbols;
     Ast ast;
 } Module;
@@ -52,14 +52,12 @@ typedef struct Context {
     Arena string_allocator; // lexer
     Arena node_allocator; // parser
 
-    Module *modules;
     Module *current_module;
 
     AstProcedure *curr_checker_proc;
     AstDecl *decl_for_main;
 
     // stb hash tables
-    SymbolTable *symbol_table; // unused
     TypeTable *type_table;
     struct {char *key; Name *value;} *name_table;
     struct {char *key; AstLiteral *value;} *string_literal_pool;
@@ -84,7 +82,7 @@ void compile_error_end();
 void compile_warning(Context *ctx, Token t, const char *fmt, ...);
 
 void init_context(Context *c, const char *file_path);
-void context_init_modules(Context *ctx, const SourceStats *stats);
+void init_module(Context *ctx, Module *mod, SourceStats stats, char *path);
 void free_context(Context *c);
 
 // From types.c, couldn't declare in types.h because of a circular dependency with context.h

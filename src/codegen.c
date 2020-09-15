@@ -479,8 +479,8 @@ char *generate_and_write_c_code(Context *ctx, Ast *ast) {
     // Generate initialization code for global variables
     //
     fprintf(output, "void __global_initializers() {\n");
-    for (u64 i = 0; i < shlenu(ctx->symbol_table); i++) {
-        AstDecl *decl = ctx->symbol_table[i].value;
+    for (u64 i = 0; i < shlenu(ctx->current_module->symbols); i++) {
+        AstDecl *decl = ctx->current_module->symbols[i].value;
         if (decl->tag != Decl_VAR) continue;
         AstVar *var = (AstVar *)decl;
         if (!(var->flags & VAR_IS_INITED)) continue;

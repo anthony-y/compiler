@@ -25,10 +25,11 @@ static AstProcedure **proc_stack = NULL;
 static AstBlock **scope_stack = NULL;
 
 static AstProcedure *resolve_call(AstNode *callnode, Context *ctx) {
+    SymbolTable *table = ctx->current_module->symbols;
     Token tok = callnode->token;
     AstCall *call = (AstCall *)callnode;
     char *str_name = call->name->as.name->text;
-    u64 symbol_index = shgeti(ctx->symbol_table, str_name);
+    u64 symbol_index = shgeti(table, str_name);
     if (symbol_index == -1) {
         compile_error(ctx, tok, "call to undeclared procedure \"%s\"", str_name);
         return NULL;
@@ -37,7 +38,7 @@ static AstProcedure *resolve_call(AstNode *callnode, Context *ctx) {
         AstExpr *arg = (AstExpr *)call->params->nodes[i];
         resolve_expression(arg, ctx);
     }
-    AstDecl *hopefully_proc = ctx->symbol_table[symbol_index].value;
+    AstDecl *hopefully_proc = table[symbol_index].value;
     if (hopefully_proc->tag != Decl_PROC) {
         compile_error(ctx, tok, "attempted to call \"%s\", but it's not a procedure", str_name);
         return NULL;
@@ -56,7 +57,7 @@ static Type *resolve_name(Context *ctx, Name *name, AstNode *site) {
 
     AstDecl *var = NULL;
 
-    if (!scope) var = shget(ctx->symbol_table, name->text); // global scope
+    if (!scope) var = shget(ctx->current_module->symbols, name->text); // global scope
     else var = lookup_local(ctx, in, name, scope);
 
     if (!var) {
@@ -262,7 +263,7 @@ static Type *resolve_type(Context *ctx, Type *type, AstNode *site, bool cyclic_a
     // ... if it was we store it here
     Type *real_type = ctx->type_table[i].value;
 
-    SymbolTable *current_table = ctx->symbol_table;
+    SymbolTable *current_table = ctx->current_module->symbols;
 
     // Next we'll look up the actual declaration of the type.
     u64 type_i = shgeti(current_table, type->name);
@@ -517,7 +518,7 @@ static void resolve_procedure(AstDecl *procsym, Context *ctx) {
     stbds_arrpop(proc_stack); // pop the scope
 }
 
-void resolve_program(Context *ctx) {
+void resolve_main_module(Context *ctx, Module *main_module) {
     resolve_procedure(ctx->decl_for_main, ctx);
 
     // Resolving main will resolve all the symbols in the code
@@ -528,9 +529,9 @@ void resolve_program(Context *ctx) {
     // so that later on the compiler will correctly assert that they were not
     // referred to in the code.
 
-    u64 len = shlenu(ctx->symbol_table);
+    u64 len = shlenu(main_module->symbols);
     for (int i = 0; i < len; i++) {
-        AstDecl *decl = ctx->symbol_table[i].value;
+        AstDecl *decl = main_module->symbols[i].value;
         if (decl->status == Status_RESOLVED) continue;
 
         decl->status = Status_RESOLVING;
@@ -556,3 +557,41 @@ void resolve_program(Context *ctx) {
     stbds_arrfree(proc_stack);
     stbds_arrfree(scope_stack);
 }
+
+void resolve_module(Context *ctx) {
+    // Resolving main will resolve all the symbols in the code
+    // that are actually used. There may be some top level symbols
+    // that are left as unresolved because they do not get used.
+    // The following code exists to validate that these unused decls
+    // are still correct, however we will keep their status as Status_UNRESOLVED
+    // so that later on the compiler will correctly assert that they were not
+    // referred to in the code.
+
+    u64 len = shlenu(ctx->current_module->symbols);
+    for (int i = 0; i < len; i++) {
+        AstDecl *decl = ctx->current_module->symbols[i].value;
+        if (decl->status == Status_RESOLVED) continue;
+
+        decl->status = Status_RESOLVING;
+        switch (decl->tag) {
+        case Decl_PROC:
+            resolve_procedure(decl, ctx);
+            break;
+        case Decl_VAR:
+            resolve_var(decl, ctx);
+            break;
+        case Decl_TYPEDEF: {
+            AstTypedef *def = (AstTypedef *)decl;
+            if (def->of->tag == Node_STRUCT) {
+                resolve_struct((AstStruct *)def->of, ctx);
+                // NOTE types that are only used inside unused structs
+                // will still be set as Status_RESOLVED. Maybe this shouldn't be the case?
+            }
+        } break;
+        }
+    }
+
+    // stbds_arrfree(proc_stack);
+    // stbds_arrfree(scope_stack);
+}
+
