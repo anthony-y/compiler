@@ -60,9 +60,8 @@ int main(int arg_count, char *args[]) {
 
     token_list_init(&tokens);
     token_list_init(&import_paths);
-
-    lexer.string_allocator = &context.string_allocator;
     lexer_init(&lexer, args[1], data);
+    lexer.string_allocator = &context.string_allocator;
 
     // Collect tokens, stats and import paths from the main module.
     if (!lexer_lex(&lexer, &tokens, &main_stats, &import_paths)) {
