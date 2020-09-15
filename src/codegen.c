@@ -362,16 +362,17 @@ static void emit_c_for_proc(AstProcedure *proc, bool entry_point) {
 char *generate_and_write_c_code(Context *ctx, Ast *ast) {
     name_for_main = make_namet(ctx, "main");
 
+    char *path = ctx->current_module->name->text;
     const char *postfix = "_generated.c";
-    u64 len = strlen(ctx->current_file_path) + strlen(postfix) + 1;
+    u64 len = strlen(path) + strlen(postfix) + 1;
     char *output_file = arena_alloc(&ctx->scratch, len);
-    strcpy(output_file, ctx->current_file_path);
+    strcpy(output_file, path);
     strcat(output_file, postfix);
 
     output = fopen(output_file, "w");
     assert(output);
 
-    emit_boilerplate(ctx->current_file_path);
+    emit_boilerplate(path);
 
     //
     // Generate forward decls

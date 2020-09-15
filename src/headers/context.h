@@ -46,7 +46,6 @@ typedef struct SourceStats {
 // passed to most functions in the compiler.
 typedef struct Context {
     int error_count;
-    const char *current_file_path;
 
     Arena scratch;
     Arena string_allocator; // lexer
@@ -81,7 +80,7 @@ void compile_error_end();
 
 void compile_warning(Context *ctx, Token t, const char *fmt, ...);
 
-void init_context(Context *c, const char *file_path);
+void init_context(Context *c);
 void init_module(Context *ctx, Module *mod, SourceStats stats, char *path);
 void free_context(Context *c);
 

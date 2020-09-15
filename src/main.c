@@ -35,8 +35,6 @@ static void do_front_end_for_module(Context *, Module *module, char *path, char 
     id##_delta = (id##end.tv_sec - id##start.tv_sec) * 1000000 + id##end.tv_usec - id##start.tv_usec;\
 } while (false)
 
-// THINK: for imports, just lex, parse and resolve all the files and then merge their scopes into one scope, then generate code for the symbols, symbols that are Sym_UNRESOLVED, can be ignored.
-
 int main(int arg_count, char *args[]) {
     if (arg_count < 2) {
         fprintf(stderr, "Error: expected a root compilation target (a file path).\n");
@@ -44,7 +42,7 @@ int main(int arg_count, char *args[]) {
     }
 
     Context context;
-    init_context(&context, args[1]);
+    init_context(&context);
 
     #define NEXT_STAGE_OR_QUIT() if (context.error_count > 0) goto end
 

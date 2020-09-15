@@ -61,16 +61,15 @@ Name *make_namet(Context *ctx, const char *txt) {
 inline void add_symbol(Context *c, AstDecl *n, char *name) {
     Token t = ((AstNode *)n)->token;
     if (shgeti(c->current_module->symbols, name) != -1) {
-        compile_error(c, t, "Redefinition of symbol \"%s\" in module %s", name, c->current_file_path);
+        compile_error(c, t, "Redefinition of symbol \"%s\" in module %s", name, c->current_module->name->text);
         return;
     }
     shput(c->current_module->symbols, name, n);
 }
 
-void init_context(Context *c, const char *file_path) {
+void init_context(Context *c) {
     *c = (Context){0};
     arena_init(&c->string_allocator, 1024 * 20, sizeof(char), 1);
-    c->current_file_path = file_path;
     arena_init(&c->scratch, CONTEXT_SCRATCH_SIZE, sizeof(u8), 1);
     sh_new_arena(c->string_literal_pool);
     sh_new_arena(c->name_table);
