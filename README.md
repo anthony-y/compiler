@@ -12,7 +12,6 @@ I consider this project pre-alpha software, it has some bugs, but it mostly work
 I am actively developing this project (as of September 2020), but here's some notes on the current progress:
 
 - Currently outputting C code, this will change in the future.
-- Enums have not been implemented yet
 - The bytecode interpreter for compile-time code execution is not currently working at all. It has been `#if`'d out for the time being while I redesign it.
 - The lexer, parser, "resolver" (symbol resolution, expression-to-type evaluation, type inference) and checker (semantic and type checking) are fairly robust, though they most likely contain undiscovered bugs.
 
