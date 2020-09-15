@@ -191,10 +191,6 @@ static void do_front_end_for_module(Context *ctx, Module *module, char *path, ch
     }
     ctx->current_module = module;
 
-    for (u64 i = 0; i < module_ast.len; i++) {
-        ast_add(&imported_in->ast, module_ast.nodes[i]);
-    }
-
     for (u64 i = 0; i < shlenu(module->symbols); i++) {
         AstDecl *decl = module->symbols[i].value;
         shput(imported_in->symbols, decl->name->text, decl);

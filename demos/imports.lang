@@ -1,5 +1,4 @@
 #import "std/mem.lang"
-//#import "std/basic.lang"
 
 msg := "Arena allocator from another module\n";
 len := msg.length;
