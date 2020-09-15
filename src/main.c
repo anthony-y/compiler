@@ -122,15 +122,16 @@ int main(int arg_count, char *args[]) {
     //
     NEXT_STAGE_OR_QUIT();
     resolve_main_module(&context, &main_module);
+    print_unused_symbol_warnings(&context, &main_module);
     NEXT_STAGE_OR_QUIT();
     check_ast(&context, &ast);
     NEXT_STAGE_OR_QUIT();
 
-    char *output_path = generate_and_write_c_code(&context, &ast);
-    u64 len = strlen("gcc -std=c99") + strlen(output_path) + strlen("-o ") + strlen("-Wno-discarded-qualifiers ") + strlen("-Wno-return-local-addr") + strlen("-Wno-builtin-declaration-mismatch") + 1;
-    char *command = arena_alloc(&context.scratch, len);
-    sprintf(command, "gcc -std=c99 %s -Wno-return-local-addr -Wno-discarded-qualifiers -Wno-builtin-declaration-mismatch -o output_bin", output_path);
-    system(command);
+    // char *output_path = generate_and_write_c_code(&context, &ast);
+    // u64 len = strlen("gcc -std=c99") + strlen(output_path) + strlen("-o ") + strlen("-Wno-discarded-qualifiers ") + strlen("-Wno-return-local-addr") + strlen("-Wno-builtin-declaration-mismatch") + 1;
+    // char *command = arena_alloc(&context.scratch, len);
+    // sprintf(command, "gcc -std=c99 %s -Wno-return-local-addr -Wno-discarded-qualifiers -Wno-builtin-declaration-mismatch -o output_bin", output_path);
+    // system(command);
 
 end:
     free(main_module.imports);
@@ -200,6 +201,8 @@ static void do_front_end_for_module(Context *ctx, Module *module, char *path, ch
         AstDecl *decl = module->symbols[i].value;
         shput(imported_in->symbols, decl->name->text, decl);
     }
+
+    // print_unused_symbol_warnings(ctx, module);
 
     resolve_module(ctx);
     if (ctx->error_count > 0) return;
