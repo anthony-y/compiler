@@ -13,7 +13,7 @@ Right now it only compiles on Linux, because I'm developing it under Windows Sub
 msg := get_message();
 
 proc main() {
-	print(msg.data);
+    print(msg.data);
 }
 
 proc get_message(): string {
