@@ -5,6 +5,22 @@ This is a hobby project for fun, I don't expect people to write real code with i
 
 Right now it only compiles on Linux, because I'm developing it under Windows Subsystem for Linux version 2. Just run `/build.sh` and it will spit out an ELF executable called `lang`, providing you have gcc installed on your Linux system.
 
+## Syntax example
+
+```go
+#import "std/basic.lang"
+
+msg := get_message();
+
+proc main() {
+	print(msg.data);
+}
+
+proc get_message(): string {
+    return "Hello, world\n";
+}
+```
+
 ## Progress
 
 I consider this project pre-alpha software, it has some bugs, but it mostly works. I'm working towards the basic feature set of the language being implemented robustly, then I will move onto real additions, right now it's basically a skin over C.
