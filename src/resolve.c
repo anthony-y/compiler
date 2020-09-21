@@ -29,10 +29,18 @@ static AstProcedure *resolve_call(AstNode *callnode, Context *ctx) {
     Token tok = callnode->token;
     AstCall *call = (AstCall *)callnode;
     char *str_name = call->name->as.name->text;
+
     u64 symbol_index = shgeti(table, str_name);
     if (symbol_index == -1) {
-        compile_error(ctx, tok, "call to undeclared procedure \"%s\"", str_name);
-        return NULL;
+        for (u64 i = 0; i < shlenu(ctx->current_module->imports); i++) {
+            Module *m = ctx->current_module->imports[i].value;
+            table = m->symbols;
+            symbol_index = shgeti(table, str_name);
+        }
+        if (symbol_index == -1) {
+            compile_error(ctx, tok, "call to undeclared procedure \"%s\"", str_name);
+            return NULL;
+        }
     }
     if (call->params) for (int i = 0; i < call->params->len; i++) {
         AstExpr *arg = (AstExpr *)call->params->nodes[i];
@@ -66,7 +74,7 @@ static Type *resolve_name(Context *ctx, Name *name, AstNode *site) {
     }
 
     if (var->tag == Decl_TYPEDEF) {
-        Type *maybe_enum = shget(ctx->type_table, name->text);
+        Type *maybe_enum = shget(ctx->current_module->type_table, name->text);
         resolve_type(ctx, maybe_enum, site, false);
         if (!maybe_enum || maybe_enum->kind != Type_ENUM) {
             compile_error(ctx, site->token, "undeclared identifier \"%s\"", name->text);
@@ -100,7 +108,7 @@ static Type *resolve_name(Context *ctx, Name *name, AstNode *site) {
     return var->as.var.typename->as.type;
 }
 
-static Type *resolve_expression_1(AstExpr *expr, Context *ctx, AstDecl *target) {
+static Type *resolve_expression_1(AstExpr *expr, Context *ctx) {
     Token t = expr_tok(expr);
     switch (expr->tag) {
     case Expr_STRING: return ctx->type_string;
@@ -196,14 +204,7 @@ static Type *resolve_expression_1(AstExpr *expr, Context *ctx, AstDecl *target) 
 
 static Type *resolve_expression(AstExpr *expr, Context *ctx) {
     if (!expr) return NULL;
-    Type *re = resolve_expression_1(expr, ctx, NULL);
-    expr->resolved_type = re;
-    return re;
-}
-
-static Type *resolve_expression_for_variable(Context *ctx, AstExpr *expr, AstDecl *target) {
-    if (!expr) return NULL;
-    Type *re = resolve_expression_1(expr, ctx, target);
+    Type *re = resolve_expression_1(expr, ctx);
     expr->resolved_type = re;
     return re;
 }
@@ -254,14 +255,14 @@ static Type *resolve_type(Context *ctx, Type *type, AstNode *site, bool cyclic_a
     // as placeholder types, and are not put in the type table. If they then go on to be defined in the source code, they will be placed into the type table.
     // Here, we lookup the type in the type table. If it is not found, then it was never declared.
     // ...
-    u64 i = shgeti(ctx->type_table, type->name);
+    u64 i = shgeti(ctx->current_module->type_table, type->name);
     if (i == -1) {
         compile_error(ctx, site->token, "undeclared type \"%s\"", type->name);
         return NULL;
     }
 
     // ... if it was we store it here
-    Type *real_type = ctx->type_table[i].value;
+    Type *real_type = ctx->current_module->type_table[i].value;
 
     SymbolTable *current_table = ctx->current_module->symbols;
 
@@ -408,7 +409,7 @@ static Type *resolve_var(AstDecl *decl, Context *ctx) {
     }
 
     decl->status = Status_RESOLVING;
-    Type *inferred_type = resolve_expression_for_variable(ctx, var->value, decl);
+    Type *inferred_type = resolve_expression(var->value, ctx);
     decl->status = Status_RESOLVED;
 
     if (!inferred_type) return NULL;

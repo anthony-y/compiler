@@ -87,9 +87,9 @@ void free_context(Context *c) {
 
 void init_module(Context *ctx, Module *mod, SourceStats stats, char *path) {
     mod->name = make_namet(ctx, path);
-    mod->imports = malloc(stats.number_of_imports * sizeof(Module));
     ctx->current_module = mod;
     sh_new_arena(mod->symbols);
+    sh_new_arena(mod->type_table);
 }
 
 void compile_error(Context *ctx, Token t, const char *fmt, ...) {

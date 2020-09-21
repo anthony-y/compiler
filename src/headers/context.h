@@ -22,11 +22,14 @@ typedef struct Name {
     AstDecl *resolved_decl;
 } Name;
 
+struct Module;
+typedef struct {char *key; struct Module *value;} ModuleTable;
 typedef struct Module {
-    Name *name;
-    struct Module *imports;
-    SymbolTable *symbols;
     Ast ast;
+    Name *name;
+    ModuleTable *imports;
+    SymbolTable *symbols;
+    TypeTable *type_table;
 } Module;
 
 // Contains statistics about the source code
@@ -57,7 +60,7 @@ typedef struct Context {
     AstDecl *decl_for_main;
 
     // stb hash tables
-    TypeTable *type_table;
+    TypeTable *builtin_type_table;
     struct {char *key; Name *value;} *name_table;
     struct {char *key; AstLiteral *value;} *string_literal_pool;
 

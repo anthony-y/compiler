@@ -21,26 +21,12 @@ static inline string __make_string(u8 *data, u64 length) {
 }
 
 void compiler_main();
-void free(void* ptr);
-void* malloc(u64 size);
-void printf(u8* fmt, ...);
-void memcpy(void* dest, void* src, u64 n);
-string substring(string s, u64 up_to);
 
 
 
 void __compiler_main() {
 __global_initializers();
 printf(__make_string("Hello, world\n", 16).data);
-}
-
-string substring(string s, u64 up_to) {
-string sub;
-sub.data = malloc(up_to+1);
-memcpy(sub.data, s.data, up_to);
-sub.data[up_to] = 0;
-sub.length = up_to;
-return sub;
 }
 
 void __global_initializers() {

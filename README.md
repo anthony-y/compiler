@@ -10,6 +10,8 @@ Right now it only compiles on Linux, because I'm developing it under Windows Sub
 ```go
 #import "std/basic.lang"
 
+// Type inference, same as:
+//    msg: string = get_message();
 msg := get_message();
 
 proc main() {

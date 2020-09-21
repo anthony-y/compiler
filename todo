@@ -14,6 +14,15 @@ Check if the casts expression can even be casted to the requested type
 When adding local procedures, make sure the non-local ones get their flags set as DECL_IS_TOP_LEVEL.
 
 //
+// Checker
+//
+
+When local procedures are implemented, proc calls will need to be checked using lookup_local or something else.
+
+Show warning if a global variable calls a proc which uses global state that gets inited in main, since main gets called after global vars initializers.
+
+
+//
 // Syntax
 //
 
@@ -47,9 +56,3 @@ Const semantics
     }
 
 Enum composition
-
-//
-// Checker
-//
-
-When local procedures are implemented, proc calls will need to be checked using lookup_local or something else.

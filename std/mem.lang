@@ -1,14 +1,17 @@
 #import "std/basic.lang"
 
 type Arena: struct {
-	fixed    := false;
-	cursor   := 0;
-	capacity := 1024;
+	fixed    : bool;
+	cursor   : int //= 0;
+	capacity : int;
 	mem: ^u8;
 }
 
 proc arena_init(a: ^Arena) {
 	a.mem = alloc(a.capacity);
+	a.fixed = false;
+	a.cursor = 0;
+	a.capacity = 1024;
 }
 
 proc arena_alloc(a: ^Arena, size: u64): ^u8 {

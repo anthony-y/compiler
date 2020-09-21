@@ -342,7 +342,7 @@ Token next_token(Lexer *tz) {
     return token_new(tz, Token_UNKNOWN);
 }
 
-bool lexer_lex(Lexer *l, TokenList *list, SourceStats *stats, TokenList *import_paths) {
+bool lexer_lex(Lexer *l, TokenList *list, SourceStats *stats, ModuleTable *table) {
     TokenType last;
 
     u64 pointers = 0;
@@ -355,11 +355,12 @@ bool lexer_lex(Lexer *l, TokenList *list, SourceStats *stats, TokenList *import_
         last = l->last;
         Token t = next_token(l);
 
-        if (import_paths && (last == Token_IMPORT && t.type == Token_STRING_LIT)) {
+        if (table && (last == Token_IMPORT && t.type == Token_STRING_LIT)) {
             number_imports++;
             if (list) token_list_add(list, t);
             if (t.type == Token_EOF) break;
-            token_list_add(import_paths, t);
+            if (shgeti(table, t.text) != -1) continue;
+            shput(table, t.text, NULL);
             continue;
         }
 

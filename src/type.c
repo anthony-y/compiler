@@ -49,20 +49,20 @@ inline bool is_type_numeric(Type *t) {
 static inline Type *make_and_insert_primitive(Context *ctx, char *name, u64 size, Signage signage) {
     Type *t = make_type(Type_PRIMITIVE, name, size);
     t->data.signage = signage;
-    shput(ctx->type_table, name, t);
+    shput(ctx->builtin_type_table, name, t);
     return t;
 }
 
 void free_types(Context *ctx) {
     arena_free(&type_arena);
-    shfree(ctx->type_table);
+    shfree(ctx->builtin_type_table);
 }
 
 // Initialize the type table and add the primitive types to it.
 // Then, create some handles to internal types.
 // Uses a const SourceStats * to compute the type arenas allocation size.
 void init_types(Context *ctx, SourceStats *stats) {
-    const int num_builtins = 14;
+    const int num_builtins = 16;
 
     // We need room for two potential allocations per type;
     // one for the actual type, and an extra for its placeholder
@@ -72,7 +72,7 @@ void init_types(Context *ctx, SourceStats *stats) {
     u64 total_types = (num_builtins + stats->pointer_types + (stats->declared_types * 2));
     arena_init(&type_arena, total_types, sizeof(Type), 8);
 
-    sh_new_arena(ctx->type_table); // initialize the type table as a string hash map
+    sh_new_arena(ctx->builtin_type_table); // initialize the type table as a string hash map
 
     ctx->type_int = make_and_insert_primitive(ctx, "int", sizeof(s64), Signage_SIGNED);
 
