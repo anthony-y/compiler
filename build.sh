@@ -1,7 +1,7 @@
 #!/bin/bash
 
 compile="gcc -std=c99 src/*.c -o lang -Wall -Wpedantic -Wno-switch -Wno-unused-function -g -ldl -lpthread -O0"
-run="./lang demos/imports.lang"
+run="./lang demos/hello.lang"
 
 echo -e "\nCompiling:"
 echo -e "\t$compile\n"

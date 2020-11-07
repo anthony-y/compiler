@@ -25,22 +25,22 @@ static AstProcedure **proc_stack = NULL;
 static AstBlock **scope_stack = NULL;
 
 static AstProcedure *resolve_call(AstNode *callnode, Context *ctx) {
-    SymbolTable *table = ctx->current_module->symbols;
+    SymbolTable *table = ctx->symbols;
     Token tok = callnode->token;
     AstCall *call = (AstCall *)callnode;
     char *str_name = call->name->as.name->text;
 
     u64 symbol_index = shgeti(table, str_name);
     if (symbol_index == -1) {
-        for (u64 i = 0; i < shlenu(ctx->current_module->imports); i++) {
-            Module *m = ctx->current_module->imports[i].value;
-            table = m->symbols;
-            symbol_index = shgeti(table, str_name);
-        }
-        if (symbol_index == -1) {
+        // for (u64 i = 0; i < shlenu(ctx->current_module->imports); i++) {
+        //     Module *m = ctx->current_module->imports[i].value;
+        //     table = m->symbols;
+        //     symbol_index = shgeti(table, str_name);
+        // }
+        // if (symbol_index == -1) {
             compile_error(ctx, tok, "call to undeclared procedure \"%s\"", str_name);
             return NULL;
-        }
+        // }
     }
     if (call->params) for (int i = 0; i < call->params->len; i++) {
         AstExpr *arg = (AstExpr *)call->params->nodes[i];
@@ -65,7 +65,7 @@ static Type *resolve_name(Context *ctx, Name *name, AstNode *site) {
 
     AstDecl *var = NULL;
 
-    if (!scope) var = shget(ctx->current_module->symbols, name->text); // global scope
+    if (!scope) var = shget(ctx->symbols, name->text); // global scope
     else var = lookup_local(ctx, in, name, scope);
 
     if (!var) {
@@ -74,7 +74,7 @@ static Type *resolve_name(Context *ctx, Name *name, AstNode *site) {
     }
 
     if (var->tag == Decl_TYPEDEF) {
-        Type *maybe_enum = shget(ctx->current_module->type_table, name->text);
+        Type *maybe_enum = shget(ctx->type_table, name->text);
         resolve_type(ctx, maybe_enum, site, false);
         if (!maybe_enum || maybe_enum->kind != Type_ENUM) {
             compile_error(ctx, site->token, "undeclared identifier \"%s\"", name->text);
@@ -255,16 +255,16 @@ static Type *resolve_type(Context *ctx, Type *type, AstNode *site, bool cyclic_a
     // as placeholder types, and are not put in the type table. If they then go on to be defined in the source code, they will be placed into the type table.
     // Here, we lookup the type in the type table. If it is not found, then it was never declared.
     // ...
-    u64 i = shgeti(ctx->current_module->type_table, type->name);
+    u64 i = shgeti(ctx->type_table, type->name);
     if (i == -1) {
         compile_error(ctx, site->token, "undeclared type \"%s\"", type->name);
         return NULL;
     }
 
     // ... if it was we store it here
-    Type *real_type = ctx->current_module->type_table[i].value;
+    Type *real_type = ctx->type_table[i].value;
 
-    SymbolTable *current_table = ctx->current_module->symbols;
+    SymbolTable *current_table = ctx->symbols;
 
     // Next we'll look up the actual declaration of the type.
     u64 type_i = shgeti(current_table, type->name);
@@ -519,7 +519,47 @@ static void resolve_procedure(AstDecl *procsym, Context *ctx) {
     stbds_arrpop(proc_stack); // pop the scope
 }
 
-void resolve_main_module(Context *ctx, Module *main_module) {
+// void resolve_main_module(Context *ctx) {
+    
+
+//     // Resolving main will resolve all the symbols in the code
+//     // that are actually used. There may be some top level symbols
+//     // that are left as unresolved because they do not get used.
+//     // The following code exists to validate that these unused decls
+//     // are still correct, however we will keep their status as Status_UNRESOLVED
+//     // so that later on the compiler will correctly assert that they were not
+//     // referred to in the code.
+
+//     u64 len = shlenu(main_module->symbols);
+//     for (int i = 0; i < len; i++) {
+//         AstDecl *decl = main_module->symbols[i].value;
+//         if (decl->status == Status_RESOLVED) continue;
+
+//         decl->status = Status_RESOLVING;
+//         switch (decl->tag) {
+//         case Decl_PROC:
+//             resolve_procedure(decl, ctx);
+//             break;
+//         case Decl_VAR:
+//             resolve_var(decl, ctx);
+//             break;
+//         case Decl_TYPEDEF: {
+//             AstTypedef *def = (AstTypedef *)decl;
+//             if (def->of->tag == Node_STRUCT) {
+//                 resolve_struct((AstStruct *)def->of, ctx);
+//                 // NOTE types that are only used inside unused structs
+//                 // will still be set as Status_RESOLVED. Maybe this shouldn't be the case?
+//             }
+//         } break;
+//         }
+//         decl->status = Status_UNRESOLVED;
+//     }
+
+//     stbds_arrfree(proc_stack);
+//     stbds_arrfree(scope_stack);
+// }
+
+void resolve_module(Context *ctx) {
     resolve_procedure(ctx->decl_for_main, ctx);
 
     // Resolving main will resolve all the symbols in the code
@@ -530,47 +570,9 @@ void resolve_main_module(Context *ctx, Module *main_module) {
     // so that later on the compiler will correctly assert that they were not
     // referred to in the code.
 
-    u64 len = shlenu(main_module->symbols);
+    u64 len = shlenu(ctx->symbols);
     for (int i = 0; i < len; i++) {
-        AstDecl *decl = main_module->symbols[i].value;
-        if (decl->status == Status_RESOLVED) continue;
-
-        decl->status = Status_RESOLVING;
-        switch (decl->tag) {
-        case Decl_PROC:
-            resolve_procedure(decl, ctx);
-            break;
-        case Decl_VAR:
-            resolve_var(decl, ctx);
-            break;
-        case Decl_TYPEDEF: {
-            AstTypedef *def = (AstTypedef *)decl;
-            if (def->of->tag == Node_STRUCT) {
-                resolve_struct((AstStruct *)def->of, ctx);
-                // NOTE types that are only used inside unused structs
-                // will still be set as Status_RESOLVED. Maybe this shouldn't be the case?
-            }
-        } break;
-        }
-        decl->status = Status_UNRESOLVED;
-    }
-
-    stbds_arrfree(proc_stack);
-    stbds_arrfree(scope_stack);
-}
-
-void resolve_module(Context *ctx) {
-    // Resolving main will resolve all the symbols in the code
-    // that are actually used. There may be some top level symbols
-    // that are left as unresolved because they do not get used.
-    // The following code exists to validate that these unused decls
-    // are still correct, however we will keep their status as Status_UNRESOLVED
-    // so that later on the compiler will correctly assert that they were not
-    // referred to in the code.
-
-    u64 len = shlenu(ctx->current_module->symbols);
-    for (int i = 0; i < len; i++) {
-        AstDecl *decl = ctx->current_module->symbols[i].value;
+        AstDecl *decl = ctx->symbols[i].value;
         if (decl->status == Status_RESOLVED) continue;
 
         decl->status = Status_RESOLVING;

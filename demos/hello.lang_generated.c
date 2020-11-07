@@ -20,6 +20,7 @@ static inline string __make_string(u8 *data, u64 length) {
     return (string){.data=data, .length=length};
 }
 
+void printf(u8* fmt, ...);
 void compiler_main();
 
 

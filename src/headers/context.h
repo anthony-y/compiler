@@ -15,22 +15,13 @@
 
 typedef struct SymbolTable {char *key; AstDecl *value;} SymbolTable;
 typedef struct {char *key; Type *value;} TypeTable;
+typedef struct {char *key; void *value;} ModuleTable;
 
 // An entry in the name table.
 typedef struct Name {
     char    *text;
     AstDecl *resolved_decl;
 } Name;
-
-struct Module;
-typedef struct {char *key; struct Module *value;} ModuleTable;
-typedef struct Module {
-    Ast ast;
-    Name *name;
-    ModuleTable *imports;
-    SymbolTable *symbols;
-    TypeTable *type_table;
-} Module;
 
 // Contains statistics about the source code
 // which can be used to compute allocation sizes.
@@ -50,17 +41,19 @@ typedef struct SourceStats {
 typedef struct Context {
     int error_count;
 
+    const char *path;
+
     Arena scratch;
     Arena string_allocator; // lexer
     Arena node_allocator; // parser
 
-    Module *current_module;
-
     AstProcedure *curr_checker_proc;
     AstDecl *decl_for_main;
 
+    SymbolTable *symbols;
+
     // stb hash tables
-    TypeTable *builtin_type_table;
+    TypeTable *type_table;
     struct {char *key; Name *value;} *name_table;
     struct {char *key; AstLiteral *value;} *string_literal_pool;
 
@@ -84,7 +77,7 @@ void compile_error_end();
 void compile_warning(Context *ctx, Token t, const char *fmt, ...);
 
 void init_context(Context *c);
-void init_module(Context *ctx, Module *mod, SourceStats stats, char *path);
+//void init_module(Context *ctx, Module *mod, SourceStats stats, char *path);
 void free_context(Context *c);
 
 // From types.c, couldn't declare in types.h because of a circular dependency with context.h

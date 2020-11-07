@@ -506,15 +506,15 @@ static AstNode *parse_typedef(Context *ctx, Parser *parser) {
         return NULL;
     }
 
-    u64 type_i = shgeti(ctx->current_module->type_table, name.text); // hopefully -1
+    u64 type_i = shgeti(ctx->type_table, name.text); // hopefully -1
     if (type_i != -1) {
-        Type *existing = ctx->current_module->type_table[type_i].value;
+        Type *existing = ctx->type_table[type_i].value;
         // AstDecl *existing_decl = shget(ctx->current_module->symbols, existing->name);
         // assert(existing_decl);
         AstStmt *user = existing->data.user;
         assert(user);
         compile_error_start(ctx, name, "type \"%s\" was declared more than once; first declared here:", name.text);
-        compile_error_add_line(ctx, "\t%s:%lu", ctx->current_module->name->text, stmt_tok(user).line);
+        compile_error_add_line(ctx, "\t%s:%lu", ctx->path, stmt_tok(user).line);
         compile_error_end();
         return NULL;
     }
@@ -522,7 +522,7 @@ static AstNode *parse_typedef(Context *ctx, Parser *parser) {
     AstNode *decl = NULL;
     Type *type = make_type(0, name.text, 0); // NOTE size is wrong lol
 
-    TypeTable *table = ctx->current_module->type_table;
+    TypeTable *table = ctx->type_table;
 
     switch (parser->curr->type) {
     case Token_STRUCT:
@@ -541,7 +541,7 @@ static AstNode *parse_typedef(Context *ctx, Parser *parser) {
 
     // These should be equivalent to the tokens we check for in parse_typename.
     case Token_RESERVED_TYPE:
-        table = ctx->builtin_type_table;
+        table = ctx->type_table;
     case Token_IDENT:
     case Token_CARAT:
     case Token_OPEN_BRACKET:
@@ -574,8 +574,8 @@ static AstNode *parse_typename(Context *ctx, Parser *parser) {
     switch (t.type) {
     case Token_RESERVED_TYPE: {
         parser_next(parser);
-        u64 i = shgeti(ctx->builtin_type_table, t.text);
-        type_node->as.type = ctx->builtin_type_table[i].value;
+        u64 i = shgeti(ctx->type_table, t.text);
+        type_node->as.type = ctx->type_table[i].value;
         assert(type_node->as.type);
         return type_node;
     } break;
@@ -587,7 +587,7 @@ static AstNode *parse_typename(Context *ctx, Parser *parser) {
     case Token_IDENT: {
         parser_next(parser);
 
-        if (shgeti(ctx->current_module->type_table, t.text) == -1) { // type doesn't exist (or not appeared in program text yet)
+        if (shgeti(ctx->type_table, t.text) == -1) { // type doesn't exist (or not appeared in program text yet)
             type_node->as.type = make_type(
                 Type_UNRESOLVED,
                 t.text,
@@ -595,7 +595,7 @@ static AstNode *parse_typename(Context *ctx, Parser *parser) {
             );
             return type_node;
         }
-        type_node->as.type = shget(ctx->current_module->type_table, t.text);
+        type_node->as.type = shget(ctx->type_table, t.text);
         return type_node;
     } break;
 

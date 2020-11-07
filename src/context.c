@@ -13,7 +13,7 @@ AstDecl *lookup_in_block(AstBlock *block, Name *name) {
 }
 
 AstDecl *lookup_local(Context *ctx, AstProcedure *proc, Name *name, AstBlock *start_from) {
-    SymbolTable *table = ctx->current_module->symbols;
+    SymbolTable *table = ctx->symbols;
     if (proc->params) {
         for (int i = 0; i < proc->params->len; i++) {
             AstDecl *decl = (AstDecl *)proc->params->nodes[i];
@@ -60,11 +60,11 @@ Name *make_namet(Context *ctx, const char *txt) {
 
 inline void add_symbol(Context *c, AstDecl *n, char *name) {
     Token t = ((AstNode *)n)->token;
-    if (shgeti(c->current_module->symbols, name) != -1) {
-        compile_error(c, t, "Redefinition of symbol \"%s\" in module %s", name, c->current_module->name->text);
+    if (shgeti(c->symbols, name) != -1) {
+        compile_error(c, t, "Redefinition of symbol \"%s\" in module %s", name, c->path);
         return;
     }
-    shput(c->current_module->symbols, name, n);
+    shput(c->symbols, name, n);
 }
 
 void init_context(Context *c) {
@@ -85,12 +85,12 @@ void free_context(Context *c) {
     arena_free(&c->node_allocator);
 }
 
-void init_module(Context *ctx, Module *mod, SourceStats stats, char *path) {
-    mod->name = make_namet(ctx, path);
-    ctx->current_module = mod;
-    sh_new_arena(mod->symbols);
-    sh_new_arena(mod->type_table);
-}
+// void init_module(Context *ctx, Module *mod, SourceStats stats, char *path) {
+//     mod->name = make_namet(ctx, path);
+//     ctx->current_module = mod;
+//     sh_new_arena(mod->symbols);
+//     sh_new_arena(mod->type_table);
+// }
 
 void compile_error(Context *ctx, Token t, const char *fmt, ...) {
     va_list args;
@@ -98,7 +98,7 @@ void compile_error(Context *ctx, Token t, const char *fmt, ...) {
 
     // The weird looking escape characters are to set the text color
     // to red, print "Error", and then reset the colour.
-    fprintf(stderr, "%s:%lu: \033[0;31mError\033[0m: ", ctx->current_module->name->text, t.line);
+    fprintf(stderr, "%s:%lu: \033[0;31mError\033[0m: ", ctx->path, t.line);
     vfprintf(stderr, fmt, args);
     fprintf(stderr, ".\n");
     va_end(args);
@@ -110,7 +110,7 @@ void compile_error_start(Context *ctx, Token t, const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
 
-    fprintf(stderr, "%s:%lu: \033[0;31mError\033[0m: ", ctx->current_module->name->text, t.line);
+    fprintf(stderr, "%s:%lu: \033[0;31mError\033[0m: ", ctx->path, t.line);
     vfprintf(stderr, fmt, args);
     va_end(args);
 
@@ -132,7 +132,7 @@ void compile_warning(Context *ctx, Token t, const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
 
-    fprintf(stderr, "%s:%lu: \033[0;33mWarning\033[0m: ", ctx->current_module->name->text, t.line);
+    fprintf(stderr, "%s:%lu: \033[0;33mWarning\033[0m: ", ctx->path, t.line);
     vfprintf(stderr, fmt, args);
     fprintf(stderr, ".\n");
     va_end(args);

@@ -362,7 +362,7 @@ static void emit_c_for_proc(AstProcedure *proc, bool entry_point) {
 char *generate_and_write_c_code(Context *ctx, Ast *ast) {
     name_for_main = make_namet(ctx, "main");
 
-    char *path = ctx->current_module->name->text;
+    char *path = ctx->path;
     const char *postfix = "_generated.c";
     u64 len = strlen(path) + strlen(postfix) + 1;
     char *output_file = arena_alloc(&ctx->scratch, len);
@@ -480,8 +480,8 @@ char *generate_and_write_c_code(Context *ctx, Ast *ast) {
     // Generate initialization code for global variables
     //
     fprintf(output, "void __global_initializers() {\n");
-    for (u64 i = 0; i < shlenu(ctx->current_module->symbols); i++) {
-        AstDecl *decl = ctx->current_module->symbols[i].value;
+    for (u64 i = 0; i < shlenu(ctx->symbols); i++) {
+        AstDecl *decl = ctx->symbols[i].value;
         if (decl->tag != Decl_VAR) continue;
         AstVar *var = (AstVar *)decl;
         if (!(var->flags & VAR_IS_INITED)) continue;
