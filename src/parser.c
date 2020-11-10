@@ -1105,7 +1105,7 @@ void parser_init(Parser *parser, const TokenList *l, const SourceStats *stats) {
     /* Initialize the persistent storage for subtrees */
     /* blocks * 2 because there's two ASTs for each block */
     u64 num_trees = (stats->blocks * 2) + stats->argument_lists;
-    arena_init(&parser->tree_allocator, num_trees, sizeof(Ast), 8);
+    assert(arena_init(&parser->tree_allocator, num_trees, sizeof(Ast), 8));
 
     parser->curr = l->tokens;
     parser->prev = l->tokens;

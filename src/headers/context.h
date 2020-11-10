@@ -13,9 +13,20 @@
 
 #define CONTEXT_SCRATCH_SIZE 1024
 
+struct Module;
+
 typedef struct SymbolTable {char *key; AstDecl *value;} SymbolTable;
 typedef struct {char *key; Type *value;} TypeTable;
-typedef struct {char *key; void *value;} ModuleTable;
+typedef struct {char *key; struct Module *value;} ModuleTable;
+
+typedef struct Module {
+	char *path;
+	ModuleTable *imports;
+	SymbolTable *symbols;
+	Parser parser;
+	Lexer lexer;
+	Ast ast;
+} Module;
 
 // An entry in the name table.
 typedef struct Name {

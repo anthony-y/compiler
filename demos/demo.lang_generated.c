@@ -21,8 +21,10 @@ static inline string __make_string(u8 *data, u64 length) {
 }
 
 void compiler_main();
+void puts(u8* s);
 void free(void* ptr);
 void* malloc(u64 size);
+void* realloc(void* ptr, u64 size);
 void printf(u8* fmt, ...);
 void memcpy(void* dest, void* src, u64 n);
 u8* c_string(string s);

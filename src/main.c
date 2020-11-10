@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
+#include <assert.h>
 
 #include "headers/context.h"
 #include "headers/parser.h"
@@ -35,6 +36,55 @@ static void print_unused_symbol_warnings(Context *);
     gettimeofday(&id##end, NULL);\
     id##_delta = (id##end.tv_sec - id##start.tv_sec) * 1000000 + id##end.tv_usec - id##start.tv_usec;\
 } while (false)
+
+static Arena module_arena;
+
+// All imports must be initialized individually before they are collectively
+// resolved, checked and compiled.
+Module *load_imported_module(Context *ctx, Arena *storage, char *path) {
+	// Lex, parse, resolve, check.
+	// And keep lexer, parser, etc. on Module to be freed later.
+	// Allocate into "storage" and store the pointers in the ModuleTable.
+	//
+	// All the functionality is there, just need to find the right way
+	// to hook it up to multiple files/namespaces.
+	//
+	char *data = read_file(path);
+	if (!data) return false;
+	
+	ModuleTable *imports;
+	SourceStats stats = (SourceStats){10};
+	TokenList   tokens;
+	Parser      parser;
+	Lexer       lexer;
+	Ast         ast;
+
+	token_list_init(&tokens);
+	lexer_init(&lexer, path, data);
+	lexer.string_allocator = &ctx->string_allocator;
+
+	sh_new_arena(imports);
+
+	Module *mod = arena_alloc(storage, sizeof(Module));
+
+	if (!lexer_lex(&lexer, &tokens, &stats, imports)) return NULL;
+	if (tokens.len == 1) return mod;
+	
+	parser_init(&parser, &tokens, &stats);
+	ast = parse(ctx, &parser);
+
+	mod->path = path;
+	mod->imports = imports;
+	mod->symbols = NULL; // TODO
+	mod->ast = ast;
+	return mod;
+}
+
+bool compile_aux_module(Module *mod) {
+	
+}
+
+void free_imported_module(Module *mod) {} // TODO
 
 int main(int arg_count, char *args[]) {
     if (arg_count < 2) {
@@ -86,22 +136,40 @@ int main(int arg_count, char *args[]) {
 
         if (!success) goto end;
     }
+	u64 num_mods = shlenu(import_table);
 
     //
     // At this point we know how much memory to allocate.
     //
 
     // Allocate space for AST nodes for all modules.
-    const u64 max_nodes = (u64)(total_stats.number_of_lines * 10); // roughly 5 nodes for each line
-    arena_init(&context.node_allocator, max_nodes, sizeof(AstNode), 8);
+    const u64 max_nodes = (u64)(total_stats.number_of_lines * 10);
+    assert(arena_init(&context.node_allocator, max_nodes, sizeof(AstNode), 8));
+	assert(arena_init(&module_arena, num_mods, sizeof(Module), 8));
     init_types(&context, &total_stats);
-
     parser_init(&parser, &tokens, &main_stats);
+	
+	// Perform front end for each imported file.
+	for (u64 i = 0; i < num_mods; i++) {
+		char *path = import_table[i].key;
+		Module *mod = load_imported_module(&context, &module_arena, path);
+		if (!mod) {
+			break;
+		}
+		import_table[i].value = mod;
+	}
 
     NEXT_STAGE_OR_QUIT();
 
     Ast ast;
     ast = parse(&context, &parser);
+	
+	for (u64 i = 0; i < num_mods; i++) {
+		Module *mod = import_table[i].value;
+		for (u64 j = 0; j < mod->ast.len; j++) {
+			ast_add(&ast, mod->ast.nodes[j]);
+		}
+	}
 
     ensure_main_is_declared(&context);
 
@@ -123,7 +191,6 @@ int main(int arg_count, char *args[]) {
 
 end:
     printf("It ran.\n");
-
     shfree(import_table);
     parser_free(&parser, &ast);
     token_list_free(&tokens);

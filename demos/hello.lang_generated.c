@@ -20,14 +20,40 @@ static inline string __make_string(u8 *data, u64 length) {
     return (string){.data=data, .length=length};
 }
 
-void printf(u8* fmt, ...);
 void compiler_main();
+void puts(u8* s);
+void free(void* ptr);
+void* malloc(u64 size);
+void* realloc(void* ptr, u64 size);
+void printf(u8* fmt, ...);
+void memcpy(void* dest, void* src, u64 n);
+u8* c_string(string s);
+string substring(string s, u64 up_to);
+void free_substring(string s);
 
 
 
 void __compiler_main() {
 __global_initializers();
 printf(__make_string("Hello, world\n", 16).data);
+}
+
+u8* c_string(string s) {
+string s2 = substring(s, s.length);
+return s2.data;
+}
+
+string substring(string s, u64 up_to) {
+string sub;
+sub.data = malloc(up_to+1);
+memcpy(sub.data, s.data, up_to);
+sub.data[up_to] = 0;
+sub.length = up_to;
+return sub;
+}
+
+void free_substring(string s) {
+free(s.data);
 }
 
 void __global_initializers() {

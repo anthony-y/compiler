@@ -16,7 +16,9 @@
 bool arena_init(Arena *a, u64 capacity, u64 elem_size, int alignment) {
     u64 space = (capacity * elem_size) + (alignment * capacity);
     u8 *tmp = (u8 *)malloc(space);
-    if (!tmp) return false;
+    if (!tmp) {
+        return false;
+    }
 
     a->block      = tmp;
     a->alignment  = alignment;
