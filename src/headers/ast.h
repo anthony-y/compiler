@@ -4,6 +4,7 @@
 #include "token.h"
 #include "common.h"
 #include "type.h"
+#include "table.h"
 
 struct Parser;
 struct Ast;
@@ -145,7 +146,7 @@ typedef struct {
 } AstStruct;
 
 typedef struct {
-    struct SymbolTable *fields;
+    Table fields;
     Type *base_type;
 } AstEnum;
 
@@ -252,11 +253,9 @@ typedef struct {
     struct Name *name;
 } AstVarArgsExpand;
 
-struct SymbolTable;
-
 typedef struct AstBlock {
     struct Ast *statements;
-    struct SymbolTable *symbols;
+    Table symbols;
     struct AstBlock *parent;
     struct Ast *deferred;
 } AstBlock;
@@ -299,6 +298,7 @@ enum {
     DECL_IS_TOP_LEVEL     = 1 << 0,
     DECL_IS_PROC_ARGUMENT = 1 << 1,
     DECL_IS_EXPORTED      = 1 << 2,
+	DECL_IS_STRUCT_FIELD  = 1 << 3,
 };
 
 typedef struct AstDecl {

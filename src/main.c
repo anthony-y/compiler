@@ -8,6 +8,7 @@
 #include <sys/time.h>
 #include <assert.h>
 
+#include "headers/table.h"
 #include "headers/context.h"
 #include "headers/parser.h"
 #include "headers/lexer.h"
@@ -21,11 +22,9 @@
 #include "headers/stb/stb_ds.h"
 #include "headers/stb/stretchy_buffer.h"
 
-bool lexer_lex(Lexer *l, TokenList *list, SourceStats *stats, ModuleTable *table);
 static char *read_file(const char *path);
 static void ensure_main_is_declared(Context *ctx);
 static void print_unused_symbol_warnings(Context *);
-//static void do_front_end_for_module(Context *, Module *module, char *path, char *data, Module *imported_in);
 
 // Roughly time the execution of "code" in microseconds
 // There must be a variable called "id"_delta in the scope that you use this in
@@ -52,22 +51,22 @@ Module *load_imported_module(Context *ctx, Arena *storage, char *path) {
 	char *data = read_file(path);
 	if (!data) return false;
 	
-	ModuleTable *imports;
+	Table imports;
 	SourceStats stats = (SourceStats){10};
 	TokenList   tokens;
 	Parser      parser;
 	Lexer       lexer;
 	Ast         ast;
 
+	init_table(&imports);
+
 	token_list_init(&tokens);
 	lexer_init(&lexer, path, data);
 	lexer.string_allocator = &ctx->string_allocator;
 
-	sh_new_arena(imports);
-
 	Module *mod = arena_alloc(storage, sizeof(Module));
 
-	if (!lexer_lex(&lexer, &tokens, &stats, imports)) return NULL;
+	if (!lexer_lex(&lexer, &tokens, &stats, &imports)) return NULL;
 	if (tokens.len == 1) return mod;
 	
 	parser_init(&parser, &tokens, &stats);
@@ -75,13 +74,13 @@ Module *load_imported_module(Context *ctx, Arena *storage, char *path) {
 
 	mod->path = path;
 	mod->imports = imports;
-	mod->symbols = NULL; // TODO
+    // mod->symbols = NULL; // TODO
 	mod->ast = ast;
 	return mod;
 }
 
 bool compile_aux_module(Module *mod) {
-	
+	return false;	
 }
 
 void free_imported_module(Module *mod) {} // TODO
@@ -96,7 +95,7 @@ int main(int arg_count, char *args[]) {
     init_context(&context);
     context.path = args[1];
 
-    #define NEXT_STAGE_OR_QUIT() if (context.error_count > 0) goto end
+	#define NEXT_STAGE_OR_QUIT() if (context.error_count > 0) goto end
 
     char *data = read_file(args[1]);
 
@@ -111,11 +110,11 @@ int main(int arg_count, char *args[]) {
     lexer_init(&lexer, args[1], data);
     lexer.string_allocator = &context.string_allocator;
 
-    ModuleTable *import_table;
-    sh_new_arena(import_table);
+    Table import_table;
+    init_table(&import_table);
 
     // Collect tokens, stats and import paths from the main module.
-    if (!lexer_lex(&lexer, &tokens, &main_stats, import_table)) {
+    if (!lexer_lex(&lexer, &tokens, &main_stats, &import_table)) {
         return 1;
     }
 
@@ -127,16 +126,16 @@ int main(int arg_count, char *args[]) {
     // Tally up SourceStats for every file imported into the program
     // This includes files imported indirectly (imports inside imports).
     total_stats = main_stats;
-    for (u64 i = 0; i < shlenu(import_table); i++) {
-        char *path = import_table[i].key;
+    TableIter import_iter = table_get_iterator(&import_table);
+    for (u64 i = 0; i < import_iter.num_entries; i++) {
+        char *path = import_iter.pairs[i].key;
         char *tmp_file_data = read_file(path);
         lexer_init(&lexer, path, tmp_file_data);
-        bool success = lexer_lex(&lexer, NULL, &total_stats, import_table);
+        bool success = lexer_lex(&lexer, NULL, &total_stats, &import_table);
         free(tmp_file_data);
-
         if (!success) goto end;
+        import_iter = table_get_iterator(&import_table);
     }
-	u64 num_mods = shlenu(import_table);
 
     //
     // At this point we know how much memory to allocate.
@@ -145,27 +144,29 @@ int main(int arg_count, char *args[]) {
     // Allocate space for AST nodes for all modules.
     const u64 max_nodes = (u64)(total_stats.number_of_lines * 10);
     assert(arena_init(&context.node_allocator, max_nodes, sizeof(AstNode), 8));
-	assert(arena_init(&module_arena, num_mods, sizeof(Module), 8));
+	assert(arena_init(&module_arena, import_table.num_entries, sizeof(Module), 8));
     init_types(&context, &total_stats);
     parser_init(&parser, &tokens, &main_stats);
-	
+
 	// Perform front end for each imported file.
-	for (u64 i = 0; i < num_mods; i++) {
-		char *path = import_table[i].key;
+	for (u64 i = 0; i < import_iter.num_entries; i++) {
+		char *path = import_iter.pairs[i].key;
 		Module *mod = load_imported_module(&context, &module_arena, path);
 		if (!mod) {
 			break;
 		}
-		import_table[i].value = mod;
+        u64 rehash = table_hash_key(path);
+		import_table.pairs[rehash % import_table.capacity].value = mod; // TODO: this is a bit scuffed
 	}
 
     NEXT_STAGE_OR_QUIT();
 
     Ast ast;
     ast = parse(&context, &parser);
-	
-	for (u64 i = 0; i < num_mods; i++) {
-		Module *mod = import_table[i].value;
+
+    import_iter = table_get_iterator(&import_table);
+	for (u64 i = 0; i < import_iter.num_entries; i++) {
+		Module *mod = import_iter.pairs[i].value;
 		for (u64 j = 0; j < mod->ast.len; j++) {
 			ast_add(&ast, mod->ast.nodes[j]);
 		}
@@ -184,18 +185,18 @@ int main(int arg_count, char *args[]) {
     NEXT_STAGE_OR_QUIT();
 
     char *output_path = generate_and_write_c_code(&context, &ast);
-    u64 len = strlen("gcc -std=c99") + strlen(output_path) + strlen("-o ") + strlen("-Wno-discarded-qualifiers ") + strlen("-Wno-return-local-addr") + strlen("-Wno-builtin-declaration-mismatch") + 1;
+    u64 len = strlen("gcc -g -std=c99") + strlen(output_path) + strlen("-o ") + strlen("-Wno-discarded-qualifiers ") + strlen("-Wno-return-local-addr") + strlen("-Wno-builtin-declaration-mismatch") + 1;
     char *command = arena_alloc(&context.scratch, len);
-    sprintf(command, "gcc -std=c99 %s -Wno-return-local-addr -Wno-discarded-qualifiers -Wno-builtin-declaration-mismatch -o output_bin", output_path);
+    sprintf(command, "gcc -g -std=c99 %s -Wno-return-local-addr -Wno-discarded-qualifiers -Wno-builtin-declaration-mismatch -o output_bin", output_path);
     system(command);
-
+	printf("It ran.\n");
 end:
-    printf("It ran.\n");
-    shfree(import_table);
-    parser_free(&parser, &ast);
+    free_table(&import_table);
+    //parser_free(&parser, &ast); TODO fix
     token_list_free(&tokens);
     free_context(&context);
     free(data);
+    arena_free(&module_arena);
 
     return 0;
 }
@@ -203,6 +204,7 @@ end:
 static void ensure_main_is_declared(Context *ctx) {
     if (!ctx->decl_for_main) {
         compile_error(ctx, (Token){0}, "No entry point found. Please declare \"main\"");
+        return;
     }
     
     Token main_decl_token = decl_tok(ctx->decl_for_main);
@@ -216,9 +218,9 @@ static void ensure_main_is_declared(Context *ctx) {
 }
 
 static void print_unused_symbol_warnings(Context *ctx) {
-    u64 len = shlenu(ctx->symbols);
-    for (int i = 0; i < len; i++) {
-        AstDecl *d = ctx->symbols[i].value;
+    TableIter it = table_get_iterator(&ctx->symbols);
+    for (int i = 0; i < it.num_entries; i++) {
+        AstDecl *d = it.pairs[i].value;
         char *name = d->name->text;
         Token t = decl_tok(d);
         if (d->status == Status_UNRESOLVED) {
@@ -229,6 +231,7 @@ static void print_unused_symbol_warnings(Context *ctx) {
             }
         }
     }
+    free(it.pairs);
 }
 
 static char *read_file(const char *path) {

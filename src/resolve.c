@@ -6,6 +6,7 @@
 #include "headers/type.h"
 #include "headers/context.h"
 #include "headers/passes.h"
+#include "headers/table.h"
 
 #include "headers/stb/stb_ds.h"
 
@@ -25,13 +26,13 @@ static AstProcedure **proc_stack = NULL;
 static AstBlock **scope_stack = NULL;
 
 static AstProcedure *resolve_call(AstNode *callnode, Context *ctx) {
-    SymbolTable *table = ctx->symbols;
+    Table *table = &ctx->symbols;
     Token tok = callnode->token;
     AstCall *call = (AstCall *)callnode;
     char *str_name = call->name->as.name->text;
 
-    u64 symbol_index = shgeti(table, str_name);
-    if (symbol_index == -1) {
+    AstDecl *hopefully_proc = table_get(table, str_name);
+    if (!hopefully_proc) {
         // for (u64 i = 0; i < shlenu(ctx->current_module->imports); i++) {
         //     Module *m = ctx->current_module->imports[i].value;
         //     table = m->symbols;
@@ -46,7 +47,6 @@ static AstProcedure *resolve_call(AstNode *callnode, Context *ctx) {
         AstExpr *arg = (AstExpr *)call->params->nodes[i];
         resolve_expression(arg, ctx);
     }
-    AstDecl *hopefully_proc = table[symbol_index].value;
     if (hopefully_proc->tag != Decl_PROC) {
         compile_error(ctx, tok, "attempted to call \"%s\", but it's not a procedure", str_name);
         return NULL;
@@ -65,7 +65,7 @@ static Type *resolve_name(Context *ctx, Name *name, AstNode *site) {
 
     AstDecl *var = NULL;
 
-    if (!scope) var = shget(ctx->symbols, name->text); // global scope
+    if (!scope) var = table_get(&ctx->symbols, name->text); // global scope
     else var = lookup_local(ctx, in, name, scope);
 
     if (!var) {
@@ -74,7 +74,7 @@ static Type *resolve_name(Context *ctx, Name *name, AstNode *site) {
     }
 
     if (var->tag == Decl_TYPEDEF) {
-        Type *maybe_enum = shget(ctx->type_table, name->text);
+        Type *maybe_enum = table_get(&ctx->type_table, name->text);
         resolve_type(ctx, maybe_enum, site, false);
         if (!maybe_enum || maybe_enum->kind != Type_ENUM) {
             compile_error(ctx, site->token, "undeclared identifier \"%s\"", name->text);
@@ -93,7 +93,7 @@ static Type *resolve_name(Context *ctx, Name *name, AstNode *site) {
     name->resolved_decl = var;
 
     if (var->status == Status_UNRESOLVED) {
-        if (!(var->flags & DECL_IS_TOP_LEVEL)) {
+        if (!(var->flags & DECL_IS_TOP_LEVEL) && !(var->flags & DECL_IS_STRUCT_FIELD)) {
             compile_error(ctx, site->token, "local variable \"%s\" was used before it was declared", name->text);
             return NULL;
         }
@@ -210,16 +210,19 @@ static Type *resolve_expression(AstExpr *expr, Context *ctx) {
 }
 
 void resolve_struct(AstStruct *def, Context *ctx) {
-    SymbolTable *table = def->members->as.block.symbols;
-    u64 len = shlenu(table);
-    for (int i = 0; i < len; i++) {
-        AstDecl *field = table[i].value;
+    Table *table = &def->members->as.block.symbols;
+    TableIter it = table_get_iterator(table);
+    for (int i = 0; i < it.num_entries; i++) {
+        AstDecl *field = it.pairs[i].value;
         if (field->tag != Decl_VAR) {
             compile_error(ctx, decl_tok(field), "only variable declarations are valid inside a struct body"); // this is semantic checking but we have to do it here otherwise it's a nightmare
             continue;
         }
+        stbds_arrpush(scope_stack, &def->members->as.block);
         resolve_var(field, ctx);
+        stbds_arrpop(scope_stack);
     }
+    free(it.pairs);
 }
 
 // Resolves an unresolved type to it's "real" type
@@ -255,20 +258,15 @@ static Type *resolve_type(Context *ctx, Type *type, AstNode *site, bool cyclic_a
     // as placeholder types, and are not put in the type table. If they then go on to be defined in the source code, they will be placed into the type table.
     // Here, we lookup the type in the type table. If it is not found, then it was never declared.
     // ...
-    u64 i = shgeti(ctx->type_table, type->name);
-    if (i == -1) {
+    Type *real_type = table_get(&ctx->type_table, type->name);
+    if (!real_type) {
         compile_error(ctx, site->token, "undeclared type \"%s\"", type->name);
         return NULL;
     }
 
-    // ... if it was we store it here
-    Type *real_type = ctx->type_table[i].value;
-
-    SymbolTable *current_table = ctx->symbols;
-
     // Next we'll look up the actual declaration of the type.
-    u64 type_i = shgeti(current_table, type->name);
-    AstDecl *sym = current_table[type_i].value;
+    AstDecl *sym = table_get(&ctx->symbols, type->name);
+	assert(sym);
 
     if (sym->status == Status_RESOLVED)
         return real_type;
@@ -316,8 +314,8 @@ static Type *resolve_selector(Context *ctx, AstBinary *accessor) {
 
     if (lhs_type->kind == Type_ENUM) {
         AstEnum *enum_def = &lhs_type->data.user->as._enum;
-        u64 member_idx = shgeti(enum_def->fields, rhs->text);
-        if (member_idx == -1) {
+        AstDecl *member = table_get(&enum_def->fields, rhs->text);
+        if (!member) {
             compile_error(ctx, expr_tok(accessor->left), "enum has no field \"%s\"", rhs->text);
             return NULL;
         }
@@ -462,7 +460,7 @@ static void resolve_statement(Context *ctx, AstNode *stmt) {
         AstBlock *target_scope = stbds_arrlast(scope_stack);
         for (int i = 0; i < source_scope->statements->len; i++) {
             AstDecl *decl = (AstDecl *)source_scope->statements->nodes[i];
-            shput(target_scope->symbols, decl->name->text, decl);
+            assert(table_add(&target_scope->symbols, decl->name->text, decl));
             ast_add(target_scope->statements, (AstNode *)decl);
         }
     } break;
@@ -519,46 +517,6 @@ static void resolve_procedure(AstDecl *procsym, Context *ctx) {
     stbds_arrpop(proc_stack); // pop the scope
 }
 
-// void resolve_main_module(Context *ctx) {
-    
-
-//     // Resolving main will resolve all the symbols in the code
-//     // that are actually used. There may be some top level symbols
-//     // that are left as unresolved because they do not get used.
-//     // The following code exists to validate that these unused decls
-//     // are still correct, however we will keep their status as Status_UNRESOLVED
-//     // so that later on the compiler will correctly assert that they were not
-//     // referred to in the code.
-
-//     u64 len = shlenu(main_module->symbols);
-//     for (int i = 0; i < len; i++) {
-//         AstDecl *decl = main_module->symbols[i].value;
-//         if (decl->status == Status_RESOLVED) continue;
-
-//         decl->status = Status_RESOLVING;
-//         switch (decl->tag) {
-//         case Decl_PROC:
-//             resolve_procedure(decl, ctx);
-//             break;
-//         case Decl_VAR:
-//             resolve_var(decl, ctx);
-//             break;
-//         case Decl_TYPEDEF: {
-//             AstTypedef *def = (AstTypedef *)decl;
-//             if (def->of->tag == Node_STRUCT) {
-//                 resolve_struct((AstStruct *)def->of, ctx);
-//                 // NOTE types that are only used inside unused structs
-//                 // will still be set as Status_RESOLVED. Maybe this shouldn't be the case?
-//             }
-//         } break;
-//         }
-//         decl->status = Status_UNRESOLVED;
-//     }
-
-//     stbds_arrfree(proc_stack);
-//     stbds_arrfree(scope_stack);
-// }
-
 void resolve_module(Context *ctx) {
     resolve_procedure(ctx->decl_for_main, ctx);
 
@@ -570,9 +528,9 @@ void resolve_module(Context *ctx) {
     // so that later on the compiler will correctly assert that they were not
     // referred to in the code.
 
-    u64 len = shlenu(ctx->symbols);
-    for (int i = 0; i < len; i++) {
-        AstDecl *decl = ctx->symbols[i].value;
+    TableIter it = table_get_iterator(&ctx->symbols);
+    for (int i = 0; i < it.num_entries; i++) {
+        AstDecl *decl = it.pairs[i].value;
         if (decl->status == Status_RESOLVED) continue;
 
         decl->status = Status_RESOLVING;
@@ -592,9 +550,10 @@ void resolve_module(Context *ctx) {
             }
         } break;
         }
+        decl->status = Status_UNRESOLVED;
     }
-
-    // stbds_arrfree(proc_stack);
-    // stbds_arrfree(scope_stack);
+    free(it.pairs);
+    stbds_arrfree(proc_stack);
+    stbds_arrfree(scope_stack);
 }
 

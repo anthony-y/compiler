@@ -3,6 +3,7 @@
 
 #include "token.h"
 #include "arena.h"
+#include "table.h"
 
 //#include <pthread.h>
 
@@ -45,6 +46,7 @@ void lexer_free(Lexer *);
 struct SourceStats;
 struct Module;
 
+bool lexer_lex(Lexer *l, struct TokenList *list, struct SourceStats *stats, Table *table);
 //bool lexer_lex(Lexer *l, TokenList *list, struct SourceStats *stats, TokenList *import_paths);
 void divide_tokens_into_modules(struct Module *modules, struct SourceStats stats, const TokenList *all_tokens);
 ///void *lexer_lex(void *);

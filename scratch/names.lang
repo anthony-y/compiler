@@ -1,6 +1,9 @@
+//#import "scratch/interp.lang"
+
 proc main() {
-	main: int = 0
+//	main: int = 0
 	other(10)
+	print("H".data);
 }
 
 proc other(k: int) {

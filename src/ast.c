@@ -21,9 +21,9 @@ void free_block(AstStmt *stmt) {
     if (!stmt || stmt->tag != Stmt_BLOCK) return;
     AstBlock *b = (AstBlock *)stmt;
 
-    u64 sym_len = shlenu(b->symbols);
-    for (int i = 0; i < sym_len; i++) {
-        AstDecl *d = b->symbols[i].value;
+    TableIter it = table_get_iterator(&b->symbols);
+    for (int i = 0; i < it.num_entries; i++) {
+        AstDecl *d = it.pairs[i].value;
         if (d->tag == Decl_VAR) {
             AstVar *var = (AstVar *)d;
             if (var->typename->as.type && var->typename->as.type->kind == Type_ANON_STRUCT) {
@@ -31,6 +31,7 @@ void free_block(AstStmt *stmt) {
             }
         }
     }
+    free(it.pairs);
 
     for (int i = 0; i < b->statements->len; i++) {
         AstNode *n = b->statements->nodes[i];
@@ -53,7 +54,7 @@ void free_block(AstStmt *stmt) {
 
     ast_free(b->statements);
     ast_free(b->deferred);
-    shfree(b->symbols);
+    free_table(&b->symbols);
     b->parent = NULL;
 }
 

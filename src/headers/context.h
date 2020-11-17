@@ -8,6 +8,7 @@
 #include "token.h"
 #include "arena.h"
 #include "ast.h"
+#include "table.h"
 
 #include <stdarg.h>
 
@@ -15,14 +16,10 @@
 
 struct Module;
 
-typedef struct SymbolTable {char *key; AstDecl *value;} SymbolTable;
-typedef struct {char *key; Type *value;} TypeTable;
-typedef struct {char *key; struct Module *value;} ModuleTable;
-
 typedef struct Module {
 	char *path;
-	ModuleTable *imports;
-	SymbolTable *symbols;
+	Table imports;
+	Table symbols;
 	Parser parser;
 	Lexer lexer;
 	Ast ast;
@@ -51,7 +48,6 @@ typedef struct SourceStats {
 // passed to most functions in the compiler.
 typedef struct Context {
     int error_count;
-
     const char *path;
 
     Arena scratch;
@@ -61,10 +57,9 @@ typedef struct Context {
     AstProcedure *curr_checker_proc;
     AstDecl *decl_for_main;
 
-    SymbolTable *symbols;
+    Table symbols;
+    Table type_table;
 
-    // stb hash tables
-    TypeTable *type_table;
     struct {char *key; Name *value;} *name_table;
     struct {char *key; AstLiteral *value;} *string_literal_pool;
 
@@ -72,9 +67,7 @@ typedef struct Context {
        for easy comparison in type-checking, etc. */
     Type *type_int, *type_s64, *type_u64, *type_u32, *type_s32,
         *type_u16, *type_s16, *type_u8, *type_s8;
-
     Type *type_f32, *type_f64;
-
     Type *type_string, *type_void, *type_bool; // non-integer types
     Type *null_type; // type of "null" literal
     Type *type_any; // any
@@ -88,7 +81,6 @@ void compile_error_end();
 void compile_warning(Context *ctx, Token t, const char *fmt, ...);
 
 void init_context(Context *c);
-//void init_module(Context *ctx, Module *mod, SourceStats stats, char *path);
 void free_context(Context *c);
 
 // From types.c, couldn't declare in types.h because of a circular dependency with context.h

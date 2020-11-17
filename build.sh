@@ -1,6 +1,6 @@
 #!/bin/bash
 
-compile="gcc -std=c99 src/*.c -o lang -Wall -Wpedantic -Wno-switch -Wno-unused-function -g -ldl -lpthread -O0"
+compile="clang -std=c99 src/*.c -o lang -Wall -Wpedantic -Wno-switch -Wno-unused-function -g -ldl -lpthread -O0"
 run="./lang demos/hello.lang"
 
 echo -e "\nCompiling:"

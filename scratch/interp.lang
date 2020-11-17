@@ -4,7 +4,10 @@ pp : ^int = null;
 s := "Hii"
 ss := s
 
-proc main() {
+#import "std/basic.lang"
+#import "scratch/names.lang"
+
+proc ___main() {
 	zz = 1;
 	ss = "a"
 	//main()

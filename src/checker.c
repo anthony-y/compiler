@@ -498,10 +498,11 @@ bool check_assignment(Context *ctx, AstExpr *expr, bool lhs_must_be_pointer) {
 }
 
 void check_block(Context *ctx, AstBlock *block, AstNodeType restriction) {
-    u64 num_decls = shlenu(block->symbols);
-    for (int i = 0; i < num_decls; i++) {
-        check_var(ctx, block->symbols[i].value); // NOTE modify for local procs
+    TableIter it = table_get_iterator(&block->symbols);
+    for (int i = 0; i < it.num_entries; i++) {
+        check_var(ctx, it.pairs[i].value); // NOTE modify for local procs
     }
+    free(it.pairs);
     for (int i = 0; i < block->statements->len; i++) {
         AstNode *stmt = block->statements->nodes[i];
         if (is_decl(stmt)) continue; // we already checked the declarations
@@ -540,13 +541,13 @@ void check_statement(Context *ctx, AstStmt *node) {
 }
 
 void check_struct(Context *ctx, AstStruct *s) {
-    u64 struct_len = shlenu(s->members->as.block.symbols);
-    for (int i = 0; i < struct_len; i++) {
-        AstDecl *d = s->members->as.block.symbols[i].value;
+    Table local_copy = s->members->as.block.symbols;
+    TableIter it = table_get_iterator(&local_copy);
+    for (int i = 0; i < it.num_entries; i++) {
+        AstDecl *d = it.pairs[i].value;
         check_var(ctx, d);
     }
-    // AstBlock *fields = &s->members->as.block;
-    // check_block(ctx, fields, Node_VAR);
+    free(it.pairs);
 }
 
 void check_typedef(Context *ctx, AstDecl *node) {

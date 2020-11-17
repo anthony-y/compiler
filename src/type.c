@@ -49,13 +49,13 @@ inline bool is_type_numeric(Type *t) {
 static inline Type *make_and_insert_primitive(Context *ctx, char *name, u64 size, Signage signage) {
     Type *t = make_type(Type_PRIMITIVE, name, size);
     t->data.signage = signage;
-    shput(ctx->type_table, name, t);
+	assert(table_add(&ctx->type_table, name, t));
     return t;
 }
 
 void free_types(Context *ctx) {
     arena_free(&type_arena);
-    shfree(ctx->type_table);
+    free_table(&ctx->type_table);
 }
 
 // Initialize the type table and add the primitive types to it.
@@ -72,7 +72,7 @@ void init_types(Context *ctx, SourceStats *stats) {
     u64 total_types = (num_builtins + stats->pointer_types + (stats->declared_types * 2));
     arena_init(&type_arena, total_types, sizeof(Type), 8);
 
-    sh_new_arena(ctx->type_table); // initialize the type table as a string hash map
+    init_table(&ctx->type_table);
 
     ctx->type_int = make_and_insert_primitive(ctx, "int", sizeof(s64), Signage_SIGNED);
 

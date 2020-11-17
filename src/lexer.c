@@ -4,8 +4,7 @@
 #include "headers/lexer.h"
 #include "headers/token.h"
 #include "headers/context.h"
-
-#include "headers/stb/stb_ds.h"
+#include "headers/table.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -342,7 +341,7 @@ Token next_token(Lexer *tz) {
     return token_new(tz, Token_UNKNOWN);
 }
 
-bool lexer_lex(Lexer *l, TokenList *list, SourceStats *stats, ModuleTable *table) {
+bool lexer_lex(Lexer *l, TokenList *list, SourceStats *stats, Table *table) {
     TokenType last;
 
     u64 pointers = 0;
@@ -356,11 +355,15 @@ bool lexer_lex(Lexer *l, TokenList *list, SourceStats *stats, ModuleTable *table
         Token t = next_token(l);
 
         if (table && (last == Token_IMPORT && t.type == Token_STRING_LIT)) {
-            number_imports++;
             if (list) token_list_add(list, t);
             if (t.type == Token_EOF) break;
-            if (shgeti(table, t.text) != -1) continue;
-            shput(table, t.text, NULL);
+
+            Module *existing = table_get(table, t.text);
+            if (existing) {
+                continue;
+            }
+            table_add(table, t.text, &(Module){0});
+            number_imports++;
             continue;
         }
 

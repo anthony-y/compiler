@@ -7,13 +7,11 @@
 #include <assert.h>
 
 AstDecl *lookup_in_block(AstBlock *block, Name *name) {
-    u64 index = shgeti(block->symbols, name->text);
-    if (index == -1) return NULL;
-    return block->symbols[index].value;
+	return table_get(&block->symbols, name->text);
 }
 
 AstDecl *lookup_local(Context *ctx, AstProcedure *proc, Name *name, AstBlock *start_from) {
-    SymbolTable *table = ctx->symbols;
+    Table *table = &ctx->symbols;
     if (proc->params) {
         for (int i = 0; i < proc->params->len; i++) {
             AstDecl *decl = (AstDecl *)proc->params->nodes[i];
@@ -29,8 +27,8 @@ AstDecl *lookup_local(Context *ctx, AstProcedure *proc, Name *name, AstBlock *st
             if (sym) return sym;
             parent = parent->parent;
         }
-        u64 global_i = shgeti(table, name->text);
-        if (global_i != -1) return table[global_i].value;
+		AstDecl *global = table_get(table, name->text);
+        if (global) return global;
         return NULL;
     }
     return s;
@@ -60,11 +58,11 @@ Name *make_namet(Context *ctx, const char *txt) {
 
 inline void add_symbol(Context *c, AstDecl *n, char *name) {
     Token t = ((AstNode *)n)->token;
-    if (shgeti(c->symbols, name) != -1) {
+    if (table_get(&c->symbols, name)) {
         compile_error(c, t, "Redefinition of symbol \"%s\" in module %s", name, c->path);
         return;
     }
-    shput(c->symbols, name, n);
+    assert(table_add(&c->symbols, name, n));
 }
 
 void init_context(Context *c) {
@@ -73,6 +71,7 @@ void init_context(Context *c) {
     arena_init(&c->scratch, CONTEXT_SCRATCH_SIZE, sizeof(u8), 1);
     sh_new_arena(c->string_literal_pool);
     sh_new_arena(c->name_table);
+	init_table(&c->symbols);
 }
 
 void free_context(Context *c) {
@@ -83,6 +82,7 @@ void free_context(Context *c) {
     arena_free(&c->scratch);
     shfree(c->string_literal_pool);
     arena_free(&c->node_allocator);
+	free_table(&c->symbols);
 }
 
 // void init_module(Context *ctx, Module *mod, SourceStats stats, char *path) {

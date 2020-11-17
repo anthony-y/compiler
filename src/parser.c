@@ -7,6 +7,7 @@
 #include "headers/ast.h"
 #include "headers/arena.h"
 #include "headers/context.h"
+#include "headers/table.h"
 
 // Just for arrlen
 #include "headers/stb/stretchy_buffer.h"
@@ -321,7 +322,7 @@ static AstStmt *parse_block(Context *ctx, Parser *parser) {
     blocknode->as.stmt.tag = Stmt_BLOCK;
     AstBlock *block = &blocknode->as.stmt.as.block;
     block->deferred = make_subtree(parser);
-    sh_new_arena(block->symbols);
+    init_table(&block->symbols);
 
     parser->current_scope = block;
 
@@ -344,10 +345,10 @@ static AstStmt *parse_block(Context *ctx, Parser *parser) {
         }
         if (is_decl(statement)) {
             AstDecl *decl = (AstDecl *)statement;
-            if (shgeti(block->symbols, decl->name->text) != -1) {
+            if (table_get(&block->symbols, decl->name->text)) {
                 compile_error(ctx, *parser->curr, "redeclaration of local \"%s\"", decl->name->text);
             }
-            shput(block->symbols, decl->name->text, decl);
+            assert(table_add(&block->symbols, decl->name->text, decl));
             consume(parser, Token_SEMI_COLON);
         }
 
@@ -427,7 +428,6 @@ static AstStmt *parse_enum(Context *ctx, Parser *parser) {
 
     Token start = *parser->curr;
     AstEnum e;
-    e.fields = NULL;
     e.base_type = ctx->type_int;
 
     if (!consume(parser, Token_OPEN_BRACE)) {
@@ -436,7 +436,7 @@ static AstStmt *parse_enum(Context *ctx, Parser *parser) {
         return NULL;
     }
 
-    sh_new_arena(e.fields);
+    init_table(&e.fields);
 
     while (parser->curr->type == Token_IDENT) {
         Token start = *parser->curr;
@@ -473,7 +473,7 @@ static AstStmt *parse_enum(Context *ctx, Parser *parser) {
         var.value = value;
         var.flags = 0;
         AstDecl *decl = ast_var(ctx, start, decl_name, &var);
-        shput(e.fields, decl_name->text, decl);
+        assert(table_add(&e.fields, decl_name->text, decl));
         consume(parser, Token_COMMA);
     }
 
@@ -506,23 +506,34 @@ static AstNode *parse_typedef(Context *ctx, Parser *parser) {
         return NULL;
     }
 
-    u64 type_i = shgeti(ctx->type_table, name.text); // hopefully -1
-    if (type_i != -1) {
-        Type *existing = ctx->type_table[type_i].value;
-        // AstDecl *existing_decl = shget(ctx->current_module->symbols, existing->name);
-        // assert(existing_decl);
-        AstStmt *user = existing->data.user;
-        assert(user);
-        compile_error_start(ctx, name, "type \"%s\" was declared more than once; first declared here:", name.text);
-        compile_error_add_line(ctx, "\t%s:%lu", ctx->path, stmt_tok(user).line);
+    Table *table = &ctx->type_table;
+
+    // Type *maybe_existing = table_get(table, name.text); // hopefully NULL
+    // if (maybe_existing) {
+    //     assert(maybe_existing->kind != Type_PRIMITIVE);
+    //     AstStmt *user = maybe_existing->data.user;
+    //     assert(user);
+    //     compile_error_start(ctx, name, "type \"%s\" was declared more than once; first declared here:", name.text);
+    //     compile_error_add_line(ctx, "\t%s:%lu", ctx->path, stmt_tok(user).line);
+    //     compile_error_end();
+    //     return NULL;
+    // }
+
+    AstDecl *existing = table_get(&ctx->symbols, name.text);
+    if (existing && existing->tag == Decl_TYPEDEF) {
+        compile_error_start(
+            ctx,
+            name,
+            "type \"%s\" was declared more than once; first declared here:",
+            name.text
+        );
+        compile_error_add_line(ctx, "\t%s:%lu", ctx->path, decl_tok(existing).line);
         compile_error_end();
         return NULL;
     }
 
     AstNode *decl = NULL;
     Type *type = make_type(0, name.text, 0); // NOTE size is wrong lol
-
-    TypeTable *table = ctx->type_table;
 
     switch (parser->curr->type) {
     case Token_STRUCT:
@@ -541,7 +552,7 @@ static AstNode *parse_typedef(Context *ctx, Parser *parser) {
 
     // These should be equivalent to the tokens we check for in parse_typename.
     case Token_RESERVED_TYPE:
-        table = ctx->type_table;
+        table = &ctx->type_table;
     case Token_IDENT:
     case Token_CARAT:
     case Token_OPEN_BRACKET:
@@ -555,7 +566,7 @@ static AstNode *parse_typedef(Context *ctx, Parser *parser) {
         return NULL;
     }
 
-    shput(table, name.text, type);
+	assert(table_add(table, name.text, type));
     td.of = decl;
     td.name = namenode;
 
@@ -574,8 +585,7 @@ static AstNode *parse_typename(Context *ctx, Parser *parser) {
     switch (t.type) {
     case Token_RESERVED_TYPE: {
         parser_next(parser);
-        u64 i = shgeti(ctx->type_table, t.text);
-        type_node->as.type = ctx->type_table[i].value;
+        type_node->as.type = table_get(&ctx->type_table, t.text);
         assert(type_node->as.type);
         return type_node;
     } break;
@@ -587,7 +597,7 @@ static AstNode *parse_typename(Context *ctx, Parser *parser) {
     case Token_IDENT: {
         parser_next(parser);
 
-        if (shgeti(ctx->type_table, t.text) == -1) { // type doesn't exist (or not appeared in program text yet)
+        if (table_get(&ctx->type_table, t.text)) { // type doesn't exist (or not appeared in program text yet)
             type_node->as.type = make_type(
                 Type_UNRESOLVED,
                 t.text,
@@ -595,7 +605,7 @@ static AstNode *parse_typename(Context *ctx, Parser *parser) {
             );
             return type_node;
         }
-        type_node->as.type = shget(ctx->type_table, t.text);
+        type_node->as.type = table_get(&ctx->type_table, t.text);
         return type_node;
     } break;
 
