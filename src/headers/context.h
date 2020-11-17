@@ -48,7 +48,6 @@ typedef struct SourceStats {
 // passed to most functions in the compiler.
 typedef struct Context {
     int error_count;
-    const char *path;
 
     Arena scratch;
     Arena string_allocator; // lexer
@@ -56,7 +55,7 @@ typedef struct Context {
 
     AstProcedure *curr_checker_proc;
     AstDecl *decl_for_main;
-
+	Module *current_module;
     Table symbols;
     Table type_table;
 

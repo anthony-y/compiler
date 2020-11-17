@@ -307,6 +307,7 @@ typedef struct AstDecl {
         AstVar var;
         AstTypedef typedefi;
     } as;
+	struct Module *declared_in;
     struct Name *name;
     DeclType tag;
     int flags;

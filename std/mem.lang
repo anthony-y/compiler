@@ -8,7 +8,7 @@ type Arena: struct {
 }
 
 proc arena_init(a: ^Arena, cap: u64) {
-	if a.mem != null {
+	if a.mem {
 		free(a.mem);
 		a.mem = null;
 	}

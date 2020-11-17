@@ -65,22 +65,18 @@ Module *load_imported_module(Context *ctx, Arena *storage, char *path) {
 	lexer.string_allocator = &ctx->string_allocator;
 
 	Module *mod = arena_alloc(storage, sizeof(Module));
+    mod->path = path;
 
 	if (!lexer_lex(&lexer, &tokens, &stats, &imports)) return NULL;
 	if (tokens.len == 1) return mod;
-	
+	ctx->current_module = mod;
 	parser_init(&parser, &tokens, &stats);
 	ast = parse(ctx, &parser);
 
-	mod->path = path;
 	mod->imports = imports;
     // mod->symbols = NULL; // TODO
 	mod->ast = ast;
 	return mod;
-}
-
-bool compile_aux_module(Module *mod) {
-	return false;	
 }
 
 void free_imported_module(Module *mod) {} // TODO
@@ -93,7 +89,6 @@ int main(int arg_count, char *args[]) {
 
     Context context;
     init_context(&context);
-    context.path = args[1];
 
 	#define NEXT_STAGE_OR_QUIT() if (context.error_count > 0) goto end
 

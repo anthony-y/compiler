@@ -364,7 +364,7 @@ static void emit_c_for_proc(AstProcedure *proc, bool entry_point) {
 char *generate_and_write_c_code(Context *ctx, Ast *ast) {
     name_for_main = make_namet(ctx, "main");
 
-    char *path = ctx->path;
+    char *path = ctx->current_module->path;
     const char *postfix = "_generated.c";
     u64 len = strlen(path) + strlen(postfix) + 1;
     char *output_file = arena_alloc(&ctx->scratch, len);

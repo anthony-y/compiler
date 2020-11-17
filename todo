@@ -1,3 +1,4 @@
+Errors show the wrong name in the post-parser steps of the pipeline.
 Give imports their own namespaces.
 Allow pointers to be null-checked without != null.
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

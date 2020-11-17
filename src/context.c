@@ -59,7 +59,7 @@ Name *make_namet(Context *ctx, const char *txt) {
 inline void add_symbol(Context *c, AstDecl *n, char *name) {
     Token t = ((AstNode *)n)->token;
     if (table_get(&c->symbols, name)) {
-        compile_error(c, t, "Redefinition of symbol \"%s\" in module %s", name, c->path);
+        compile_error(c, t, "Redefinition of symbol \"%s\" in module %s", name, c->current_module->path);
         return;
     }
     assert(table_add(&c->symbols, name, n));
@@ -98,7 +98,7 @@ void compile_error(Context *ctx, Token t, const char *fmt, ...) {
 
     // The weird looking escape characters are to set the text color
     // to red, print "Error", and then reset the colour.
-    fprintf(stderr, "%s:%lu: \033[0;31mError\033[0m: ", ctx->path, t.line);
+    fprintf(stderr, "%s:%lu: \033[0;31mError\033[0m: ", ctx->current_module->path, t.line);
     vfprintf(stderr, fmt, args);
     fprintf(stderr, ".\n");
     va_end(args);
@@ -110,7 +110,7 @@ void compile_error_start(Context *ctx, Token t, const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
 
-    fprintf(stderr, "%s:%lu: \033[0;31mError\033[0m: ", ctx->path, t.line);
+    fprintf(stderr, "%s:%lu: \033[0;31mError\033[0m: ", ctx->current_module->path, t.line);
     vfprintf(stderr, fmt, args);
     va_end(args);
 
@@ -132,7 +132,7 @@ void compile_warning(Context *ctx, Token t, const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
 
-    fprintf(stderr, "%s:%lu: \033[0;33mWarning\033[0m: ", ctx->path, t.line);
+    fprintf(stderr, "%s:%lu: \033[0;33mWarning\033[0m: ", ctx->current_module->path, t.line);
     vfprintf(stderr, fmt, args);
     fprintf(stderr, ".\n");
     va_end(args);

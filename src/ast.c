@@ -133,7 +133,8 @@ void ast_add(Ast *list, AstNode *node) {
     if (list->cap < list->len) {
         list->cap *= 2;
         AstNode **tmp = realloc(list->nodes, list->cap * sizeof(AstNode *));
-        if (tmp) { list->nodes = tmp;
+        if (tmp) {
+			list->nodes = tmp;
         } else {
             fprintf(stderr, "Alloc failed\n");
             free(list->nodes);
@@ -207,6 +208,7 @@ AstDecl *ast_proc(Context *c, Token t, Name *name, const AstProcedure *proc) {
     n->as.decl.status = Status_UNRESOLVED;
     n->as.decl.tag = Decl_PROC;
     n->as.decl.name = name;
+	n->as.decl.declared_in = c->current_module;	
     n->as.decl.as.proc = *proc;
     return &n->as.decl;
 }
@@ -217,6 +219,7 @@ AstDecl *ast_var(Context *c, Token t, Name *name, const AstVar *var) {
     n->as.decl.status = Status_UNRESOLVED;
     n->as.decl.tag = Decl_VAR;
     n->as.decl.name = name;
+	n->as.decl.declared_in = c->current_module;
     n->as.decl.as.var = *var;
     return &n->as.decl;
 }
@@ -227,6 +230,7 @@ AstDecl *ast_typedefi(Context *c, Token t, Name *name, const AstTypedef *td) {
     n->as.decl.status = Status_UNRESOLVED;
     n->as.decl.tag = Decl_TYPEDEF;
     n->as.decl.name = name;
+	n->as.decl.declared_in = c->current_module;	
     n->as.decl.as.typedefi = *td;
     return &n->as.decl;
 }

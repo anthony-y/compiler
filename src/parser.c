@@ -527,7 +527,7 @@ static AstNode *parse_typedef(Context *ctx, Parser *parser) {
             "type \"%s\" was declared more than once; first declared here:",
             name.text
         );
-        compile_error_add_line(ctx, "\t%s:%lu", ctx->path, decl_tok(existing).line);
+        compile_error_add_line(ctx, "\t%s:%lu", ctx->current_module->path, decl_tok(existing).line);
         compile_error_end();
         return NULL;
     }

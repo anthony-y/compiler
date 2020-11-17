@@ -405,7 +405,7 @@ bool check_var(Context *ctx, AstDecl *node) {
 
 void check_if(Context *ctx, AstStmt *node) {
     AstIf *iff = &node->as._if;
-    if (!does_type_describe_expr(ctx, ctx->type_bool, iff->condition)) {
+    if (iff->condition->resolved_type != ctx->type_bool && iff->condition->resolved_type->kind != Type_POINTER) {
         compile_error_start(ctx, stmt_tok(node), "'If' statement requires a condition which evaluates to a boolean, this one evaluates to ");
         print_type(iff->condition->resolved_type);
         compile_error_end();
