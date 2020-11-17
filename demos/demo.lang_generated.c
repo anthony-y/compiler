@@ -21,7 +21,6 @@ static inline string __make_string(u8 *data, u64 length) {
 }
 
 void compiler_main();
-void puts(u8* s);
 void free(void* ptr);
 void* malloc(u64 size);
 void* realloc(void* ptr, u64 size);
@@ -42,6 +41,10 @@ struct Arena {
 };
 
 void __Arena_initer(struct Arena* s) {
+s->fixed = true;
+s->cursor = 0;
+s->capacity = 2048;
+s->mem = malloc(2048);
 }
 
 void __compiler_main() {
@@ -75,14 +78,14 @@ free(s.data);
 }
 
 bool arena_maybe_grow(struct Arena* a, u64 desired_size) {
-if (a->fixed) {
-puts(__make_string("Out of space :(", 17).data);
-return false;
-;
-};
-if ((a->cursor+desired_size)>a->capacity) {
+if (!a->fixed&&(a->cursor+desired_size)>a->capacity) {
 a->capacity *= 2;
-a->mem = realloc(a->mem, a->capacity);
+u8* tmp = (cast(u8*)realloc(a->mem, a->capacity));
+if (!tmp) {
+return false;
+};
+a->mem = tmp;
+return true;
 ;
 };
 return true;

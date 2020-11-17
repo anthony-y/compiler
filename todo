@@ -1,9 +1,9 @@
-BUG: global variable len not getting initialized in imports.lang
-Table entries that live in the collision list of another are not getting iterated over.
+Give imports their own namespaces.
+Allow pointers to be null-checked without != null.
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 FEATURE: already support function calls inside struct field initializers,
          now need to allow struct fields to be resolved from inside the struct.
-         Already added DECL_IS_STRUCT_FIELD flag, need to add this flag to fields,
+         Already added DECL_IS_STRUCT_FIELD flag, need to add this flag to fields.
 //
 // Codegen
 //

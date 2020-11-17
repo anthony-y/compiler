@@ -1,0 +1,13 @@
+#import "std/basic.lang"
+
+// Type inference, same as:
+//    msg: string = get_message();
+msg := get_message();
+
+proc main() {
+    print(msg.data);
+}
+
+proc get_message(): string {
+    return "Hello, world\n";
+}

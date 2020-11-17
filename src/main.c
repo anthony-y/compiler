@@ -87,7 +87,7 @@ void free_imported_module(Module *mod) {} // TODO
 
 int main(int arg_count, char *args[]) {
     if (arg_count < 2) {
-        fprintf(stderr, "Error: expected a root compilation target (a file path).\n");
+        fprintf(stderr, "Error: expected a root compilation target (a file path) as argument.\n");
         return 1;
     }
 
@@ -104,13 +104,13 @@ int main(int arg_count, char *args[]) {
 
     TokenList tokens; // tokens for main module
     Parser parser; // parser for main module
-    Lexer lexer;
+    Lexer lexer; // lexer used to gather telemetry for all used modules
 
     token_list_init(&tokens);
     lexer_init(&lexer, args[1], data);
     lexer.string_allocator = &context.string_allocator;
 
-    Table import_table;
+    Table import_table; // Hash-table of char* -> Module*
     init_table(&import_table);
 
     // Collect tokens, stats and import paths from the main module.
@@ -142,11 +142,13 @@ int main(int arg_count, char *args[]) {
     //
 
     // Allocate space for AST nodes for all modules.
-    const u64 max_nodes = (u64)(total_stats.number_of_lines * 10);
+    const u64 max_nodes = (u64)(total_stats.number_of_lines * 7);
     assert(arena_init(&context.node_allocator, max_nodes, sizeof(AstNode), 8));
 	assert(arena_init(&module_arena, import_table.num_entries, sizeof(Module), 8));
-    init_types(&context, &total_stats);
-    parser_init(&parser, &tokens, &main_stats);
+
+    init_types(&context, &total_stats); // Initialize the type table, and allocate space for user defined types
+
+    parser_init(&parser, &tokens, &main_stats); // Initialize the parser for the main module
 
 	// Perform front end for each imported file.
 	for (u64 i = 0; i < import_iter.num_entries; i++) {
@@ -155,15 +157,22 @@ int main(int arg_count, char *args[]) {
 		if (!mod) {
 			break;
 		}
+
+		// Put the Module* into the imports table.
+		// TODO: this could probably be cleaner.
         u64 rehash = table_hash_key(path);
-		import_table.pairs[rehash % import_table.capacity].value = mod; // TODO: this is a bit scuffed
+		import_table.pairs[rehash % import_table.capacity].value = mod;
 	}
 
     NEXT_STAGE_OR_QUIT();
-
+	
+	// Actually parse the main module.
     Ast ast;
     ast = parse(&context, &parser);
-
+	
+	// Copy the declarations from each of the imported modules
+	// into the main modules AST.
+	// TODO: namespaced modules.
     import_iter = table_get_iterator(&import_table);
 	for (u64 i = 0; i < import_iter.num_entries; i++) {
 		Module *mod = import_iter.pairs[i].value;
@@ -171,19 +180,26 @@ int main(int arg_count, char *args[]) {
 			ast_add(&ast, mod->ast.nodes[j]);
 		}
 	}
+	free(import_iter.pairs);
 
     ensure_main_is_declared(&context);
+    NEXT_STAGE_OR_QUIT();
 
     //
     // Complete compilation pipeline for the main file.
     //
-    NEXT_STAGE_OR_QUIT();
-    resolve_module(&context);
-    print_unused_symbol_warnings(&context);
-    NEXT_STAGE_OR_QUIT();
-    check_ast(&context, &ast);
+	resolve_module(&context);
+	print_unused_symbol_warnings(&context);
+
     NEXT_STAGE_OR_QUIT();
 
+	check_ast(&context, &ast);
+
+    NEXT_STAGE_OR_QUIT();
+	
+	//
+	// C code generation
+	//
     char *output_path = generate_and_write_c_code(&context, &ast);
     u64 len = strlen("gcc -g -std=c99") + strlen(output_path) + strlen("-o ") + strlen("-Wno-discarded-qualifiers ") + strlen("-Wno-return-local-addr") + strlen("-Wno-builtin-declaration-mismatch") + 1;
     char *command = arena_alloc(&context.scratch, len);
@@ -192,7 +208,7 @@ int main(int arg_count, char *args[]) {
 	printf("It ran.\n");
 end:
     free_table(&import_table);
-    //parser_free(&parser, &ast); TODO fix
+	parser_free(&parser, &ast);
     token_list_free(&tokens);
     free_context(&context);
     free(data);
