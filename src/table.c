@@ -49,7 +49,8 @@ bool table_add(Table *table, char *key, void *value) {
 	// Does having a 32-bit hash mean I can only address 32-bits worth of array indexes?
 	u32 hash  = table_hash_key(key);
 	u64 index = hash % table->capacity;
-	if (index == 0) {
+
+	if (table->capacity < table->num_entries+1) {
 		// printf("Full, resizing\n");
 		table->capacity *= 2;
 		table->pairs = realloc(table->pairs, table->capacity);
@@ -57,6 +58,7 @@ bool table_add(Table *table, char *key, void *value) {
 		hash = table_hash_key(key);
 		index = hash % table->capacity;
 	}
+
 	if (table->pairs[index].value != NULL && table->pairs[index].key != NULL) {
 		TablePair *existing_pair = &table->pairs[index];
 		// printf("table_get: already a pair for %s: %s.\n", key, existing_pair->key);
@@ -70,6 +72,8 @@ bool table_add(Table *table, char *key, void *value) {
 	}
 	table->pairs[index].key = key;
 	table->pairs[index].value = value;
+	table->pairs[index].num_collisions = 0;
+	table->pairs[index].collision_capacity = 32;
 	table->num_entries++;
 	return true;
 }

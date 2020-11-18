@@ -1,6 +1,5 @@
 Errors show the wrong name in the post-parser steps of the pipeline.
 Give imports their own namespaces.
-Allow pointers to be null-checked without != null.
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 FEATURE: already support function calls inside struct field initializers,
          now need to allow struct fields to be resolved from inside the struct.

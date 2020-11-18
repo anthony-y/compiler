@@ -235,9 +235,9 @@ static AstExpr *parse_expression(Context *ctx, Parser *parser, int min_prec) {
         TokenType op = parser->curr->type;
         BinaryOperator info = get_binary_op_info(op);
 
-        if ((op < Token_BINOP_START && op > Token_BINOP_END) || info.prec < min_prec) {
-            break;
-        }
+		if (!(op > Token_BINOP_START && op < Token_BINOP_END) || info.prec < min_prec) {
+			break;
+		}
 
         int next_min_prec = info.prec;
         if (info.left_assoc) next_min_prec++;
