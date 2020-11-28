@@ -11,7 +11,6 @@ AstDecl *lookup_in_block(AstBlock *block, Name *name) {
 }
 
 AstDecl *lookup_local(Context *ctx, AstProcedure *proc, Name *name, AstBlock *start_from) {
-    Table *table = &ctx->symbols;
     if (proc->params) {
         for (int i = 0; i < proc->params->len; i++) {
             AstDecl *decl = (AstDecl *)proc->params->nodes[i];
@@ -19,6 +18,7 @@ AstDecl *lookup_local(Context *ctx, AstProcedure *proc, Name *name, AstBlock *st
         }
     }
 
+    Table *table = &ctx->symbols;
     AstDecl *s = lookup_in_block(start_from, name);
     if (!s) {
         AstBlock *parent = start_from->parent;
@@ -57,12 +57,13 @@ Name *make_namet(Context *ctx, const char *txt) {
 }
 
 inline void add_symbol(Context *c, AstDecl *n, char *name) {
+    Table *table = &c->symbols;
     Token t = ((AstNode *)n)->token;
-    if (table_get(&c->symbols, name)) {
+    if (table_get(table, name)) {
         compile_error(c, t, "Redefinition of symbol \"%s\" in module %s", name, c->current_module->path);
         return;
     }
-    assert(table_add(&c->symbols, name, n));
+    assert(table_add(table, name, n));
 }
 
 void init_context(Context *c) {
@@ -84,13 +85,6 @@ void free_context(Context *c) {
     arena_free(&c->node_allocator);
 	free_table(&c->symbols);
 }
-
-// void init_module(Context *ctx, Module *mod, SourceStats stats, char *path) {
-//     mod->name = make_namet(ctx, path);
-//     ctx->current_module = mod;
-//     sh_new_arena(mod->symbols);
-//     sh_new_arena(mod->type_table);
-// }
 
 void compile_error(Context *ctx, Token t, const char *fmt, ...) {
     va_list args;

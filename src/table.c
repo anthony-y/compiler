@@ -45,6 +45,23 @@ TableIter table_get_iterator(const Table *t) {
 	return it;
 }
 
+char **table_get_keys(const Table *t) {
+	char **out = malloc(t->num_entries * sizeof(char*));
+	assert(out);
+	u64 out_i = 0;
+	for (u64 i = 0; i < t->capacity; i++) {
+		TablePair p = t->pairs[i];
+		if (p.key == NULL) continue;
+		out[out_i++] = p.key;
+		if (p.collisions) {
+			for (u64 j = 0; j < p.num_collisions; j++) {
+				out[out_i++] = p.collisions[j].key;
+			}
+		}
+	}
+	return out;
+}
+
 bool table_add(Table *table, char *key, void *value) {
 	// Does having a 32-bit hash mean I can only address 32-bits worth of array indexes?
 	u32 hash  = table_hash_key(key);

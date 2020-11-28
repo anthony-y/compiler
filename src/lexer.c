@@ -348,7 +348,6 @@ bool lexer_lex(Lexer *l, TokenList *list, SourceStats *stats, Table *table) {
     u64 args = 0;
     u64 blocks = 0;
     u64 types = 0;
-    u64 number_imports = 0;
 
     while (true) {
         last = l->last;
@@ -363,7 +362,6 @@ bool lexer_lex(Lexer *l, TokenList *list, SourceStats *stats, Table *table) {
                 continue;
             }
             table_add(table, t.text, &(Module){0});
-            number_imports++;
             continue;
         }
 
@@ -395,7 +393,6 @@ bool lexer_lex(Lexer *l, TokenList *list, SourceStats *stats, Table *table) {
         stats->pointer_types += pointers;
         stats->argument_lists += args;
         stats->declared_types += types;
-        stats->number_of_imports += number_imports;
         stats->number_of_lines += l->line;
     }
     return true;

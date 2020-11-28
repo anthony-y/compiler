@@ -26,34 +26,40 @@ static AstProcedure **proc_stack = NULL;
 static AstBlock **scope_stack = NULL;
 
 static AstProcedure *resolve_call(AstNode *callnode, Context *ctx) {
-    Table *table = &ctx->symbols;
-    Token tok = callnode->token;
-    AstCall *call = (AstCall *)callnode;
-    char *str_name = call->name->as.name->text;
+    Table   *table    = &ctx->symbols;
+    AstCall *call     = (AstCall *)callnode;
+    char    *str_name = call->name->as.name->text;
+    Token    tok      = callnode->token;
 
     AstDecl *hopefully_proc = table_get(table, str_name);
     if (!hopefully_proc) {
-        // for (u64 i = 0; i < shlenu(ctx->current_module->imports); i++) {
-        //     Module *m = ctx->current_module->imports[i].value;
-        //     table = m->symbols;
-        //     symbol_index = shgeti(table, str_name);
-        // }
-        // if (symbol_index == -1) {
+        Module *start = ctx->current_module;
+        for (u64 i = 0; i < start->num_imports; i++) {
+            char *aux_module_path = start->imports[i];
+            Module *aux_module = table_get(&ctx->imports, aux_module_path);
+            // TODO: Append aux_module_path to str_name and search again.
+            hopefully_proc = table_get(table, str_name);
+        }
+        if (!hopefully_proc) {
             compile_error(ctx, tok, "call to undeclared procedure \"%s\"", str_name);
             return NULL;
-        // }
+        }
     }
+
     if (call->params) for (int i = 0; i < call->params->len; i++) {
         AstExpr *arg = (AstExpr *)call->params->nodes[i];
         resolve_expression(arg, ctx);
     }
+
     if (hopefully_proc->tag != Decl_PROC) {
         compile_error(ctx, tok, "attempted to call \"%s\", but it's not a procedure", str_name);
         return NULL;
     }
+
     if (hopefully_proc->status == Status_UNRESOLVED) {
         resolve_procedure(hopefully_proc, ctx);
     }
+
     AstProcedure *calling = (AstProcedure *)hopefully_proc;
     call->calling = calling;
     return calling;
@@ -243,21 +249,9 @@ static Type *resolve_type(Context *ctx, Type *type, AstNode *site, bool cyclic_a
     if (type->kind == Type_ARRAY)
         return make_array_type(resolve_type(ctx, type->data.base, site, true));
 
-    #if 0
-    if (type->kind != Type_UNRESOLVED) {
-        // For types which were declared before they are used, the declaration
-        // won't get resolved at top level, so we just do it here.
-        AstDecl *types_decl = shget(ctx->symbol_table, type->name);
-        assert(types_decl);
-        types_decl->status = Status_RESOLVED;
-        return type;
-    }
-    #endif
-
     // Unresolved types (that is, types which are used before they are defined) are returned
     // as placeholder types, and are not put in the type table. If they then go on to be defined in the source code, they will be placed into the type table.
     // Here, we lookup the type in the type table. If it is not found, then it was never declared.
-    // ...
     Type *real_type = table_get(&ctx->type_table, type->name);
     if (!real_type) {
         compile_error(ctx, site->token, "undeclared type \"%s\"", type->name);
@@ -556,4 +550,3 @@ void resolve_module(Context *ctx) {
     stbds_arrfree(proc_stack);
     stbds_arrfree(scope_stack);
 }
-

@@ -508,17 +508,6 @@ static AstNode *parse_typedef(Context *ctx, Parser *parser) {
 
     Table *table = &ctx->type_table;
 
-    // Type *maybe_existing = table_get(table, name.text); // hopefully NULL
-    // if (maybe_existing) {
-    //     assert(maybe_existing->kind != Type_PRIMITIVE);
-    //     AstStmt *user = maybe_existing->data.user;
-    //     assert(user);
-    //     compile_error_start(ctx, name, "type \"%s\" was declared more than once; first declared here:", name.text);
-    //     compile_error_add_line(ctx, "\t%s:%lu", ctx->path, stmt_tok(user).line);
-    //     compile_error_end();
-    //     return NULL;
-    // }
-
     AstDecl *existing = table_get(&ctx->symbols, name.text);
     if (existing && existing->tag == Decl_TYPEDEF) {
         compile_error_start(
@@ -805,7 +794,7 @@ static int parse_proc_mod(Context *ctx, Parser *parser, AstExpr **out_maybe_fore
     return -1;
 }
 
-// Parse a procuedure declaration.
+// Parse a procedure declaration.
 static AstNode *parse_proc(Context *ctx, Parser *parser, bool in_typedef) {
     
     Token start = *parser->curr;
@@ -821,15 +810,14 @@ static AstNode *parse_proc(Context *ctx, Parser *parser, bool in_typedef) {
         return NULL;
     }
 
-    Token name = *parser->curr;
+    Token name_token = *parser->curr;
     if (!consume(parser, Token_IDENT) && !in_typedef) {
         compile_error(ctx, *parser->curr, "expected name on procedure declaration");
         parser_recover_to_declaration(parser);
         return NULL;
     }
 
-    Name *ident = make_name(ctx, *parser->prev);
-
+    Name *ident = make_name(ctx, name_token);
     proc.name = ident;
 
     if (!consume(parser, Token_OPEN_PAREN)) {
@@ -948,7 +936,7 @@ static AstNode *parse_proc(Context *ctx, Parser *parser, bool in_typedef) {
     if (ident == make_namet(ctx, "main")) {
         ctx->decl_for_main = procnode;
     }
-    add_symbol(ctx, procnode, name.text);
+    add_symbol(ctx, procnode, name_token.text);
 
     return (AstNode *)procnode;
 }

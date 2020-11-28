@@ -26,8 +26,8 @@ static char *read_file(const char *path);
 static void ensure_main_is_declared(Context *ctx);
 static void print_unused_symbol_warnings(Context *);
 
-// Roughly time the execution of "code" in microseconds
-// There must be a variable called "id"_delta in the scope that you use this in
+// Roughly time the execution of "code" in microseconds.
+// There must be a variable called "id"_delta in the scope that you use this in.
 #define PROFILE(id, code) do {\
     struct timeval id ## end, id ## start;\
     gettimeofday(&id##start, NULL);\
@@ -36,22 +36,14 @@ static void print_unused_symbol_warnings(Context *);
     id##_delta = (id##end.tv_sec - id##start.tv_sec) * 1000000 + id##end.tv_usec - id##start.tv_usec;\
 } while (false)
 
-static Arena module_arena;
-
 // All imports must be initialized individually before they are collectively
 // resolved, checked and compiled.
 Module *load_imported_module(Context *ctx, Arena *storage, char *path) {
-	// Lex, parse, resolve, check.
-	// And keep lexer, parser, etc. on Module to be freed later.
-	// Allocate into "storage" and store the pointers in the ModuleTable.
-	//
-	// All the functionality is there, just need to find the right way
-	// to hook it up to multiple files/namespaces.
-	//
-	char *data = read_file(path);
-	if (!data) return false;
+	char *file_data = read_file(path);
+	if (!file_data) return false;
 	
 	Table imports;
+
 	SourceStats stats = (SourceStats){10};
 	TokenList   tokens;
 	Parser      parser;
@@ -61,25 +53,40 @@ Module *load_imported_module(Context *ctx, Arena *storage, char *path) {
 	init_table(&imports);
 
 	token_list_init(&tokens);
-	lexer_init(&lexer, path, data);
+	lexer_init(&lexer, path, file_data);
 	lexer.string_allocator = &ctx->string_allocator;
 
 	Module *mod = arena_alloc(storage, sizeof(Module));
     mod->path = path;
 
-	if (!lexer_lex(&lexer, &tokens, &stats, &imports)) return NULL;
-	if (tokens.len == 1) return mod;
-	ctx->current_module = mod;
-	parser_init(&parser, &tokens, &stats);
-	ast = parse(ctx, &parser);
+	if (!lexer_lex(&lexer, &tokens, &stats, &imports)) {
+        return NULL;
+    } else if (tokens.len == 1) {
+        return mod;
+    }
 
-	mod->imports = imports;
-    // mod->symbols = NULL; // TODO
-	mod->ast = ast;
+    mod->num_imports = imports.num_entries;
+    mod->imports     = table_get_keys(&imports);
+
+	parser_init(&parser, &tokens, &stats);
+
+	ctx->current_module = mod;
+
+	ast = parse(ctx, &parser);
+	mod->ast    = ast;
+    mod->lexer  = lexer;
+    mod->parser = parser;
+
 	return mod;
 }
 
-void free_imported_module(Module *mod) {} // TODO
+void free_imported_module(Module *mod) {
+    free(mod->imports);
+    mod->num_imports = 0;
+    mod->path = NULL;
+    parser_free(&mod->parser, &mod->ast);
+    lexer_free(&mod->lexer);
+}
 
 int main(int arg_count, char *args[]) {
     if (arg_count < 2) {
@@ -92,17 +99,17 @@ int main(int arg_count, char *args[]) {
 
 	#define NEXT_STAGE_OR_QUIT() if (context.error_count > 0) goto end
 
-    char *data = read_file(args[1]);
+    char *file_data = read_file(args[1]);
 
-    SourceStats main_stats = (SourceStats){10}; // stats for main module
     SourceStats total_stats; // stats for all used modules
-
-    TokenList tokens; // tokens for main module
-    Parser parser; // parser for main module
     Lexer lexer; // lexer used to gather telemetry for all used modules
 
+    SourceStats main_stats = (SourceStats){10}; // stats for main module
+    TokenList tokens; // tokens for main module
+    Parser parser; // parser for main module
+
     token_list_init(&tokens);
-    lexer_init(&lexer, args[1], data);
+    lexer_init(&lexer, args[1], file_data);
     lexer.string_allocator = &context.string_allocator;
 
     Table import_table; // Hash-table of char* -> Module*
@@ -132,17 +139,22 @@ int main(int arg_count, char *args[]) {
         import_iter = table_get_iterator(&import_table);
     }
 
+    context.imports = import_table;
+
+
     //
     // At this point we know how much memory to allocate.
     //
 
+
     // Allocate space for AST nodes for all modules.
     const u64 max_nodes = (u64)(total_stats.number_of_lines * 7);
     assert(arena_init(&context.node_allocator, max_nodes, sizeof(AstNode), 8));
+
+    Arena module_arena;
 	assert(arena_init(&module_arena, import_table.num_entries, sizeof(Module), 8));
 
     init_types(&context, &total_stats); // Initialize the type table, and allocate space for user defined types
-
     parser_init(&parser, &tokens, &main_stats); // Initialize the parser for the main module
 
 	// Perform front end for each imported file.
@@ -158,7 +170,6 @@ int main(int arg_count, char *args[]) {
         u64 rehash = table_hash_key(path);
 		import_table.pairs[rehash % import_table.capacity].value = mod;
 	}
-
     NEXT_STAGE_OR_QUIT();
 	
 	// Actually parse the main module.
@@ -175,7 +186,6 @@ int main(int arg_count, char *args[]) {
 			ast_add(&ast, mod->ast.nodes[j]);
 		}
 	}
-	free(import_iter.pairs);
 
     ensure_main_is_declared(&context);
     NEXT_STAGE_OR_QUIT();
@@ -185,11 +195,9 @@ int main(int arg_count, char *args[]) {
     //
 	resolve_module(&context);
 	print_unused_symbol_warnings(&context);
-
     NEXT_STAGE_OR_QUIT();
 
 	check_ast(&context, &ast);
-
     NEXT_STAGE_OR_QUIT();
 	
 	//
@@ -202,11 +210,21 @@ int main(int arg_count, char *args[]) {
     system(command);
 	printf("It ran.\n");
 end:
+    // Free modules (if we got far enough to allocate them).
+    if (import_iter.pairs) {
+        for (u64 i = 0; i < import_iter.num_entries; i++) {
+		    Module *mod = import_iter.pairs[i].value;
+		    free_imported_module(mod);
+	    }
+        free(import_iter.pairs);
+    }
+
+    // Free main.
     free_table(&import_table);
 	parser_free(&parser, &ast);
     token_list_free(&tokens);
     free_context(&context);
-    free(data);
+    free(file_data);
     arena_free(&module_arena);
 
     return 0;

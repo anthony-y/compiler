@@ -18,17 +18,20 @@ struct Module;
 
 typedef struct Module {
 	char *path;
-	Table imports;
-	Table symbols;
-	Parser parser;
-	Lexer lexer;
+	char **imports;
+    u64 num_imports;
 	Ast ast;
+
+    // These are just here to be
+    // freed at the end.
+    Parser parser;
+    Lexer lexer;
 } Module;
 
 // An entry in the name table.
 typedef struct Name {
     char    *text;
-    AstDecl *resolved_decl;
+    AstDecl *resolved_decl; // TODO: this should be an array
 } Name;
 
 // Contains statistics about the source code
@@ -38,7 +41,6 @@ typedef struct SourceStats {
     u64 declared_types;
     u64 pointer_types;
     u64 argument_lists;
-    u64 number_of_imports;
     u64 blocks;
     u64 structs;
     u64 number_of_lines;
@@ -47,19 +49,20 @@ typedef struct SourceStats {
 // Central compiler context, a reference to an instance of this struct is
 // passed to most functions in the compiler.
 typedef struct Context {
-    int error_count;
-
-    Arena scratch;
     Arena string_allocator; // lexer
     Arena node_allocator; // parser
+    Arena scratch;
 
-    AstProcedure *curr_checker_proc;
-    AstDecl *decl_for_main;
-	Module *current_module;
     Table symbols;
     Table type_table;
+    Table imports;
 
-    struct {char *key; Name *value;} *name_table;
+    AstProcedure *curr_checker_proc;
+	Module *current_module;
+
+    AstDecl *decl_for_main;
+
+    struct {char *key; Name       *value;} *name_table;
     struct {char *key; AstLiteral *value;} *string_literal_pool;
 
     /* Handles to types in the type table
@@ -70,6 +73,8 @@ typedef struct Context {
     Type *type_string, *type_void, *type_bool; // non-integer types
     Type *null_type; // type of "null" literal
     Type *type_any; // any
+
+    int error_count;
 } Context;
 
 void compile_error(Context *ctx, Token t, const char *fmt, ...);

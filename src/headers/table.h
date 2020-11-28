@@ -30,6 +30,7 @@ void init_table(Table *table);
 bool table_add(Table *table, char *key, void *value);
 void *table_get(Table *table, char *key);
 TableIter table_get_iterator(const Table *);
+char **table_get_keys(const Table *);
 void free_table(Table *table);
 
 #endif
