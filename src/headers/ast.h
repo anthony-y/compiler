@@ -307,7 +307,6 @@ typedef struct AstDecl {
         AstVar var;
         AstTypedef typedefi;
     } as;
-	struct Module *declared_in;
     struct Name *name;
     DeclType tag;
     int flags;
@@ -323,7 +322,6 @@ typedef struct AstNode {
         AstExpr expr;
         AstDecl decl;
         AstStmt stmt;
-
         Type *type;
     } as;
     AstNodeType tag;
@@ -332,7 +330,6 @@ typedef struct AstNode {
 
 typedef struct Ast {
     AstNode **nodes;
-
     u64 cap;
     u64 len;
 } Ast;

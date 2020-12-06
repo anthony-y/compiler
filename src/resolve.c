@@ -26,25 +26,19 @@ static AstProcedure **proc_stack = NULL;
 static AstBlock **scope_stack = NULL;
 
 static AstProcedure *resolve_call(AstNode *callnode, Context *ctx) {
-    Table   *table    = &ctx->symbols;
-    AstCall *call     = (AstCall *)callnode;
-    char    *str_name = call->name->as.name->text;
-    Token    tok      = callnode->token;
+    Table *table = &ctx->symbols;
+    AstCall *call = (AstCall *)callnode;
+    Token tok = callnode->token;
 
-    AstDecl *hopefully_proc = table_get(table, str_name);
+    char *raw_name = call->name->as.name->text;
+
+    AstDecl *hopefully_proc = table_get(table, raw_name);
     if (!hopefully_proc) {
-        Module *start = ctx->current_module;
-        for (u64 i = 0; i < start->num_imports; i++) {
-            char *aux_module_path = start->imports[i];
-            Module *aux_module = table_get(&ctx->imports, aux_module_path);
-            // TODO: Append aux_module_path to str_name and search again.
-            hopefully_proc = table_get(table, str_name);
-        }
-        if (!hopefully_proc) {
-            compile_error(ctx, tok, "call to undeclared procedure \"%s\"", str_name);
-            return NULL;
-        }
+        compile_error(ctx, tok, "call to undeclared procedure \"%s\"", raw_name);
+        return NULL;
     }
+
+    // Ensure the module that the requested function was declared in is imported in the module the call was made in.
 
     if (call->params) for (int i = 0; i < call->params->len; i++) {
         AstExpr *arg = (AstExpr *)call->params->nodes[i];
@@ -52,7 +46,7 @@ static AstProcedure *resolve_call(AstNode *callnode, Context *ctx) {
     }
 
     if (hopefully_proc->tag != Decl_PROC) {
-        compile_error(ctx, tok, "attempted to call \"%s\", but it's not a procedure", str_name);
+        compile_error(ctx, tok, "attempted to call \"%s\", but it's not a procedure", raw_name);
         return NULL;
     }
 
@@ -95,8 +89,6 @@ static Type *resolve_name(Context *ctx, Name *name, AstNode *site) {
     }
 
     assert(var->name == name);
-
-    name->resolved_decl = var;
 
     if (var->status == Status_UNRESOLVED) {
         if (!(var->flags & DECL_IS_TOP_LEVEL) && !(var->flags & DECL_IS_STRUCT_FIELD)) {
@@ -318,11 +310,11 @@ static Type *resolve_selector(Context *ctx, AstBinary *accessor) {
     }
 
     if (lhs_type == ctx->type_string || (lhs_type->kind == Type_POINTER && lhs_type->data.base == ctx->type_string)) {
-        if (rhs == make_namet(ctx, "data")) {
+        if (rhs == make_name_from_string(ctx, "data")) {
             static Type *data_type;
             data_type = make_pointer_type(ctx->type_u8);
             return data_type;
-        } else if (rhs == make_namet(ctx, "length")) {
+        } else if (rhs == make_name_from_string(ctx, "length")) {
             return ctx->type_u64;
         } else {
             compile_error(ctx, expr_tok(accessor->left), "type \"string\" has no field \"%s\"", rhs->text);

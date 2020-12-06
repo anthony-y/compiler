@@ -13,6 +13,8 @@
 
 #define FAILED_BUT_DONT_ERROR_AT_CALL_SITE true
 
+static AstProcedure *curr_checker_proc;
+
 void check_statement  (Context *, AstStmt *);
 void check_block      (Context *, AstBlock *, AstNodeType);
 void check_struct     (Context *, AstStruct *);
@@ -323,9 +325,9 @@ bool does_type_describe_expr(Context *ctx, Type *type, AstExpr *expr) {
 }
 
 // Ensure a return statement is compatible with the procedure declaration
-// that it resides inside. Uses `ctx->curr_checker_proc` to compare against.
+// that it resides inside. Uses `curr_checker_proc;` to compare against.
 bool check_proc_return_value(Context *ctx, AstStmt *retnode) {
-    Type *return_type = ctx->curr_checker_proc->return_type->as.type;
+    Type *return_type = curr_checker_proc->return_type->as.type;
 
     Token tok = stmt_tok(retnode);
     AstReturn *r = &retnode->as._return;
@@ -484,14 +486,15 @@ bool check_assignment(Context *ctx, AstExpr *expr, bool lhs_must_be_pointer) {
     }
 
     if (binary->left->tag == Expr_NAME) {
-        Name *left_name = binary->left->as.name;
-        if (left_name->resolved_decl->tag == Decl_VAR) {
-            AstVar *var = (AstVar *)left_name->resolved_decl;
-            if (var->flags & VAR_IS_CONST) {
-                compile_error(ctx, tok, "attempt to modify a const value");
-                return false;
-            }
-        }
+        /* TODO: check for const value modification without Name.resolved_decl */
+        // Name *left_name = binary->left->as.name;
+        // if (left_name->resolved_decl->tag == Decl_VAR) {
+        //     AstVar *var = (AstVar *)left_name->resolved_decl;
+        //     if (var->flags & VAR_IS_CONST) {
+        //         compile_error(ctx, tok, "attempt to modify a const value");
+        //         return false;
+        //     }
+        // }
     }
 
     return true;
@@ -534,7 +537,7 @@ void check_statement(Context *ctx, AstStmt *node) {
         break;
     case Stmt_RETURN: {
         if (check_proc_return_value(ctx, node)) {
-            ctx->curr_checker_proc->flags |= PROC_RET_VALUE_CHECKED;
+            curr_checker_proc->flags |= PROC_RET_VALUE_CHECKED;
         }
     } break;
     }
@@ -584,10 +587,10 @@ void check_ast(Context *ctx, Ast *ast) {
                 }
             }
             if (proc->flags & PROC_IS_FOREIGN) continue;
-            ctx->curr_checker_proc = proc;
+            curr_checker_proc = proc;
             check_block(ctx, (AstBlock *)((AstProcedure *)node)->block, Node_ZERO);
-            if (!(ctx->curr_checker_proc->flags & PROC_RET_VALUE_CHECKED)) {
-                if (ctx->curr_checker_proc->return_type->as.type != ctx->type_void)
+            if (!(curr_checker_proc->flags & PROC_RET_VALUE_CHECKED)) {
+                if (curr_checker_proc->return_type->as.type != ctx->type_void)
                     compile_error(ctx, node->token, "Non-void procedure has no 'return' statement");
             }
         } break;

@@ -54,7 +54,7 @@ void free_block(AstStmt *stmt) {
 
     ast_free(b->statements);
     ast_free(b->deferred);
-    free_table(&b->symbols);
+    table_free(&b->symbols);
     b->parent = NULL;
 }
 
@@ -149,7 +149,7 @@ void ast_add(Ast *list, AstNode *node) {
 AstExpr *ast_name(Context *c, Token t) {
     AstNode *n = ast_node(c, Node_IDENT, t);
     n->as.expr.tag = Expr_NAME;
-    n->as.expr.as.name = make_name(c, t);
+    n->as.expr.as.name = make_name_from_token(c, t);
     return &n->as.expr;
 }
 
@@ -208,7 +208,6 @@ AstDecl *ast_proc(Context *c, Token t, Name *name, const AstProcedure *proc) {
     n->as.decl.status = Status_UNRESOLVED;
     n->as.decl.tag = Decl_PROC;
     n->as.decl.name = name;
-	n->as.decl.declared_in = c->current_module;	
     n->as.decl.as.proc = *proc;
     return &n->as.decl;
 }
@@ -219,7 +218,6 @@ AstDecl *ast_var(Context *c, Token t, Name *name, const AstVar *var) {
     n->as.decl.status = Status_UNRESOLVED;
     n->as.decl.tag = Decl_VAR;
     n->as.decl.name = name;
-	n->as.decl.declared_in = c->current_module;
     n->as.decl.as.var = *var;
     return &n->as.decl;
 }
@@ -230,7 +228,6 @@ AstDecl *ast_typedefi(Context *c, Token t, Name *name, const AstTypedef *td) {
     n->as.decl.status = Status_UNRESOLVED;
     n->as.decl.tag = Decl_TYPEDEF;
     n->as.decl.name = name;
-	n->as.decl.declared_in = c->current_module;	
     n->as.decl.as.typedefi = *td;
     return &n->as.decl;
 }

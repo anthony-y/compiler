@@ -50,7 +50,7 @@ Module *load_imported_module(Context *ctx, Arena *storage, char *path) {
 	Lexer       lexer;
 	Ast         ast;
 
-	init_table(&imports);
+	table_init(&imports);
 
 	token_list_init(&tokens);
 	lexer_init(&lexer, path, file_data);
@@ -65,8 +65,7 @@ Module *load_imported_module(Context *ctx, Arena *storage, char *path) {
         return mod;
     }
 
-    mod->num_imports = imports.num_entries;
-    mod->imports     = table_get_keys(&imports);
+    mod->imports = imports;
 
 	parser_init(&parser, &tokens, &stats);
 
@@ -81,8 +80,6 @@ Module *load_imported_module(Context *ctx, Arena *storage, char *path) {
 }
 
 void free_imported_module(Module *mod) {
-    free(mod->imports);
-    mod->num_imports = 0;
     mod->path = NULL;
     parser_free(&mod->parser, &mod->ast);
     lexer_free(&mod->lexer);
@@ -113,7 +110,7 @@ int main(int arg_count, char *args[]) {
     lexer.string_allocator = &context.string_allocator;
 
     Table import_table; // Hash-table of char* -> Module*
-    init_table(&import_table);
+    table_init(&import_table);
 
     // Collect tokens, stats and import paths from the main module.
     if (!lexer_lex(&lexer, &tokens, &main_stats, &import_table)) {
@@ -138,9 +135,6 @@ int main(int arg_count, char *args[]) {
         if (!success) goto end;
         import_iter = table_get_iterator(&import_table);
     }
-
-    context.imports = import_table;
-
 
     //
     // At this point we know how much memory to allocate.
@@ -171,6 +165,9 @@ int main(int arg_count, char *args[]) {
 		import_table.pairs[rehash % import_table.capacity].value = mod;
 	}
     NEXT_STAGE_OR_QUIT();
+
+    context.current_module = &(Module){0};
+    context.current_module->path = args[1];
 	
 	// Actually parse the main module.
     Ast ast;
@@ -220,7 +217,7 @@ end:
     }
 
     // Free main.
-    free_table(&import_table);
+    table_free(&import_table);
 	parser_free(&parser, &ast);
     token_list_free(&tokens);
     free_context(&context);

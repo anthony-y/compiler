@@ -55,7 +55,7 @@ static inline Type *make_and_insert_primitive(Context *ctx, char *name, u64 size
 
 void free_types(Context *ctx) {
     arena_free(&type_arena);
-    free_table(&ctx->type_table);
+    table_free(&ctx->type_table);
 }
 
 // Initialize the type table and add the primitive types to it.
@@ -72,7 +72,7 @@ void init_types(Context *ctx, SourceStats *stats) {
     u64 total_types = (num_builtins + stats->pointer_types + (stats->declared_types * 2));
     arena_init(&type_arena, total_types, sizeof(Type), 8);
 
-    init_table(&ctx->type_table);
+    table_init(&ctx->type_table);
 
     ctx->type_int = make_and_insert_primitive(ctx, "int", sizeof(s64), Signage_SIGNED);
 

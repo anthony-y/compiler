@@ -17,7 +17,7 @@ u32 table_hash_key(char *key) {
 	return hash;
 }
 
-void init_table(Table *table) {
+void table_init(Table *table) {
 	table->capacity = 32;
 	table->num_entries = 0;
 	table->pairs = calloc(table->capacity, sizeof(TablePair));
@@ -119,7 +119,7 @@ void *table_get(Table *table, char *key) {
 	return NULL;
 }
 
-void free_table(Table *table) {
+void table_free(Table *table) {
 	for (u64 i = 0; i < table->capacity; i++) {
 		if (table->pairs[i].key == NULL && table->pairs[i].value == NULL) continue;
 		TablePair *p = &table->pairs[i];

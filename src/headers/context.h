@@ -14,25 +14,18 @@
 
 #define CONTEXT_SCRATCH_SIZE 1024
 
-struct Module;
+// An entry in the name table.
+typedef struct Name {char *text;} Name;
 
 typedef struct Module {
 	char *path;
-	char **imports;
-    u64 num_imports;
+    Table imports;
 	Ast ast;
 
-    // These are just here to be
-    // freed at the end.
+    // These are just here to be freed at the end.
     Parser parser;
     Lexer lexer;
 } Module;
-
-// An entry in the name table.
-typedef struct Name {
-    char    *text;
-    AstDecl *resolved_decl; // TODO: this should be an array
-} Name;
 
 // Contains statistics about the source code
 // which can be used to compute allocation sizes.
@@ -55,15 +48,13 @@ typedef struct Context {
 
     Table symbols;
     Table type_table;
-    Table imports;
+    struct {
+        char *key;
+        Name *value;
+    } *name_table;
 
-    AstProcedure *curr_checker_proc;
 	Module *current_module;
-
     AstDecl *decl_for_main;
-
-    struct {char *key; Name       *value;} *name_table;
-    struct {char *key; AstLiteral *value;} *string_literal_pool;
 
     /* Handles to types in the type table
        for easy comparison in type-checking, etc. */
@@ -77,22 +68,23 @@ typedef struct Context {
     int error_count;
 } Context;
 
-void compile_error(Context *ctx, Token t, const char *fmt, ...);
+void compile_error(Context *, Token, const char *fmt, ...);
 void compile_error_start(Context *, Token, const char *fmt, ...);
-void compile_error_add_line(Context *ctx, const char *fmt, ...);
+void compile_error_add_line(Context *, const char *fmt, ...);
 void compile_error_end();
+void compile_warning(Context *, Token, const char *fmt, ...);
 
-void compile_warning(Context *ctx, Token t, const char *fmt, ...);
-
-void init_context(Context *c);
-void free_context(Context *c);
+void init_context(Context *);
+void free_context(Context *);
 
 // From types.c, couldn't declare in types.h because of a circular dependency with context.h
 void init_types(Context *, SourceStats *);
 void free_types(Context *);
 
-Name *make_name(Context *, Token from);
-Name *make_namet(Context *, const char *txt);
+char *encode_module_into_name(Context *, char *raw);
+char *get_encoded_name(char *module, char *raw);
+Name *make_name_from_string(Context *, const char *txt);
+Name *make_name_from_token(Context *, Token from);
 
 AstDecl *lookup_local(Context *ctx, AstProcedure *proc, Name *name, AstBlock *start_from);
 AstDecl *lookup_struct_field(AstStruct *, Name *);

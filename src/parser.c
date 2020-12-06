@@ -118,7 +118,7 @@ static AstExpr *parse_simple_expr(Context *ctx, Parser *parser) {
             compile_error(ctx, dots, "var-args expansion expects a name");
             return NULL;
         }
-        ve.name = make_name(ctx, *parser->prev);
+        ve.name = make_name_from_token(ctx, *parser->prev);
         return ast_var_args_expand(ctx, dots, &ve);
     }
 
@@ -322,7 +322,7 @@ static AstStmt *parse_block(Context *ctx, Parser *parser) {
     blocknode->as.stmt.tag = Stmt_BLOCK;
     AstBlock *block = &blocknode->as.stmt.as.block;
     block->deferred = make_subtree(parser);
-    init_table(&block->symbols);
+    table_init(&block->symbols);
 
     parser->current_scope = block;
 
@@ -436,7 +436,7 @@ static AstStmt *parse_enum(Context *ctx, Parser *parser) {
         return NULL;
     }
 
-    init_table(&e.fields);
+    table_init(&e.fields);
 
     while (parser->curr->type == Token_IDENT) {
         Token start = *parser->curr;
@@ -733,7 +733,7 @@ static bool parse_var(Context *ctx, Parser *parser, bool top_level, bool is_cons
 
     AstVar var;
     var.flags    = 0;
-    var.name     = make_name(ctx, name); // probs remove AstDecl names from their actual nodes
+    var.name     = make_name_from_token(ctx, name); // probs remove AstDecl names from their actual nodes
     var.typename = ast_node(ctx, Node_TYPENAME, *parser->curr);
 
     if (is_const) {
@@ -817,7 +817,7 @@ static AstNode *parse_proc(Context *ctx, Parser *parser, bool in_typedef) {
         return NULL;
     }
 
-    Name *ident = make_name(ctx, name_token);
+    Name *ident = make_name_from_token(ctx, name_token);
     proc.name = ident;
 
     if (!consume(parser, Token_OPEN_PAREN)) {
@@ -933,9 +933,11 @@ static AstNode *parse_proc(Context *ctx, Parser *parser, bool in_typedef) {
     }
 
     AstDecl *procnode = ast_proc(ctx, start, ident, &proc);
-    if (ident == make_namet(ctx, "main")) {
+    if (ident == make_name_from_string(ctx, "main")) {
         ctx->decl_for_main = procnode;
     }
+
+
     add_symbol(ctx, procnode, name_token.text);
 
     return (AstNode *)procnode;
@@ -953,7 +955,7 @@ static AstStmt *parse_using(Context *ctx, Parser *parser) {
     }
 
     AstUsing using;
-    using.what = make_name(ctx, *parser->prev);
+    using.what = make_name_from_token(ctx, *parser->prev);
     return ast_using(ctx, start, &using);
 }
 
@@ -965,9 +967,9 @@ static AstNode *parse_top_level_directive(Context *ctx, Parser *parser) {
         parser_recover_to_declaration(parser);
         return NULL;
     }
-    // Name *name = make_name(ctx, *parser->curr);
+    // Name *name = make_name_from_token(ctx, *parser->curr);
     //parser_next(parser);
-    if (/*name == make_namet(ctx, "import")*/consume(parser, Token_IMPORT)) {
+    if (/*name == make_name_from_string(ctx, "import")*/consume(parser, Token_IMPORT)) {
         if (!consume(parser, Token_STRING_LIT)) {
             compile_error(ctx, *parser->curr, "expected a path in the form of a string literal after import");
             return NULL;
@@ -1126,15 +1128,10 @@ static inline AstExpr *int_literal(Context *ctx, Parser *parser) {
 
 static inline AstExpr *string_literal(Context *ctx, Parser *parser) {
     parser_next(parser);
-    u64 str_index = shgeti(ctx->string_literal_pool, parser->prev->text);
-    if (str_index == -1) {
-        AstNode *l = ast_node(ctx, Node_STRING_LIT, *parser->prev);
-        l->as.expr.tag = Expr_STRING;
-        l->as.expr.as.literal.data.string = parser->prev->text;
-        shput(ctx->string_literal_pool, parser->prev->text, (AstLiteral *)l);
-        return &l->as.expr;
-    }
-    return (AstExpr *)ctx->string_literal_pool[str_index].value;
+    AstNode *l = ast_node(ctx, Node_STRING_LIT, *parser->prev);
+    l->as.expr.tag = Expr_STRING;
+    l->as.expr.as.literal.data.string = parser->prev->text;
+    return &l->as.expr;
 }
 
 static inline AstExpr *float_literal(Context *ctx, Parser *parser) {
