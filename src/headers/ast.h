@@ -79,7 +79,7 @@ typedef enum {
         Node_CALL,
         Node_INDEX,
         Node_VAR_ARGS_EXPAND,
-		Node_IMPORT,
+        Node_IMPORT,
         //Node_INITIALIZER,
 
     Node_EXPRESSIONS_END, // sentinal expressions end
@@ -292,7 +292,7 @@ enum {
     DECL_IS_TOP_LEVEL     = 1 << 0,
     DECL_IS_PROC_ARGUMENT = 1 << 1,
     DECL_IS_EXPORTED      = 1 << 2,
-	DECL_IS_STRUCT_FIELD  = 1 << 3,
+    DECL_IS_STRUCT_FIELD  = 1 << 3,
 };
 
 typedef struct AstDecl {

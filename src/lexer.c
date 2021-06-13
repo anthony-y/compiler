@@ -343,9 +343,9 @@ Token next_token(Lexer *tz) {
 }
 
 bool lexer_lex(Lexer *l, TokenList *out) {
-	assert(out);
-	TokenList list;
-	token_list_init(&list);
+    assert(out);
+    TokenList list;
+    token_list_init(&list);
 
     assert(l->string_allocator);
     while (true) { 
@@ -353,6 +353,6 @@ bool lexer_lex(Lexer *l, TokenList *out) {
         token_list_add(&list, t);
         if (t.type == Token_EOF) break;
     }
-	*out = list;
+    *out = list;
     return true;
 }

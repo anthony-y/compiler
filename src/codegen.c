@@ -435,10 +435,10 @@ char *generate_and_write_c_code(Context *ctx, Ast *ast, const char *file_name) {
     }
 
     fprintf(output, "\n");
-	
-	//
-	// Generate implicit initializers for structs.
-	//
+    
+    //
+    // Generate implicit initializers for structs.
+    //
     for (u64 i = 0; i < ast->len; i++) {
         AstDecl *decl = (AstDecl *)ast->nodes[i];
         if (decl->status == Status_UNRESOLVED) continue;

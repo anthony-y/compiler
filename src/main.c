@@ -46,39 +46,39 @@ void load_used_modules(Ast *module, Context *ctx) {
 }
 
 int main(int arg_count, char **args) {
-	if (arg_count < 2) {
-		fprintf(stderr, "error: expected root compilation target (a single file path) as argument.\n");
-		return -1;
-	}
+    if (arg_count < 2) {
+        fprintf(stderr, "error: expected root compilation target (a single file path) as argument.\n");
+        return -1;
+    }
     char *path = args[1];
 
-	Context context;
-	init_context(&context);
+    Context context;
+    init_context(&context);
     init_types(&context, NULL);
-	
-	char *data = read_file(path);
-	if (!data) return -1;
+    
+    char *data = read_file(path);
+    if (!data) return -1;
  
-	Lexer lexer;
-	lexer_init(&lexer, path, data);
-	lexer.string_allocator = &context.string_allocator;	
+    Lexer lexer;
+    lexer_init(&lexer, path, data);
+    lexer.string_allocator = &context.string_allocator; 
     TokenList tokens;
-	if (!lexer_lex(&lexer, &tokens)) return -1;
+    if (!lexer_lex(&lexer, &tokens)) return -1;
 
-	Parser parser;
+    Parser parser;
     Ast the_ast;
     parser_init(&parser, &tokens);
-	parse(&context, &parser, &the_ast, path);
-	if (context.error_count > 0) return -1;
+    parse(&context, &parser, &the_ast, path);
+    if (context.error_count > 0) return -1;
 
     load_used_modules(&the_ast, &context);
-	if (context.error_count > 0) {
+    if (context.error_count > 0) {
         // TODO free
         return -1;
     }
 
     resolve_module(&context, &the_ast);
-	if (context.error_count > 0) return -1;
+    if (context.error_count > 0) return -1;
 
     check_ast(&context, &the_ast);
     if (context.error_count > 0) return -1;
@@ -92,11 +92,11 @@ int main(int arg_count, char **args) {
     sprintf(command, "gcc -g -std=c99 %s -Wno-return-local-addr -Wno-discarded-qualifiers -Wno-builtin-declaration-mismatch -o output_bin", output_path);
 
     system(command);
-	printf("It ran.\n");
+    printf("It ran.\n");
 
-	parser_free(&parser, &the_ast);
-	free_context(&context);
-	// free_types(&context.type_table);
+    parser_free(&parser, &the_ast);
+    free_context(&context);
+    // free_types(&context.type_table);
     return 0;
 }
 

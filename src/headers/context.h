@@ -27,8 +27,8 @@ typedef struct Context {
     Arena node_allocator; // parser
     Arena scratch;
 
-	// The name table is basically just a big string table,
-	// it means I can compare strings by pointer instead of strcmp().
+    // The name table is basically just a big string table,
+    // it means I can compare strings by pointer instead of strcmp().
     struct {
         char *key;
         Name *value;

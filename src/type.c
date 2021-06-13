@@ -23,7 +23,7 @@ Type *type_from_expr(Table *type_table, AstNode *expr);
 // and returns a reference to it.
 Type *make_type(TypeKind kind, char *name, u64 size) {
     // Type *t = arena_alloc(&type_arena, sizeof(Type));
-	Type *t = malloc(sizeof(Type)); // leak
+    Type *t = malloc(sizeof(Type)); // leak
     t->kind = kind;
     t->name = name;
     t->size = size;
