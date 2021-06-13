@@ -1,0 +1,12 @@
+dd := #import "dd.lang";
+// proc print(fmt: ^u8, args: []any..) #foreign "printf";
+
+proc main() {
+    b := get_message();
+    msg: dd.Message;
+    dd.print("%ld %s".data, msg.txt.length, msg.txt);
+}
+
+proc get_message(): string {
+    return "Hi";
+}

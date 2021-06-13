@@ -1,10 +1,10 @@
-#import "std/basic.lang"
+b := #import "std/basic.lang"
 
 type Arena: struct {
 	fixed    : bool = true;
 	cursor   : int  = 0;
 	capacity : int  = 2048;
-	mem: ^u8 = alloc(2048);
+	mem: ^u8; // b.alloc(2048); // TODO this is a bad idea
 }
 
 proc arena_init(a: ^Arena, cap: u64) {
@@ -12,7 +12,7 @@ proc arena_init(a: ^Arena, cap: u64) {
 		free(a.mem);
 		a.mem = null;
 	}
-	a.mem = alloc(cap);
+	a.mem = b.alloc(cap);
 	a.fixed = false;
 	a.cursor = 0;
 	a.capacity = cap;
@@ -26,7 +26,7 @@ proc arena_alloc(a: ^Arena, size: u64): ^u8 {
 }
 
 proc arena_free(a: ^Arena) {
-	free(a.mem);
+	b.free(a.mem);
 	a.fixed = false;
 	a.cursor = 0;
 	a.capacity = 0;
@@ -36,7 +36,7 @@ proc arena_free(a: ^Arena) {
 proc arena_maybe_grow(a: ^Arena, desired_size: u64): bool {
 	if !a.fixed && (a.cursor + desired_size) > a.capacity {
 		a.capacity *= 2;
-		tmp := cast(^u8)realloc(a.mem, a.capacity);
+		tmp := cast(^u8)b.realloc(a.mem, a.capacity);
 		if !tmp then return false;
 		a.mem = tmp;
 		return true;

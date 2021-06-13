@@ -12,6 +12,7 @@ typedef enum {
     Type_POINTER,
     Type_ARRAY,
     Type_ALIAS,
+    Type_IMPORT, // returned from #import expression, can't be typed out by programmer
 
     Type_UNRESOLVED,
         // deferred checking until end of parsing, when all types have been collected
@@ -47,10 +48,7 @@ typedef struct Type {
 
     TypeKind kind;
     union {
-        /* TODO decide on Type array or struct body pointer for this */
-        // struct Type *user;
-        struct AstStmt *user; // array of types for enums and structs
-
+        struct AstNode *user; // TODO: rename to decl.
         struct Type *alias_of; // for typedef aliases
         struct Type *base; // arrays and pointers
         Signage signage; // primitive integer types

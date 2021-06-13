@@ -18,7 +18,7 @@
 #include <assert.h>
 
 static bool consume(Parser *, TokenType);
-static Ast *make_subtree(Parser *);
+static Ast *make_subtree();
 static void parser_recover_to_declaration(Parser *);
 static void parser_recover(Parser *parser, TokenType tt);
 
@@ -122,6 +122,31 @@ static AstExpr *parse_simple_expr(Context *ctx, Parser *parser) {
         return ast_var_args_expand(ctx, dots, &ve);
     }
 
+    case Token_HASH: {
+        parser_next(parser); // #
+        if (parser->curr->type != Token_IDENT && parser->curr->type != Token_IMPORT) {
+            compile_error(ctx, *parser->curr, "expected an identifier after #");
+            parser_recover_to_declaration(parser);
+            return NULL;
+        }
+
+        if (consume(parser, Token_IMPORT)) {
+            if (!consume(parser, Token_STRING_LIT)) {
+                compile_error(ctx, *parser->curr, "expected a path in the form of a string literal after import");
+                return NULL;
+            }
+
+            char *path_buffer = malloc(parser->prev->length);
+            strncpy(path_buffer, parser->prev->text, parser->prev->length);
+
+            AstImport import;
+            import.path = path_buffer;
+
+            return ast_import(ctx, *parser->prev, &import); 
+        }
+        return NULL;
+    }
+
     case Token_CARAT:
     case Token_MINUS:
     case Token_STAR:
@@ -172,7 +197,6 @@ static AstExpr *parse_simple_expr(Context *ctx, Parser *parser) {
             compile_error(ctx, *parser->curr, "expected an expression, got a variable declaration");
             return NULL;
         }
-
         parser_next(parser);
         return ast_name(ctx, *parser->prev);
     }
@@ -185,12 +209,13 @@ static AstExpr *parse_postfix_expr(Context *ctx, Parser *parser, AstExpr *left) 
     Token start = *parser->curr;
 
     switch (parser->curr->type) {
-    case Token_OPEN_PAREN: {
+    case Token_OPEN_PAREN: { // function call
         Token start = *parser->curr;
         AstCall call = parse_call(ctx, parser, left);
         return ast_call_expr(ctx, start, &call);
     } break;
-    case Token_OPEN_BRACKET: {
+
+    case Token_OPEN_BRACKET: { // array index
         parser_next(parser);
         AstArrayIndex index;
         index.name = left;
@@ -215,10 +240,10 @@ static AstExpr *maybe_parse_array_assignment(Context *ctx, Parser *parser, AstEx
     parser_next(parser);
 
     AstBinary binary;
-
     binary.right = parse_expression(ctx, parser, 1);
     binary.left = index;
     binary.op = op.type;
+
     return ast_binary(ctx, op, &binary);
 }
 
@@ -281,7 +306,7 @@ static AstCall parse_call(Context *ctx, Parser *parser, AstExpr *name) {
         return call;
     }
 
-    Ast *params = make_subtree(parser);
+    Ast *params = make_subtree();
     while (!consume(parser, Token_CLOSE_PAREN) && parser->curr->type != Token_SEMI_COLON && parser->curr->type != Token_EOF) {
         AstExpr *arg = parse_expression(ctx, parser, 1);
         if (!arg) {
@@ -321,12 +346,11 @@ static AstStmt *parse_block(Context *ctx, Parser *parser) {
     AstNode *blocknode = ast_node(ctx, Node_BLOCK, open);
     blocknode->as.stmt.tag = Stmt_BLOCK;
     AstBlock *block = &blocknode->as.stmt.as.block;
-    block->deferred = make_subtree(parser);
-    table_init(&block->symbols);
+    block->deferred = make_subtree(); 
 
     parser->current_scope = block;
 
-    Ast *stmts = make_subtree(parser);
+    Ast *stmts = make_subtree();
 
     while (!consume(parser, Token_CLOSE_BRACE) && parser->curr->type != Token_EOF) {
         if (parser->curr->type == Token_EOF) {
@@ -343,6 +367,9 @@ static AstStmt *parse_block(Context *ctx, Parser *parser) {
             //compile_error(ctx, *parser->curr, "unclosed block (missing a '}')");
             return NULL;
         }
+
+        // TODO: redeclaration errors
+        /*
         if (is_decl(statement)) {
             AstDecl *decl = (AstDecl *)statement;
             if (table_get(&block->symbols, decl->name->text)) {
@@ -351,6 +378,7 @@ static AstStmt *parse_block(Context *ctx, Parser *parser) {
             assert(table_add(&block->symbols, decl->name->text, decl));
             consume(parser, Token_SEMI_COLON);
         }
+        */
 
         // Declarations still get added to the statements list so that we can resolve them
         // properly later on.
@@ -379,8 +407,7 @@ static AstStmt *parse_return(Context *ctx, Parser *parser) {
     return ast_return(ctx, start, &ret);
 }
 
-static AstStmt *parse_defer(Context *ctx, Parser *parser) {
-    
+static AstStmt *parse_defer(Context *ctx, Parser *parser) { 
     parser_next(parser);
 
     Token start = *parser->curr;
@@ -397,8 +424,7 @@ static AstStmt *parse_defer(Context *ctx, Parser *parser) {
     return ast_defer(ctx, start, &defer);
 }
 
-static AstStmt *parse_struct(Context *ctx, Parser *parser) {
-    
+static AstStmt *parse_struct(Context *ctx, Parser *parser) { 
     if (!consume(parser, Token_STRUCT)) {
         compile_error(ctx, *parser->curr, "expected a struct declaration");
         parser_recover_to_declaration(parser);
@@ -486,6 +512,9 @@ static AstStmt *parse_enum(Context *ctx, Parser *parser) {
     return ast_enum(ctx, start, &e);
 }
 
+//
+// TODO: add the result of this to the AST as a Type*, and just point that type to the declaration.
+//
 static AstNode *parse_typedef(Context *ctx, Parser *parser) {
     parser_next(parser);
 
@@ -497,57 +526,47 @@ static AstNode *parse_typedef(Context *ctx, Parser *parser) {
         return NULL;
     }
 
-    AstTypedef td;
-
     AstExpr *namenode = ast_name(ctx, name);
 
     if (!consume(parser, Token_COLON)) {
         compile_error(ctx, *parser->curr, "expected a ':' in type definition");
         return NULL;
     }
-
-    Table *table = &ctx->type_table;
-
-    AstDecl *existing = table_get(&ctx->symbols, name.text);
-    if (existing && existing->tag == Decl_TYPEDEF) {
+ 
+    AstDecl *existing = find_type_decl(parser->ast, namenode->as.name);
+     if (existing && existing->tag == Decl_TYPEDEF) {
         compile_error_start(
             ctx,
             name,
             "type \"%s\" was declared more than once; first declared here:",
             name.text
         );
-        compile_error_add_line(ctx, "\t%s:%lu", ctx->current_module->path, decl_tok(existing).line);
+        compile_error_add_line(ctx, "\t%s:%lu", "PLACEHOLDER", decl_tok(existing).line);
         compile_error_end();
         return NULL;
     }
 
-    AstNode *decl = NULL;
     Type *type = make_type(0, name.text, 0); // NOTE size is wrong lol
 
     switch (parser->curr->type) {
     case Token_STRUCT:
-        decl = (AstNode *)parse_struct(ctx, parser);
-        type->kind      = Type_STRUCT;
-        type->data.user = (AstStmt *)decl;
+        type->kind = Type_STRUCT;
+        type->data.user = (AstNode *)parse_struct(ctx, parser);
         break;
     case Token_ENUM:
-        decl = (AstNode *)parse_enum(ctx, parser);
         type->kind = Type_ENUM;
-        type->data.user = (AstStmt *)decl;
+        type->data.user = (AstNode *)parse_enum(ctx, parser);
         break;
     case Token_PROC:
-        decl = parse_proc(ctx, parser, true);
+        type->data.user = parse_proc(ctx, parser, true);
         break;
-
     // These should be equivalent to the tokens we check for in parse_typename.
     case Token_RESERVED_TYPE:
-        table = &ctx->type_table;
     case Token_IDENT:
     case Token_CARAT:
     case Token_OPEN_BRACKET:
-        decl = parse_typename(ctx, parser);
         type->kind = Type_ALIAS;
-        type->data.alias_of = decl->as.type;
+        type->data.alias_of = parse_typename(ctx, parser)->as.type;
         break;
     default:
         compile_error(ctx, *parser->curr, "expected a declaration");
@@ -555,17 +574,12 @@ static AstNode *parse_typedef(Context *ctx, Parser *parser) {
         return NULL;
     }
 
-	assert(table_add(table, name.text, type));
-    td.of = decl;
-    td.name = namenode;
-
-    AstDecl *n = ast_typedefi(ctx, name, namenode->as.name, &td);
-
-    add_symbol(ctx, n, name.text);
-
+    AstDecl *n = ast_typedefi(ctx, name, namenode->as.name, type);
     return (AstNode *)n;
 }
 
+// TODO: typenames should just be expressions that get resolved later.
+//       I don't know how this would work for the whole Type_UNRESOLVED thing.
 static AstNode *parse_typename(Context *ctx, Parser *parser) {
     Token t = *parser->curr;
 
@@ -574,43 +588,60 @@ static AstNode *parse_typename(Context *ctx, Parser *parser) {
     switch (t.type) {
     case Token_RESERVED_TYPE: {
         parser_next(parser);
-        type_node->as.type = table_get(&ctx->type_table, t.text);
+        if (strcmp(parser->prev->text, "int") == 0) {
+            type_node->as.type = ctx->type_int;
+        } else if (strcmp(parser->prev->text, "void") == 0) {
+            type_node->as.type = ctx->type_void;
+        } else if (strcmp(parser->prev->text, "string") == 0) {
+            type_node->as.type = ctx->type_string;
+        } else if (strcmp(parser->prev->text, "u8") == 0) {
+            type_node->as.type = ctx->type_u8;
+        } else if (strcmp(parser->prev->text, "any") == 0) {
+            type_node->as.type = ctx->type_any;
+        } else if (strcmp(parser->prev->text, "u64") == 0) {
+            type_node->as.type = ctx->type_u64;
+        } else if (strcmp(parser->prev->text, "bool") == 0) {
+            type_node->as.type = ctx->type_bool;
+        } else assert(false);
+        // TODO: type_node->as.type = get_builtin_type(t.text);
         assert(type_node->as.type);
         return type_node;
     } break;
     case Token_STRUCT: {
         type_node->as.type = make_type(Type_ANON_STRUCT, "anonymous struct", 0);
-        type_node->as.type->data.user = parse_struct(ctx, parser);
+        type_node->as.type->data.user = (AstNode *)parse_struct(ctx, parser);
         return type_node;
     } break;
     case Token_IDENT: {
+        if (parser->curr[1].type == Token_DOT) {
+            AstExpr *selector = parse_expression(ctx, parser, 1);
+            assert(selector->tag == Expr_BINARY && selector->as.binary.op == Token_DOT); // TODO: real error
+            return (AstNode *)selector;
+        }
         parser_next(parser);
 
-        if (table_get(&ctx->type_table, t.text)) { // type doesn't exist (or not appeared in program text yet)
-            type_node->as.type = make_type(
-                Type_UNRESOLVED,
-                t.text,
-                0
-            );
+        //
+        // TODO in order for this code to work properly, I either need to completely
+        //      rework the system so that I can have dependencies or whatever.
+        //      OR
+        //      I need to look through the scope at parse time and determine whether
+        //      this type has been declared yet or not.
+        //
+        AstDecl *existing = find_type_decl(parser->ast, make_name_from_token(ctx, t));
+        if (!existing) {
+            type_node->as.type = make_type(Type_UNRESOLVED, t.text, 0);
             return type_node;
         }
-        type_node->as.type = table_get(&ctx->type_table, t.text);
+        type_node->as.type = existing->as.type;
         return type_node;
     } break;
 
     //case Token_STAR: {
     case Token_CARAT: {
         parser_next(parser);
-
-        // parse the base type
-        // make the pointer type
-        // assign the base type to the pointer type
-
         AstNode *base = parse_typename(ctx, parser);
         if (!base) return NULL;
-
         type_node->as.type = make_pointer_type(base->as.type);
-
         return type_node;
     } break;
     case Token_OPEN_BRACKET: {
@@ -638,8 +669,6 @@ static AstNode *parse_typename(Context *ctx, Parser *parser) {
 }
 
 static AstStmt *parse_if(Context *ctx, Parser *parser) {
-    
-
     Token start = *parser->curr;
     parser_next(parser); // skip keyword
 
@@ -716,7 +745,7 @@ static AstNode *parse_var_as_decl(Context *ctx, Parser *parser, bool top_level, 
     AstDecl *decl = ast_var(ctx, start, var.name, &var);
     if (top_level) {
         decl->flags |= DECL_IS_TOP_LEVEL;
-        add_symbol(ctx, decl, decl->name->text);
+        // add_symbol(ctx, decl, decl->name->text);
     }
     return (AstNode *)decl;
 }
@@ -782,8 +811,7 @@ static bool parse_var(Context *ctx, Parser *parser, bool top_level, bool is_cons
     return true;
 }
 
-static int parse_proc_mod(Context *ctx, Parser *parser, AstExpr **out_maybe_foreign_link_name) {
-    
+static int parse_proc_mod(Context *ctx, Parser *parser, AstExpr **out_maybe_foreign_link_name) { 
     if (strcmp(parser->curr->text, "foreign")==0) {
         parser_next(parser);
         if (parser->curr->type == Token_STRING_LIT) {
@@ -795,8 +823,7 @@ static int parse_proc_mod(Context *ctx, Parser *parser, AstExpr **out_maybe_fore
 }
 
 // Parse a procedure declaration.
-static AstNode *parse_proc(Context *ctx, Parser *parser, bool in_typedef) {
-    
+static AstNode *parse_proc(Context *ctx, Parser *parser, bool in_typedef) { 
     Token start = *parser->curr;
 
     AstProcedure proc;
@@ -827,7 +854,7 @@ static AstNode *parse_proc(Context *ctx, Parser *parser, bool in_typedef) {
 
     // If the argument list isn't empty.
     if (!consume(parser, Token_CLOSE_PAREN)) {
-        proc.params = make_subtree(parser);
+        proc.params = make_subtree();
         bool got_var_args = false;
         while (!consume(parser, Token_CLOSE_PAREN)) {
             if (got_var_args) {
@@ -937,14 +964,12 @@ static AstNode *parse_proc(Context *ctx, Parser *parser, bool in_typedef) {
         ctx->decl_for_main = procnode;
     }
 
-
-    add_symbol(ctx, procnode, name_token.text);
+    // add_symbol(ctx, procnode, name_token.text);
 
     return (AstNode *)procnode;
 }
 
-static AstStmt *parse_using(Context *ctx, Parser *parser) {
-    
+static AstStmt *parse_using(Context *ctx, Parser *parser) { 
     Token start = *parser->curr;
     parser_next(parser);
 
@@ -959,37 +984,17 @@ static AstStmt *parse_using(Context *ctx, Parser *parser) {
     return ast_using(ctx, start, &using);
 }
 
-static AstNode *parse_top_level_directive(Context *ctx, Parser *parser) {
-    
+static AstNode *parse_top_level_directive(Context *ctx, Parser *parser) { 
     parser_next(parser); // #
     if (parser->curr->type != Token_IDENT && parser->curr->type != Token_IMPORT) {
         compile_error(ctx, *parser->curr, "expected an identifier after #");
         parser_recover_to_declaration(parser);
         return NULL;
     }
-    // Name *name = make_name_from_token(ctx, *parser->curr);
-    //parser_next(parser);
-    if (/*name == make_name_from_string(ctx, "import")*/consume(parser, Token_IMPORT)) {
-        if (!consume(parser, Token_STRING_LIT)) {
-            compile_error(ctx, *parser->curr, "expected a path in the form of a string literal after import");
-            return NULL;
-        }
-
-        char *path_buffer = malloc(parser->prev->length);
-        strncpy(path_buffer, parser->prev->text+1, parser->prev->length);
-
-        AstImport import;
-        import.path = path_buffer;
-
-        AstStmt *node = ast_import(ctx, *parser->prev, &import);
-        //stbds_arrpush(ctx->current_module->imports, (AstImport *)node);
-        return (AstNode *)node;
-    }
     return NULL;
 }
 
-static AstNode *parse_top_level(Context *ctx, Parser *parser) {
-    
+static AstNode *parse_top_level(Context *ctx, Parser *parser) { 
     switch (parser->curr->type) {
     case Token_PROC: return parse_proc(ctx, parser, false);
     case Token_IDENT: return parse_var_as_decl(ctx, parser, /*top_level=*/true, /*is_const=*/false);
@@ -1000,13 +1005,12 @@ static AstNode *parse_top_level(Context *ctx, Parser *parser) {
     case Token_TYPEDEF: return parse_typedef(ctx, parser);
     case Token_HASH: return parse_top_level_directive(ctx, parser);
     }
-    compile_error(ctx, *parser->curr, "unknown top level statement");
+    compile_error(ctx, *parser->curr, "unexpected token %s", parser->curr->text);
     parser_recover_to_declaration(parser);
     return NULL;
 }
 
 static AstNode *parse_statement(Context *ctx, Parser *parser) {
-    
     Token start = *parser->curr;
     switch (start.type) {
     case Token_IF:         return (AstNode *)parse_if(ctx, parser);
@@ -1019,7 +1023,6 @@ static AstNode *parse_statement(Context *ctx, Parser *parser) {
         parser_next(parser);
         return parse_var_as_decl(ctx, parser, false, true);
     }
-
     case Token_IDENT: {
         // Function call
         if (parser->curr[1].type == Token_OPEN_PAREN) {
@@ -1037,8 +1040,9 @@ static AstNode *parse_statement(Context *ctx, Parser *parser) {
     }
 
     AstExpr *expr_left = parse_expression(ctx, parser, 1);
-    if (!expr_left) {
-        return NULL;
+    if (!expr_left) return NULL;
+    if (expr_left->tag == Expr_CALL) {
+        return (AstNode *)ast_call_stmt(ctx, expr_tok(expr_left), &expr_left->as.call);
     }
     if (expr_left->tag == Expr_NAME) {
         compile_error(ctx, expr_tok(expr_left), "unexpected identifier");
@@ -1051,12 +1055,12 @@ static AstNode *parse_statement(Context *ctx, Parser *parser) {
     return (AstNode *)ast_assignment(ctx, start, expr_left);
 }
 
-Ast parse(Context *ctx, Parser *parser) {
+void parse(Context *ctx, Parser *parser, Ast *out, char *path) {
     Ast nodes;
     ast_init(&nodes, 100);
-
+    parser->ast = &nodes;
     for (;;) {
-        arena_clear(&ctx->scratch); // clear the temp allocator
+        // arena_clear(&ctx->scratch); // clear the temp allocator
         Token curr = *parser->curr;
         if (curr.type == Token_EOF) break;
         parser->current_scope = NULL;
@@ -1064,8 +1068,7 @@ Ast parse(Context *ctx, Parser *parser) {
         consume(parser, Token_SEMI_COLON);
         ast_add(&nodes, node);
     }
-
-    return nodes;
+    *out = nodes;
 }
 
 // If a token of type `tt` is present, eat it.
@@ -1079,8 +1082,8 @@ static bool consume(Parser *parser, TokenType tt) {
 
 // Allocates an AST on the heap using an arena so that it may persist between parse states,
 // and then freed neatly at the end of parsing.
-static Ast *make_subtree(Parser *parser) {
-    Ast *ast = arena_alloc(&parser->tree_allocator, sizeof(Ast));
+static Ast *make_subtree() {
+    Ast *ast = malloc(sizeof(Ast));
     ast_init(ast, 16);
     return ast;
 }
@@ -1101,12 +1104,7 @@ static void parser_recover_to_declaration(Parser *parser) {
     }
 }
 
-void parser_init(Parser *parser, const TokenList *l, const SourceStats *stats) {
-    /* Initialize the persistent storage for subtrees */
-    /* blocks * 2 because there's two ASTs for each block */
-    u64 num_trees = (stats->blocks * 2) + stats->argument_lists;
-    assert(arena_init(&parser->tree_allocator, num_trees, sizeof(Ast), 8));
-
+void parser_init(Parser *parser, const TokenList *l) {
     parser->curr = l->tokens;
     parser->prev = l->tokens;
     parser->current_scope = NULL;
@@ -1114,7 +1112,6 @@ void parser_init(Parser *parser, const TokenList *l, const SourceStats *stats) {
 
 // Free all resources held by the parser.
 void parser_free(Parser *parser, Ast *a) {
-    arena_free(&parser->tree_allocator);
     ast_free(a);
 }
 

@@ -25,7 +25,7 @@ void lexer_init(Lexer *tz, const char *path, char *data) {
 }
 
 void lexer_free(Lexer *tz) {
-    arena_free(tz->string_allocator);
+    // arena_free(tz->string_allocator);
     tz->curr = NULL;
     tz->line = 0;
 }
@@ -76,6 +76,7 @@ Token token_new(Lexer *tz, TokenType type) {
     t.column = tz->column;
     t.length = (s32)(tz->curr - tz->start);
     t.text   = "";
+    t.file = tz->file_name;
     
     tz->last = type;
 
@@ -83,7 +84,7 @@ Token token_new(Lexer *tz, TokenType type) {
         if (type == Token_STRING_LIT) {
             t.text = arena_alloc(tz->string_allocator, t.length-1);
             strncpy(t.text, tz->start+1, t.length-2);
-            t.text[t.length] = 0;
+            t.text[t.length-2] = 0;
             return t;
         }
         t.text = arena_alloc(tz->string_allocator, t.length + 1);
@@ -341,59 +342,17 @@ Token next_token(Lexer *tz) {
     return token_new(tz, Token_UNKNOWN);
 }
 
-bool lexer_lex(Lexer *l, TokenList *list, SourceStats *stats, Table *table) {
-    TokenType last;
+bool lexer_lex(Lexer *l, TokenList *out) {
+	assert(out);
+	TokenList list;
+	token_list_init(&list);
 
-    u64 pointers = 0;
-    u64 args = 0;
-    u64 blocks = 0;
-    u64 types = 0;
-
-    while (true) {
-        last = l->last;
+    assert(l->string_allocator);
+    while (true) { 
         Token t = next_token(l);
-
-        if (table && (last == Token_IMPORT && t.type == Token_STRING_LIT)) {
-            if (list) token_list_add(list, t);
-            if (t.type == Token_EOF) break;
-
-            Module *existing = table_get(table, t.text);
-            if (existing) {
-                continue;
-            }
-            table_add(table, t.text, &(Module){0});
-            continue;
-        }
-
-        switch (t.type) {
-        case Token_UNKNOWN:
-        case Token_ERROR:
-            return false;
-        case Token_TYPEDEF:
-            types++;
-            break;
-        case Token_IDENT:
-        case Token_RESERVED_TYPE:
-        case Token_CARAT:
-            if (last == Token_CARAT) pointers++;
-            break;
-        case Token_OPEN_PAREN:
-            if (last == Token_IDENT) args++;
-            break;
-        case Token_OPEN_BRACE:
-            blocks++;
-            break;
-        }
-
-        if (list) token_list_add(list, t);
+        token_list_add(&list, t);
         if (t.type == Token_EOF) break;
     }
-    if (stats) {
-        stats->blocks += blocks;
-        stats->pointer_types += pointers;
-        stats->argument_lists += args;
-        stats->declared_types += types;
-        stats->number_of_lines += l->line;
-    }
+	*out = list;
     return true;
 }

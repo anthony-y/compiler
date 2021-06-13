@@ -1,0 +1,1 @@
+type Extern: struct {magic_number: int = 42; }

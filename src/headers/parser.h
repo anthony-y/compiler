@@ -9,17 +9,11 @@
 typedef struct Parser {
     Token *curr;
     Token *prev;
-
-    Arena tree_allocator;
-
     AstBlock *current_scope;
+    Ast *ast;
 } Parser;
 
-struct SourceStats;
-struct Context;
-
-void parser_init(Parser *, const TokenList *, const struct SourceStats *);
+void parser_init(Parser *, const TokenList *);
 void parser_free(Parser *, Ast *);
-Ast parse(struct Context *, Parser *);
 
 #endif

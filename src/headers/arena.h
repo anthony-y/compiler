@@ -17,4 +17,14 @@ void arena_free(Arena *);
 void arena_clear(Arena *);
 void *arena_alloc(Arena *, u64);
 
+typedef struct {
+	u8 *block;
+	u64 pos, bytes_left, capacity;
+} VirtualArena;
+
+bool varena_init(VirtualArena *, u64 pages, void *start);
+void varena_free(VirtualArena *);
+void varena_clear(VirtualArena *);
+void *varena_alloc(VirtualArena *, u64);
+
 #endif

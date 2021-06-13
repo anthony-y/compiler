@@ -37,11 +37,11 @@ typedef enum {
     Expr_CALL,
     Expr_INDEX,
     Expr_VAR_ARGS_EXPAND,
+    Expr_IMPORT,
 } ExprType;
 
 typedef enum {
     Stmt_ASSIGN = 0,
-    Stmt_IMPORT,
     Stmt_BLOCK,
     Stmt_IF,
     Stmt_FOR,
@@ -79,6 +79,7 @@ typedef enum {
         Node_CALL,
         Node_INDEX,
         Node_VAR_ARGS_EXPAND,
+		Node_IMPORT,
         //Node_INITIALIZER,
 
     Node_EXPRESSIONS_END, // sentinal expressions end
@@ -95,7 +96,6 @@ typedef enum {
 
         // More statements
         Node_ASSIGN,
-        Node_IMPORT,
         Node_BLOCK,
         Node_IF,
         Node_FOR,
@@ -163,11 +163,6 @@ typedef struct {
     // AstIf for an else if.
     struct AstStmt *other_branch;
 } AstIf;
-
-typedef struct {
-    struct AstNode *of;
-    struct AstExpr *name;
-} AstTypedef;
 
 typedef struct {
     char *path;
@@ -255,7 +250,6 @@ typedef struct {
 
 typedef struct AstBlock {
     struct Ast *statements;
-    Table symbols;
     struct AstBlock *parent;
     struct Ast *deferred;
 } AstBlock;
@@ -272,6 +266,7 @@ typedef struct AstExpr {
         AstParen paren;
         AstCall call;
         AstArrayIndex index;
+        AstImport import;
     } as;
     Type *resolved_type;
     ExprType tag;
@@ -280,7 +275,6 @@ typedef struct AstExpr {
 typedef struct AstStmt {
     union {
         AstExpr assign;
-        AstImport _import;
         AstBlock block;
         AstIf _if;
         AstWhile _while;
@@ -305,7 +299,7 @@ typedef struct AstDecl {
     union {
         AstProcedure proc;
         AstVar var;
-        AstTypedef typedefi;
+        Type *type;
     } as;
     struct Name *name;
     DeclType tag;
@@ -351,13 +345,14 @@ AstExpr *ast_paren(struct Context *, Token t, const AstParen *paren);
 AstExpr *ast_cast(struct Context *, Token t, const AstCast *cast);
 AstExpr *ast_index(struct Context *, Token t, const AstArrayIndex *index);
 AstExpr *ast_var_args_expand(struct Context *, Token t, const AstVarArgsExpand *expand);
+AstExpr *ast_import(struct Context *, Token t, const AstImport *imp);
 
 AstDecl *ast_proc(struct Context *, Token t, struct Name *name, const AstProcedure *proc);
 AstDecl *ast_var(struct Context *, Token t, struct Name *name, const AstVar *var);
-AstDecl *ast_typedefi(struct Context *, Token t, struct Name *name, const AstTypedef *td);
+// AstDecl *ast_typedefi(struct Context *, Token t, struct Name *name, const AstTypedef *td);
+AstDecl *ast_typedefi(struct Context *c, Token t, struct Name *name, Type *type);
 
 AstStmt *ast_assignment(struct Context *, Token t, const AstExpr *ass);
-AstStmt *ast_import(struct Context *, Token t, const AstImport *imp);
 AstStmt *ast_block(struct Context *, Token t, const AstBlock *blk);
 AstStmt *ast_if(struct Context *, Token t, const AstIf *i);
 AstStmt *ast_while(struct Context *, Token t, const AstWhile *w);

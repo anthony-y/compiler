@@ -20,19 +20,6 @@ inline Token stmt_tok(AstStmt *s) {return ((AstNode *)s)->token;}
 void free_block(AstStmt *stmt) {
     if (!stmt || stmt->tag != Stmt_BLOCK) return;
     AstBlock *b = (AstBlock *)stmt;
-
-    TableIter it = table_get_iterator(&b->symbols);
-    for (int i = 0; i < it.num_entries; i++) {
-        AstDecl *d = it.pairs[i].value;
-        if (d->tag == Decl_VAR) {
-            AstVar *var = (AstVar *)d;
-            if (var->typename->as.type && var->typename->as.type->kind == Type_ANON_STRUCT) {
-                free_block(((AstStruct *)var->typename->as.type->data.user)->members);
-            }
-        }
-    }
-    free(it.pairs);
-
     for (int i = 0; i < b->statements->len; i++) {
         AstNode *n = b->statements->nodes[i];
         switch (n->tag) {
@@ -45,16 +32,22 @@ void free_block(AstStmt *stmt) {
             AstWhile *w = (AstWhile *)n;
             free_block(w->block);
         } break;
+        case Node_VAR: {
+            AstVar *v = (AstVar *)n;
+            if (v->typename->as.type && v->typename->as.type->kind == Type_ANON_STRUCT) {
+                free_block(((AstStruct *)v->typename->as.type->data.user)->members);
+            }
+        } break;
         case Node_CALL: {
             AstCall *call = (AstCall *)n;
             if (call->params) ast_free(call->params);
         } break;
+		free(n);
         }
     }
 
     ast_free(b->statements);
     ast_free(b->deferred);
-    table_free(&b->symbols);
     b->parent = NULL;
 }
 
@@ -72,7 +65,7 @@ void free_subtrees_and_blocks(Ast *ast) {
 }
 
 inline AstNode *ast_node(Context *c, AstNodeType tag, Token t) {
-    AstNode *node = arena_alloc(&c->node_allocator, sizeof(AstNode));
+    AstNode *node = malloc(sizeof(AstNode));
 
     node->tag = tag;
     node->token = t;
@@ -130,7 +123,7 @@ void ast_free(Ast *list) {
 }
 
 void ast_add(Ast *list, AstNode *node) {
-    if (list->cap < list->len) {
+    if (node && list->cap < list->len) {
         list->cap *= 2;
         AstNode **tmp = realloc(list->nodes, list->cap * sizeof(AstNode *));
         if (tmp) {
@@ -202,6 +195,13 @@ AstExpr *ast_var_args_expand(struct Context *c, Token t, const AstVarArgsExpand 
     return &n->as.expr;
 }
 
+AstExpr *ast_import(Context *c, Token t, const AstImport *imp) {
+    AstNode *n = ast_node(c, Node_IMPORT, t);
+    n->as.expr.tag = Expr_IMPORT;
+    n->as.expr.as.import = *imp;
+    return &n->as.expr;
+}
+
 AstDecl *ast_proc(Context *c, Token t, Name *name, const AstProcedure *proc) {
     AstNode *n = ast_node(c, Node_PROCEDURE, t);
     n->as.decl.flags = 0;
@@ -222,13 +222,13 @@ AstDecl *ast_var(Context *c, Token t, Name *name, const AstVar *var) {
     return &n->as.decl;
 }
 
-AstDecl *ast_typedefi(Context *c, Token t, Name *name, const AstTypedef *td) {
+AstDecl *ast_typedefi(Context *c, Token t, Name *name, Type *type) {
     AstNode *n = ast_node(c, Node_TYPEDEF, t);
     n->as.decl.flags = 0;
     n->as.decl.status = Status_UNRESOLVED;
     n->as.decl.tag = Decl_TYPEDEF;
     n->as.decl.name = name;
-    n->as.decl.as.typedefi = *td;
+    n->as.decl.as.type = type;
     return &n->as.decl;
 }
 
@@ -236,13 +236,6 @@ AstStmt *ast_assignment(Context *c, Token t, const AstExpr *ass) {
     AstNode *n = ast_node(c, Node_ASSIGN, t);
     n->as.stmt.tag = Stmt_ASSIGN;
     n->as.stmt.as.assign = *ass;
-    return &n->as.stmt;
-}
-
-AstStmt *ast_import(Context *c, Token t, const AstImport *imp) {
-    AstNode *n = ast_node(c, Node_IMPORT, t);
-    n->as.stmt.tag = Stmt_IMPORT;
-    n->as.stmt.as._import = *imp;
     return &n->as.stmt;
 }
 

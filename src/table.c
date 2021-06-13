@@ -23,8 +23,8 @@ void table_init(Table *table) {
 	table->pairs = calloc(table->capacity, sizeof(TablePair));
 }
 
-TableIter table_get_iterator(const Table *t) {
-	TableIter it;
+FlatTable table_flatten(const Table *t) {
+	FlatTable it;
 	it.num_entries = t->num_entries;
 	it.pairs = malloc(it.num_entries * (sizeof(char*) + sizeof(void*)));
 	assert(it.pairs);
@@ -76,7 +76,7 @@ bool table_add(Table *table, char *key, void *value) {
 		index = hash % table->capacity;
 	}
 
-	if (table->pairs[index].value != NULL && table->pairs[index].key != NULL) {
+	if (table->pairs[index].key != NULL) {
 		TablePair *existing_pair = &table->pairs[index];
 		// printf("table_get: already a pair for %s: %s.\n", key, existing_pair->key);
 		if (!existing_pair->collisions) {

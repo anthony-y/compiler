@@ -4,6 +4,9 @@ Give imports their own namespaces.
 FEATURE: already support function calls inside struct field initializers,
          now need to allow struct fields to be resolved from inside the struct.
          Already added DECL_IS_STRUCT_FIELD flag, need to add this flag to fields.
+
+Add checks for double deref (^^some_var) cus it actually makes no sense
+
 //
 // Codegen
 //

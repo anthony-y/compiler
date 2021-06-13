@@ -308,6 +308,8 @@ bool does_type_describe_expr(Context *ctx, Type *type, AstExpr *expr) {
         return do_types_match(ctx, type, expr->resolved_type);
     } break;
 
+    case Expr_IMPORT:
+        return (type == ctx->import_type);
     case Expr_NULL:
         return (type->kind == Type_POINTER);
     case Expr_INT:
@@ -365,12 +367,15 @@ bool check_var(Context *ctx, AstDecl *node) {
             compile_error(ctx, tok, "cannot assign void value (in the form of call to \"%s\") to variable \"%s\"", var->value->as.call.name->as.name->text, node->name->text);
             return false;
         }
+    } else if ((var->flags & VAR_IS_INITED) && var->value->tag == Expr_IMPORT) {
+        compile_error(ctx, tok, "type of import declaration must be inferred");
+        return NULL;
     }
 
     Type *type = var->typename->as.type;
 
     if (type->kind == Type_ANON_STRUCT) {
-        AstStruct *s = &type->data.user->as._struct;
+        AstStruct *s = &type->data.user->as.stmt.as._struct;
         check_struct(ctx, s);
     }
 
@@ -501,15 +506,13 @@ bool check_assignment(Context *ctx, AstExpr *expr, bool lhs_must_be_pointer) {
 }
 
 void check_block(Context *ctx, AstBlock *block, AstNodeType restriction) {
-    TableIter it = table_get_iterator(&block->symbols);
-    for (int i = 0; i < it.num_entries; i++) {
-        check_var(ctx, it.pairs[i].value); // NOTE modify for local procs
-    }
-    free(it.pairs);
     for (int i = 0; i < block->statements->len; i++) {
         AstNode *stmt = block->statements->nodes[i];
-        if (is_decl(stmt)) continue; // we already checked the declarations
-        if (restriction != Node_ZERO && restriction != stmt->tag) {
+        if (is_decl(stmt)) {
+            assert(stmt->tag == Node_VAR);
+            check_var(ctx, (AstDecl *)stmt); // NOTE modify for local procs
+            continue;
+        } else if (restriction != Node_ZERO && restriction != stmt->tag) {
             compile_error(ctx, stmt->token, "this statement is not allowed at this scope");
             return;
         }
@@ -544,28 +547,29 @@ void check_statement(Context *ctx, AstStmt *node) {
 }
 
 void check_struct(Context *ctx, AstStruct *s) {
-    Table local_copy = s->members->as.block.symbols;
-    TableIter it = table_get_iterator(&local_copy);
-    for (int i = 0; i < it.num_entries; i++) {
-        AstDecl *d = it.pairs[i].value;
-        check_var(ctx, d);
+    AstBlock *block = &s->members->as.block;
+    for (u64 i = 0; i < block->statements->len; i++) {
+        AstNode *n = block->statements->nodes[i];
+        assert(is_decl(n));
+        check_var(ctx, (AstDecl *)n);
     }
-    free(it.pairs);
 }
 
 void check_typedef(Context *ctx, AstDecl *node) {
-    AstTypedef *td = &node->as.typedefi;
-    if (td->of->tag == Node_STRUCT) {
-        check_struct(ctx, (AstStruct *)td->of);
+    // AstTypedef *td = &node->as.typedefi;
+    Type *type = node->as.type;
+    AstNode *decl = type->data.user;
+    if (decl->tag == Node_STRUCT) {
+        check_struct(ctx, (AstStruct *)decl);
         return;
     }
-    if (td->of->tag == Node_TYPENAME) {
-        if (td->of->as.type->kind == Type_ALIAS) {
-            compile_error(ctx, td->of->token, "you cannot create a type alias from another type alias");
+    if (decl->tag == Node_TYPENAME) {
+        if (type->kind == Type_ALIAS) {
+            compile_error(ctx, decl->token, "you cannot create a type alias from another type alias");
         }
         return;
     }
-    assert(td->of->tag == Node_ENUM);
+    assert(decl->tag == Node_ENUM);
 }
 
 // Recursively perform semantic analysis and type-checking on an Ast.

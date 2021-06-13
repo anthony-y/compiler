@@ -12,48 +12,33 @@
 
 #include <stdarg.h>
 
-#define CONTEXT_SCRATCH_SIZE 1024
+#define CONTEXT_SCRATCH_SIZE 1024 * 3
 
 // An entry in the name table.
 typedef struct Name {char *text;} Name;
 
-typedef struct Module {
-	char *path;
-    Table imports;
-	Ast ast;
-
-    // These are just here to be freed at the end.
-    Parser parser;
-    Lexer lexer;
-} Module;
-
-// Contains statistics about the source code
-// which can be used to compute allocation sizes.
-// Filled out by the lexer.
-typedef struct SourceStats {
-    u64 declared_types;
-    u64 pointer_types;
-    u64 argument_lists;
-    u64 blocks;
-    u64 structs;
-    u64 number_of_lines;
-} SourceStats;
-
 // Central compiler context, a reference to an instance of this struct is
 // passed to most functions in the compiler.
+//
+// This structure does probably not fit into a cache line so it's slow to get if it's not in cache,
+// probs gets cached anyway tho.
 typedef struct Context {
     Arena string_allocator; // lexer
     Arena node_allocator; // parser
     Arena scratch;
 
-    Table symbols;
-    Table type_table;
+	// The name table is basically just a big string table,
+	// it means I can compare strings by pointer instead of strcmp().
     struct {
         char *key;
         Name *value;
     } *name_table;
 
-	Module *current_module;
+    struct {
+        char *key;
+        Ast  *value;
+    } *modules;
+
     AstDecl *decl_for_main;
 
     /* Handles to types in the type table
@@ -64,9 +49,14 @@ typedef struct Context {
     Type *type_string, *type_void, *type_bool; // non-integer types
     Type *null_type; // type of "null" literal
     Type *type_any; // any
+    Type *import_type;
 
     int error_count;
 } Context;
+
+void parse(Context *ctx, Parser *parser, Ast *out, char *path);
+
+Ast *get_module(Context *ctx, Name *name, Ast *in, Token site);
 
 void compile_error(Context *, Token, const char *fmt, ...);
 void compile_error_start(Context *, Token, const char *fmt, ...);
@@ -78,18 +68,19 @@ void init_context(Context *);
 void free_context(Context *);
 
 // From types.c, couldn't declare in types.h because of a circular dependency with context.h
-void init_types(Context *, SourceStats *);
-void free_types(Context *);
+void init_types(Context *ctx, Ast *type_table);
+void free_types(Table *);
 
-char *encode_module_into_name(Context *, char *raw);
-char *get_encoded_name(char *module, char *raw);
 Name *make_name_from_string(Context *, const char *txt);
 Name *make_name_from_token(Context *, Token from);
 
-AstDecl *lookup_local(Context *ctx, AstProcedure *proc, Name *name, AstBlock *start_from);
+AstDecl *lookup_local(Context *ctx, AstProcedure *proc, Name *name, AstBlock *start_from, Ast *file_scope);
+AstDecl *find_type_decl(Ast *ast, Name *name);
 AstDecl *lookup_struct_field(AstStruct *, Name *);
 AstDecl *lookup_in_block(AstBlock *, Name *);
+AstDecl *find_decl(Ast *ast, Name *name);
 
 void add_symbol(Context *, AstDecl *decl, char *name);
+char *read_file(const char *path);
 
 #endif

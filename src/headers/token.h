@@ -2,9 +2,7 @@
 #define TOKEN_h
 
 #include "common.h"
-
-typedef enum {
-    Token_EOF,
+typedef enum { Token_EOF,
     Token_END_OF_CHUNK,
     Token_ERROR,
     Token_UNKNOWN,
@@ -104,6 +102,7 @@ typedef struct Token {
     u32 column;
 
     char *text;
+    const char *file;
 } Token;
 
 typedef struct TokenList {

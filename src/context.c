@@ -1,16 +1,70 @@
 #include "headers/context.h"
 #include "headers/ast.h"
 
+#define STB_DS_IMPLEMENTATION
 #include "headers/stb/stb_ds.h"
 
 #include <stdarg.h>
 #include <assert.h>
+#include <stdlib.h>
 
 AstDecl *lookup_in_block(AstBlock *block, Name *name) {
-	return table_get(&block->symbols, name->text);
+    for (u64 i = 0; i < block->statements->len; i++) {
+        AstNode *node = block->statements->nodes[i];
+        if (!is_decl(node)) continue;
+        AstDecl *decl = (AstDecl *)node;
+        if (decl->name == name) return decl;
+    }
+    return NULL;
 }
 
-AstDecl *lookup_local(Context *ctx, AstProcedure *proc, Name *name, AstBlock *start_from) {
+AstDecl *find_decl(Ast *ast, Name *name) {
+    for (u64 i = 0; i < ast->len; i++) {
+        AstNode *node = ast->nodes[i];
+        if (!is_decl(node)) continue;
+        AstDecl *decl = (AstDecl *)node;
+        if (decl->name == name) return decl;
+    }
+    return NULL;
+}
+
+AstDecl *find_type_decl(Ast *ast, Name *name) {
+    for (u64 i = 0; i < ast->len; i++) {
+        AstNode *node = ast->nodes[i];
+        if (node->tag != Node_TYPEDEF) continue;
+        assert(is_decl(node));
+        AstDecl *decl = &node->as.decl;
+        if (decl->name == name) return decl;
+    }
+    return NULL;
+}
+
+// Returns the Ast of an imported module, or NULL is there's no match.
+Ast *get_module(Context *ctx, Name *name, Ast *in, Token site) {
+    AstDecl *import = find_decl(in, name);
+    if (!import) {
+        compile_error(ctx, site, "undeclared package '%s', did you forget to #import it?", name->text);
+        return NULL;
+    }
+    if (import->tag != Decl_VAR) {
+        compile_error(ctx, site, "you tried to use a procedure/type name as a package name ('%s')", name->text);
+        return NULL;
+    }
+    
+    AstVar *var = (AstVar *)import;
+    assert (var->value->tag == Expr_IMPORT); // TODO real error
+
+    char *path = var->value->as.import.path;
+
+    int module_i = shgeti(ctx->modules, path);
+    if (module_i != -1) {
+        return ctx->modules[module_i].value;
+    }
+    compile_error(ctx, site, "no such module '%s'", path); // this fires if there is an import declaration but the file it points to doesn't exist.
+    return NULL;
+}
+
+AstDecl *lookup_local(Context *ctx, AstProcedure *proc, Name *name, AstBlock *start_from, Ast *file_scope) {
     if (proc->params) {
         for (int i = 0; i < proc->params->len; i++) {
             AstDecl *decl = (AstDecl *)proc->params->nodes[i];
@@ -18,7 +72,6 @@ AstDecl *lookup_local(Context *ctx, AstProcedure *proc, Name *name, AstBlock *st
         }
     }
 
-    Table *table = &ctx->symbols;
     AstDecl *s = lookup_in_block(start_from, name);
     if (!s) {
         AstBlock *parent = start_from->parent;
@@ -27,13 +80,12 @@ AstDecl *lookup_local(Context *ctx, AstProcedure *proc, Name *name, AstBlock *st
             if (sym) return sym;
             parent = parent->parent;
         }
-		AstDecl *global = table_get(table, name->text);
+		AstDecl *global = find_decl(file_scope, name);
         if (global) {
             return global;
         }
         return NULL;
     }
-
     return s;
 }
 
@@ -58,57 +110,12 @@ Name *make_name_from_string(Context *ctx, const char *txt) {
     return ctx->name_table[i].value;
 }
 
-char *encode_module_into_name(Context *ctx, char *raw) {
-    if (!ctx->current_module) {
-        return get_encoded_name(NULL, raw);
-    } else {
-        return get_encoded_name(ctx->current_module->path, raw);
-    }
-}
-
-char *get_encoded_name(char *module_path, char *raw) {
-    if (!module_path) return raw;
-
-    static const int postfix_len = 5/*strlen(".lang")*/;
-    int module_path_len = strlen(module_path);
-    int no_extension_len = (module_path_len - postfix_len);
-
-    int raw_len = strlen(raw);
-    int final_len = no_extension_len + raw_len + 2;
-
-    char *final = malloc(final_len);
-    strncpy(final, module_path, no_extension_len+1);
-    strcat(final, raw);
-
-    // Replace unfriendly characters with underscores.
-    for (int i = 0; i < no_extension_len + raw_len; i++) {
-        char c = module_path[i];
-        if (c == '.' || c == '/' || c == '\\') {
-            final[i] = '_';
-        }
-    }
-    final[no_extension_len] = '@'; // sentinal character that the user can't put in an identifier.
-    final[final_len] = 0; // null terminator.
-    return final;
-}
-
-inline void add_symbol(Context *c, AstDecl *n, char *name) {
-    Table *table = &c->symbols;
-    Token t = ((AstNode *)n)->token;
-    //char *encoded_name = encode_module_into_name(c, name); // TODO fix leak
-    if (table_get(table, /*encoded_*/name)) {
-        compile_error(c, t, "Redefinition of symbol \"%s\" in module %s", name, c->current_module->path);
-        return;
-    }
-    assert(table_add(table, /*encoded_*/name, n));
-}
-
 void init_context(Context *c) {
     *c = (Context){0};
-    arena_init(&c->string_allocator, 1024 * 20, sizeof(char), 1);
+    arena_init(&c->string_allocator, 1024 * 1000, sizeof(char), 1);
     arena_init(&c->scratch, CONTEXT_SCRATCH_SIZE, sizeof(u8), 1);
     sh_new_arena(c->name_table);
-	table_init(&c->symbols);
+    sh_new_arena(c->modules);
 }
 
 void free_context(Context *c) {
@@ -116,9 +123,9 @@ void free_context(Context *c) {
     for (int i = 0; i < len; i++)
         free(c->name_table[i].value);
     shfree(c->name_table);
+
     arena_free(&c->scratch);
     arena_free(&c->node_allocator);
-	table_free(&c->symbols);
 }
 
 void compile_error(Context *ctx, Token t, const char *fmt, ...) {
@@ -127,7 +134,7 @@ void compile_error(Context *ctx, Token t, const char *fmt, ...) {
 
     // The weird looking escape characters are to set the text color
     // to red, print "Error", and then reset the colour.
-    fprintf(stderr, "%s:%lu: \033[0;31mError\033[0m: ", ctx->current_module->path, t.line);
+    fprintf(stderr, "%s:%lu: \033[0;31mError\033[0m: ", t.file, t.line);
     vfprintf(stderr, fmt, args);
     fprintf(stderr, ".\n");
     va_end(args);
@@ -139,7 +146,7 @@ void compile_error_start(Context *ctx, Token t, const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
 
-    fprintf(stderr, "%s:%lu: \033[0;31mError\033[0m: ", ctx->current_module->path, t.line);
+    fprintf(stderr, "%s:%lu: \033[0;31mError\033[0m: ", t.file, t.line);
     vfprintf(stderr, fmt, args);
     va_end(args);
 
@@ -161,8 +168,40 @@ void compile_warning(Context *ctx, Token t, const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
 
-    fprintf(stderr, "%s:%lu: \033[0;33mWarning\033[0m: ", ctx->current_module->path, t.line);
+    fprintf(stderr, "%s:%lu: \033[0;33mWarning\033[0m: ", t.file, t.line);
     vfprintf(stderr, fmt, args);
     fprintf(stderr, ".\n");
     va_end(args);
+}
+
+char *read_file(const char *path) {
+	FILE *f = fopen(path, "r");
+	if (!f) {
+		fprintf(stderr, "Error: failed to open file %s.\n", path);
+		exit(0);
+	}
+
+	fseek(f, 0L, SEEK_END);
+	u64 file_length = ftell(f);
+	rewind(f);
+
+	char *buffer = malloc(file_length + 1);
+	if (!buffer) {
+		fprintf(stderr, "Error: not enough memory to read \"%s\".\n", path);
+		fclose(f);
+		exit(0);
+	}
+
+	u64 bytes_read = fread(buffer, sizeof(char), file_length, f);
+	if (bytes_read < file_length) {
+		fprintf(stderr, "Error: failed to read file \"%s\".\n", path);
+		fclose(f);
+		exit(0);
+	}
+
+	buffer[bytes_read] = '\0';
+
+	fclose(f);
+
+	return buffer;
 }

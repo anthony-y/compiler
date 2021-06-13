@@ -5,9 +5,27 @@
 #include "arena.h"
 #include "table.h"
 
-//#include <pthread.h>
+typedef struct Lexer {
+    const char *file_name;
+
+    char *start;
+    char *curr;
+    
+    u64 line;
+    u32 column;
+
+    TokenType last;
+    Arena *string_allocator; // pointer to the string allocator in Context
+} Lexer;
+
+void lexer_init(Lexer *, const char *path, char *data);
+void lexer_free(Lexer *);
+
+bool lexer_lex(Lexer *, struct TokenList *list);
+Token next_token(Lexer *);
 
 #if 0
+#include <pthread.h>
 typedef struct Lexer {
     pthread_t id;
     const char *file_name;
@@ -24,31 +42,7 @@ typedef struct Lexer {
     Pool string_allocator;
     TokenList output;
 } Lexer;
+void lexer_init(Lexer *, char *start, u64 line);
 #endif
-
-typedef struct Lexer {
-    const char *file_name;
-
-    char *start;
-    char *curr;
-    
-    u64 line;
-    u32 column;
-
-    TokenType last;
-    Arena *string_allocator; // pointer to the string allocator in Context
-} Lexer;
-
-//void lexer_init(Lexer *, char *start, u64 line);
-void lexer_init(Lexer *, const char *path, char *data);
-void lexer_free(Lexer *);
-
-struct SourceStats;
-struct Module;
-
-bool lexer_lex(Lexer *l, struct TokenList *list, struct SourceStats *stats, Table *table);
-//bool lexer_lex(Lexer *l, TokenList *list, struct SourceStats *stats, TokenList *import_paths);
-void divide_tokens_into_modules(struct Module *modules, struct SourceStats stats, const TokenList *all_tokens);
-///void *lexer_lex(void *);
 
 #endif

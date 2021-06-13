@@ -38,7 +38,7 @@ static void emit_c_for_type(Type *type) {
         fprintf(output, "enum %s", type->name);
         return;
     case Type_ANON_STRUCT:
-        emit_c_for_struct(&type->data.user->as._struct, NULL);
+        emit_c_for_struct(&type->data.user->as.stmt.as._struct, NULL);
         return;
     case Type_POINTER:
         if (!type->data.base) { // generic pointer type, probably from a null literal
@@ -110,7 +110,9 @@ static void emit_c_for_expr(AstExpr *expr) {
     Token t = expr_tok(expr);
     switch (expr->tag) {
     case Expr_STRING:
-        fprintf(output, "__make_string(\"%s\", %d)", t.text, t.length);
+        // -2 because quotes are counted in the length of the token.
+        // TODO fix this at lexer level.
+        fprintf(output, "__make_string(\"%s\", %d)", t.text, t.length-2);
         return;
     case Expr_NULL:
         fprintf(output, "NULL");
@@ -279,7 +281,7 @@ static void emit_c_for_enum(AstEnum *def, char *name) {
     fprintf(output, "enum");
     if (name) fprintf(output, " %s", name);
     fprintf(output, " {\n");
-    TableIter it = table_get_iterator(&def->fields);
+    FlatTable it = table_flatten(&def->fields);
     for (int i = 0; i < it.num_entries; i++) {
         AstVar *var = (AstVar *)it.pairs[i].value;
         fprintf(output, "\t");
@@ -298,6 +300,7 @@ static void emit_c_for_var(AstVar *var) {
     } else {
         type = var->typename->as.type;
     }
+    if (type->kind == Type_IMPORT) return;
     emit_c_for_type(type);
     fprintf(output, " %s", name->text);
     if (type->kind == Type_ARRAY) {
@@ -361,20 +364,19 @@ static void emit_c_for_proc(AstProcedure *proc, bool entry_point) {
     fprintf(output, "}\n");
 }
 
-char *generate_and_write_c_code(Context *ctx, Ast *ast) {
+char *generate_and_write_c_code(Context *ctx, Ast *ast, const char *file_name) {
     name_for_main = make_name_from_string(ctx, "main");
 
-    char *path = ctx->current_module->path;
     const char *postfix = "_generated.c";
-    u64 len = strlen(path) + strlen(postfix) + 1;
+    u64 len = strlen(file_name) + strlen(postfix) + 1;
     char *output_file = arena_alloc(&ctx->scratch, len);
-    strcpy(output_file, path);
+    strcpy(output_file, file_name);
     strcat(output_file, postfix);
 
     output = fopen(output_file, "w");
     assert(output);
 
-    emit_boilerplate(path);
+    emit_boilerplate(file_name);
 
     //
     // Generate forward decls
@@ -390,9 +392,9 @@ char *generate_and_write_c_code(Context *ctx, Ast *ast) {
             emit_c_for_var((AstVar *)decl);
             break;
         case Decl_TYPEDEF: {
-            AstTypedef *def = (AstTypedef *)decl;
-            char *name = def->name->as.name->text;
-            if (def->of->tag == Node_STRUCT) {
+            char *name = decl->name->text;
+            Type *type = decl->as.type;
+            if (type->data.user->tag == Node_STRUCT) {
                 fprintf(output, "struct %s;\n", name);
                 fprintf(output, "void __%s_initer(struct %s*)", name, name);
                 break;
@@ -421,12 +423,12 @@ char *generate_and_write_c_code(Context *ctx, Ast *ast) {
         AstDecl *decl = (AstDecl *)ast->nodes[i];
         if (decl->status == Status_UNRESOLVED) continue;
         if (decl->tag == Decl_TYPEDEF) {
-            AstTypedef *def = (AstTypedef *)decl;
-            if (def->of->tag == Node_STRUCT) {
-                emit_c_for_struct((AstStruct *)def->of, def->name->as.name->text);
+            Type *type = decl->as.type;
+            if (type->data.user->tag == Node_STRUCT) {
+                emit_c_for_struct((AstStruct *)type->data.user, decl->name->text);
                 fprintf(output, ";\n");
-            } else if (def->of->tag == Node_ENUM) {
-                emit_c_for_enum((AstEnum *)def->of, def->name->as.name->text);
+            } else if (type->data.user->tag == Node_ENUM) {
+                emit_c_for_enum((AstEnum *)type->data.user, decl->name->text);
                 fprintf(output, ";\n");
             }
         }
@@ -438,18 +440,16 @@ char *generate_and_write_c_code(Context *ctx, Ast *ast) {
 	// Generate implicit initializers for structs.
 	//
     for (u64 i = 0; i < ast->len; i++) {
-        if (ast->nodes[i]->tag == Node_IMPORT) continue;
-
         AstDecl *decl = (AstDecl *)ast->nodes[i];
         if (decl->status == Status_UNRESOLVED) continue;
         if (decl->tag != Decl_TYPEDEF) {
             continue;
         }
-        AstTypedef *def = (AstTypedef *)decl;
-        if (def->of->tag != Node_STRUCT) continue;
+        Type *def = decl->as.type;
+        if (def->data.user->tag != Node_STRUCT) continue;
 
-        char *name = def->name->as.name->text;
-        AstBlock *members = &def->of->as.stmt.as._struct.members->as.block;
+        char *name = decl->name->text;
+        AstBlock *members = &def->data.user->as.stmt.as._struct.members->as.block;
         fprintf(output, "void __%s_initer(struct %s* s) {\n", name, name);
         for (int i = 0; i < members->statements->len; i++) {
             AstVar *var = (AstVar *)members->statements->nodes[i];
@@ -489,6 +489,7 @@ char *generate_and_write_c_code(Context *ctx, Ast *ast) {
         AstDecl *decl = (AstDecl *)ast->nodes[i];
         if (decl->tag != Decl_VAR) continue;
         AstVar *var = (AstVar *)decl;
+        if (var->value->resolved_type->kind == Type_IMPORT) continue;
         if (!(var->flags & VAR_IS_INITED)) continue;
         fprintf(output, "%s = ", var->name->text);
         emit_c_for_expr(var->value);

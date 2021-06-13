@@ -1,3 +1,5 @@
+m := #import "std/mem.lang"
+
 proc puts(s: ^u8) #foreign;
 proc free(ptr: ^void) #foreign;
 proc alloc(size: u64): ^void #foreign "malloc";
@@ -13,7 +15,7 @@ proc c_string(s: string): ^u8 {
 proc substring(s: string, up_to: u64): string {
 	sub: string;
 	sub.data = alloc(up_to+1);
-	mem_copy(sub.data, s.data, up_to);
+	m.mem_copy(sub.data, s.data, up_to);
 	sub.data[up_to] = 0;
 	sub.length = up_to;
 	return sub;
@@ -22,3 +24,5 @@ proc substring(s: string, up_to: u64): string {
 proc free_substring(s: string) {
 	free(s.data);
 }
+
+type Printer: struct {}

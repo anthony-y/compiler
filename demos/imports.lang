@@ -1,16 +1,19 @@
-#import "std/mem.lang"
-#import "std/basic.lang"
-
-msg := "Arena allocator from another module\n";
-len := msg.length;
+mem := #import "std/mem.lang"
+basic := #import "std/basic.lang"
 
 proc main() {
-	arena: Arena;
-	defer arena_free(^arena);
+    msg := "Arena allocator from another module\n";
+    len := msg.length;
 
-	bytes := arena_alloc(^arena, len);
-	mem_copy(bytes, msg.data, len);
+    // using basic;
+    // using mem;
+
+	arena: mem.Arena;
+	defer mem.arena_free(^arena);
+
+	bytes := mem.arena_alloc(^arena, len);
+	basic.mem_copy(bytes, msg.data, len);
 	bytes[len] = 0;
 
-	print("%s".data, bytes);
+	basic.print("%s".data, bytes);
 }
