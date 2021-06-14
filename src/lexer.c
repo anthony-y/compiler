@@ -167,6 +167,12 @@ static Token tokenize_ident_or_keyword(Lexer *tz) {
         }
     }
 
+    if (*tz->start == 'f') {
+        if ( (strncmp(tz->start+1, "32", 2) == 0) || (strncmp(tz->start+1, "64", 2) == 0)) {
+            return token_new(tz, Token_RESERVED_TYPE);
+        }
+    }
+
     u64 len = (u64)(tz->curr-tz->start);
 
     switch (*tz->start) {

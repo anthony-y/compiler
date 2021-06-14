@@ -55,8 +55,6 @@ typedef struct Type {
     } data;
 } Type;
 
-struct Context;
-
 Type *make_type(TypeKind kind, char *name, u64 size);
 Type *make_pointer_type(Type *base_type);
 Type *make_array_type(Type *base);
@@ -64,9 +62,8 @@ void print_type(Type *);
 Type *unwrap_pointer_type(Type *ptr, int *out_depth);
 bool is_type_numeric(Type *);
 
-// Gonna declare these in main.c before or I'll get a circular dependency
-// because of the argument type.
-//    void init_types(Context *)
-//    void free_types(Context *);
+struct Context;
+void init_types(struct Context *ctx);
+void free_types(struct Context *ctx);
 
 #endif

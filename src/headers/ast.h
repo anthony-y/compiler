@@ -56,6 +56,7 @@ typedef enum {
 
 typedef enum {
     Node_ZERO = 0, // nothing, just a sentinal value
+    Node_PLACEHOLDER,
 
     Node_TYPENAME,
 

@@ -1,7 +1,6 @@
 #include "headers/context.h"
 #include "headers/ast.h"
 
-#define STB_DS_IMPLEMENTATION
 #include "headers/stb/stb_ds.h"
 
 #include <stdarg.h>
@@ -119,11 +118,12 @@ void init_context(Context *c) {
 }
 
 void free_context(Context *c) {
+    for (int i = 0; i < shlen(c->modules); i++)
+        ast_free(c->modules[i].value);
     u64 len = shlenu(c->name_table);
     for (int i = 0; i < len; i++)
         free(c->name_table[i].value);
     shfree(c->name_table);
-
     arena_free(&c->scratch);
     arena_free(&c->node_allocator);
 }

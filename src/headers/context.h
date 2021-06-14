@@ -39,6 +39,11 @@ typedef struct Context {
         Ast  *value;
     } *modules;
 
+    struct {
+        char *key;
+        Type *value;
+    } *builtin_types;
+
     AstDecl *decl_for_main;
 
     /* Handles to types in the type table
@@ -54,8 +59,6 @@ typedef struct Context {
     int error_count;
 } Context;
 
-void parse(Context *ctx, Parser *parser, Ast *out, char *path);
-
 Ast *get_module(Context *ctx, Name *name, Ast *in, Token site);
 
 void compile_error(Context *, Token, const char *fmt, ...);
@@ -66,10 +69,6 @@ void compile_warning(Context *, Token, const char *fmt, ...);
 
 void init_context(Context *);
 void free_context(Context *);
-
-// From types.c, couldn't declare in types.h because of a circular dependency with context.h
-void init_types(Context *ctx, Ast *type_table);
-void free_types(Table *);
 
 Name *make_name_from_string(Context *, const char *txt);
 Name *make_name_from_token(Context *, Token from);

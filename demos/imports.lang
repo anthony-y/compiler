@@ -1,4 +1,4 @@
-mem := #import "std/mem.lang"
+mem   := #import "std/mem.lang"
 basic := #import "std/basic.lang"
 
 proc main() {

@@ -1,14 +1,15 @@
-#import "std/mem.lang"
-#import "std/basic.lang"
-
+basic := #import "std/basic.lang"
 proc main() {
-	msg := "Hello, world!";
+	const msg := "Hello, world!";
+    const sec := "Hell";
+    // const sub := "Hello"; TODO: redefinition warning
 
-	sub := substring(msg, "Hello".length);
-	defer free_substring(sub);
+	sub := basic.substring(msg, sec.length);
+	defer basic.free_substring(sub);
 
-	fmt_string := c_string("%s\n%s\nThe demo:\n\t%s\nI will now print a number: %d\n");
-	defer free(fmt_string);
+	fmt_string := basic.c_string("%s\n%s\nThe demo:\n\t%s\nI will now print a number: %f\n");
+	defer basic.free(fmt_string);
 
-	print(fmt_string, msg.data, sub.data, "Wow printf works".data, 10);
+	basic.printf(fmt_string, msg.data, sub.data, "Wow printf works".data, 42.6);
 }
+// proc main() {} // TODO stop redefintion

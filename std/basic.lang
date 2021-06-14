@@ -1,10 +1,8 @@
-m := #import "std/mem.lang"
-
 proc puts(s: ^u8) #foreign;
 proc free(ptr: ^void) #foreign;
-proc alloc(size: u64): ^void #foreign "malloc";
+proc malloc(size: u64): ^void #foreign;
 proc realloc(ptr: ^void, size: u64): ^void #foreign;
-proc print(fmt: ^u8, args: []any..) #foreign "printf";
+proc printf(fmt: ^u8, args: []any..) #foreign;
 proc mem_copy(dest: ^void, src: ^void, n: u64) #foreign "memcpy";
 
 proc c_string(s: string): ^u8 {
@@ -12,10 +10,17 @@ proc c_string(s: string): ^u8 {
     return s2.data;
 }
 
+proc Print(fmt: string, args: []any..) {
+    // TODO: both of these cause bugs
+    // printf(fmt.data, args..);
+    // printf(fmt.data, ..args);
+    // printf(fmt.data, args);
+}
+
 proc substring(s: string, up_to: u64): string {
     sub: string;
-    sub.data = alloc(up_to+1);
-    m.mem_copy(sub.data, s.data, up_to);
+    sub.data = malloc(up_to+1);
+    mem_copy(sub.data, s.data, up_to);
     sub.data[up_to] = 0;
     sub.length = up_to;
     return sub;
@@ -24,5 +29,3 @@ proc substring(s: string, up_to: u64): string {
 proc free_substring(s: string) {
     free(s.data);
 }
-
-type Printer: struct {}

@@ -16,4 +16,7 @@ typedef struct Parser {
 void parser_init(Parser *, const TokenList *);
 void parser_free(Parser *, Ast *);
 
+struct Context;
+void parse(struct Context *ctx, Parser *parser, Ast *out, char *path);
+
 #endif

@@ -30,33 +30,33 @@ static AstProcedure *resolve_call(AstNode *callnode, Context *ctx, Ast *file_sco
     Token tok = callnode->token;
 
     Name *name = NULL;
+    char *module_name = NULL;
     Ast  *scope = file_scope;
+
+    if (call->name->tag == Expr_NAME) {
+        name = call->name->as.name;
+    }
+
     if (call->name->tag == Expr_BINARY) {
         AstBinary *sel = (AstBinary *)call->name;
         assert(sel->op == Token_DOT);
         name = sel->right->as.name;
+        module_name = sel->left->as.name->text;
         scope = get_module(ctx, sel->left->as.name, file_scope, tok);
-        if (!scope) {
-            return NULL;
-        }
-    } else if (call->name->tag == Expr_NAME) {
-        name = call->name->as.name;
-    }
+        if (!scope) return NULL;
+    } 
+
     assert(name);
 
     AstDecl *hopefully_proc = find_decl(scope, name);
     if (!hopefully_proc) {
-        compile_error(ctx, tok, "call to undeclared procedure \"%s\"", name->text);
+        if (scope == file_scope) {
+            compile_error(ctx, tok, "call to undeclared procedure \"%s\"", name->text);
+            return NULL;
+        }
+        assert(module_name);
+        compile_error(ctx, tok, "module '%s' has no such procedure '%s'", module_name, name->text);
         return NULL;
-    }
-    if (scope != file_scope) {
-        ast_add(file_scope, (AstNode *)hopefully_proc);
-    }
-
-    // Ensure the module that the requested function was declared in is imported in the module the call was made in.
-    if (call->params) for (int i = 0; i < call->params->len; i++) {
-        AstExpr *arg = (AstExpr *)call->params->nodes[i];
-        resolve_expression(arg, ctx, scope);
     }
 
     if (hopefully_proc->tag != Decl_PROC) {
@@ -67,6 +67,14 @@ static AstProcedure *resolve_call(AstNode *callnode, Context *ctx, Ast *file_sco
     if (hopefully_proc->status == Status_UNRESOLVED) {
         resolve_procedure(hopefully_proc, ctx, scope);
     }
+
+    // Ensure the module that the requested function was declared in is imported in the module the call was made in.
+    if (call->params) for (int i = 0; i < call->params->len; i++) {
+        AstExpr *arg = (AstExpr *)call->params->nodes[i];
+        resolve_expression(arg, ctx, file_scope);
+    }
+    
+    if (scope != file_scope) ast_add(file_scope, (AstNode *)hopefully_proc);
 
     AstProcedure *calling = (AstProcedure *)hopefully_proc;
     call->calling = calling;
@@ -85,18 +93,6 @@ static Type *resolve_name(Context *ctx, Name *name, AstNode *site, Ast *file_sco
         compile_error(ctx, site->token, "undeclared identifier \"%s\"", name->text);
         return NULL;
     }
-
-#if 0
-    if (var->tag == Decl_TYPEDEF) {
-        AstDecl *maybe_enum = find_type_decl(file_scope, name);
-        resolve_type(ctx, maybe_enum, site, false, file_scope);
-        if (!maybe_enum || maybe_enum->kind != Type_ENUM) {
-            compile_error(ctx, site->token, "undeclared identifier \"%s\"", name->text);
-            return NULL;
-        }
-        return maybe_enum;
-    }
-#endif
 
     if (var->tag != Decl_VAR) {
         compile_error(ctx, site->token, "\"%s\" was used like a variable, but it isn't one", name->text);
@@ -267,11 +263,6 @@ static Type *resolve_type(Context *ctx, Type *type, AstNode *site, bool cyclic_a
         return NULL;
     }
     Type *real_type = sym->as.type;
-
-    /*
-    sym->status = Status_RESOLVED;
-    return real_type;
-    */
 
     if (sym->status == Status_RESOLVED)
         return real_type;
@@ -481,12 +472,12 @@ static void resolve_statement(Context *ctx, AstNode *stmt, Ast *file_scope) {
         resolve_statement(ctx, (AstNode *)d->statement, file_scope);
     } break;
     case Node_USING: {
-        assert(false);
-        /*
+        // assert(false);
+#if 0
         AstUsing *using = (AstUsing *)stmt;
         Type *decl_type = resolve_name(ctx, using->what, stmt);
         if (decl_type->kind != Type_STRUCT && decl_type->kind != Type_ANON_STRUCT) {
-            compile_error(ctx, stmt->token, "invalid using: cannot 'use' declarations of non-struct declaration");
+            compile_error(ctx, stmt->token, "procedure level using must target struct instances only");
             return;
         }
         AstBlock *source_scope = &decl_type->data.user->as._struct.members->as.block;
@@ -496,7 +487,7 @@ static void resolve_statement(Context *ctx, AstNode *stmt, Ast *file_scope) {
             assert(table_add(&target_scope->symbols, decl->name->text, decl));
             ast_add(target_scope->statements, (AstNode *)decl);
         }
-        */
+#endif
     } break;
     case Node_IF: {
         AstIf *iff = (AstIf *)stmt;

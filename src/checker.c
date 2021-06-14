@@ -374,6 +374,11 @@ bool check_var(Context *ctx, AstDecl *node) {
 
     Type *type = var->typename->as.type;
 
+    if (type->kind == Type_IMPORT && !(node->flags & DECL_IS_TOP_LEVEL)) {
+        compile_error(ctx, tok, "import declarations are not allowed at local scope");
+        return NULL;
+    }
+
     if (type->kind == Type_ANON_STRUCT) {
         AstStruct *s = &type->data.user->as.stmt.as._struct;
         check_struct(ctx, s);

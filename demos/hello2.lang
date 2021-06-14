@@ -1,11 +1,11 @@
-// basic := #import "std/basic.lang"
+basic := #import "std/basic.lang"
 
 // Type inference, same as:
 //    msg: string = get_message();
 msg := get_message();
 
 proc main() {
-    // print(msg.data);
+    basic.printf(msg.data);
 }
 
 proc get_message(): string {

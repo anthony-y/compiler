@@ -16,9 +16,6 @@
 
 static Arena type_arena; // the structure which types are allocated from
 
-// checker.c
-Type *type_from_expr(Table *type_table, AstNode *expr);
-
 // Allocates and initializes a Type from the type_arena,
 // and returns a reference to it.
 Type *make_type(TypeKind kind, char *name, u64 size) {
@@ -47,45 +44,45 @@ inline bool is_type_numeric(Type *t) {
 }
 
 // Allocates and initializes a primitive type, and returns it.
-static inline Type *make_and_insert_primitive(Ast *type_table, char *name, u64 size, Signage signage) {
+static inline Type *make_and_insert_primitive(Context *ctx, char *name, u64 size, Signage signage) {
     Type *t = make_type(Type_PRIMITIVE, name, size);
     t->data.signage = signage;
-    // AstNode *decl = ast_typedefi(
-    // ast_add(type_table, decl);
+    shput(ctx->builtin_types, name, t);
     return t;
 }
 
-void free_types(Table *type_table) {
+void free_types(Context *ctx) {
+    shfree(ctx->builtin_types);
 }
 
 // Initialize the type table and add the primitive types to it.
 // Then, create some handles to internal types.
 // Uses a const SourceStats * to compute the type arenas allocation size.
-void init_types(Context *ctx, Ast *type_table) {
-    const int num_builtins = 16;
+void init_types(Context *ctx) {
+    sh_new_arena(ctx->builtin_types);
 
-    ctx->type_int = make_and_insert_primitive(type_table, "int", sizeof(s64), Signage_SIGNED);
+    ctx->type_int = make_and_insert_primitive(ctx, "int", sizeof(s64), Signage_SIGNED);
 
-    ctx->type_s64 = make_and_insert_primitive(type_table, "s64", sizeof(s64), Signage_SIGNED);
-    ctx->type_u64 = make_and_insert_primitive(type_table, "u64", sizeof(u64), Signage_UNSIGNED);
+    ctx->type_s64 = make_and_insert_primitive(ctx, "s64", sizeof(s64), Signage_SIGNED);
+    ctx->type_u64 = make_and_insert_primitive(ctx, "u64", sizeof(u64), Signage_UNSIGNED);
 
-    ctx->type_s32 = make_and_insert_primitive(type_table, "s32", sizeof(s32), Signage_SIGNED);
-    ctx->type_u32 = make_and_insert_primitive(type_table, "u32", sizeof(u32), Signage_UNSIGNED);
+    ctx->type_s32 = make_and_insert_primitive(ctx, "s32", sizeof(s32), Signage_SIGNED);
+    ctx->type_u32 = make_and_insert_primitive(ctx, "u32", sizeof(u32), Signage_UNSIGNED);
 
-    ctx->type_s16 = make_and_insert_primitive(type_table, "s16", sizeof(s16), Signage_SIGNED);
-    ctx->type_u16 = make_and_insert_primitive(type_table, "u16", sizeof(u16), Signage_UNSIGNED);
+    ctx->type_s16 = make_and_insert_primitive(ctx, "s16", sizeof(s16), Signage_SIGNED);
+    ctx->type_u16 = make_and_insert_primitive(ctx, "u16", sizeof(u16), Signage_UNSIGNED);
 
-    ctx->type_s8 = make_and_insert_primitive(type_table, "s8", sizeof(s8), Signage_SIGNED);
-    ctx->type_u8 = make_and_insert_primitive(type_table, "u8", sizeof(u8), Signage_UNSIGNED);
+    ctx->type_s8 = make_and_insert_primitive(ctx, "s8", sizeof(s8), Signage_SIGNED);
+    ctx->type_u8 = make_and_insert_primitive(ctx, "u8", sizeof(u8), Signage_UNSIGNED);
 
-    ctx->type_f64 = make_and_insert_primitive(type_table, "f64", sizeof(double), Signage_SIGNED_FLOATING);
-    ctx->type_f32 = make_and_insert_primitive(type_table, "f32", sizeof(float), Signage_SIGNED_FLOATING);
+    ctx->type_f64 = make_and_insert_primitive(ctx, "f64", sizeof(double), Signage_SIGNED_FLOATING);
+    ctx->type_f32 = make_and_insert_primitive(ctx, "f32", sizeof(float), Signage_SIGNED_FLOATING);
 
-    ctx->type_bool = make_and_insert_primitive(type_table, "bool", sizeof(u8), Signage_NaN);
-    ctx->type_void = make_and_insert_primitive(type_table, "void", 0, Signage_NaN);
-    ctx->type_string = make_and_insert_primitive(type_table, "string", sizeof(StringType), Signage_NaN);
+    ctx->type_bool = make_and_insert_primitive(ctx, "bool", sizeof(u8), Signage_NaN);
+    ctx->type_void = make_and_insert_primitive(ctx, "void", 0, Signage_NaN);
+    ctx->type_string = make_and_insert_primitive(ctx, "string", sizeof(StringType), Signage_NaN);
 
-    ctx->type_any = make_and_insert_primitive(type_table, "any", sizeof(AnyType), Signage_NaN);
+    ctx->type_any = make_and_insert_primitive(ctx, "any", sizeof(AnyType), Signage_NaN);
 
     ctx->import_type = make_type(Type_IMPORT, "__import", 0);
     ctx->null_type = make_pointer_type(NULL);

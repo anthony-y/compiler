@@ -80,7 +80,13 @@ static void emit_c_for_call(AstCall *call) {
         Token t = expr_tok(call->calling->foreign_link_name);
         fprintf(output, "%s(", t.text);
     } else {
-        fprintf(output, "%s(", call->name->as.name->text);
+        if (call->name->tag == Expr_BINARY) {
+            AstBinary *selector = (AstBinary *)call->name;
+            assert(selector->right->tag == Expr_NAME);
+            fprintf(output, "%s(", selector->right->as.name->text);
+        } else if (call->name->tag == Expr_NAME) {
+            fprintf(output, "%s(", call->name->as.name->text);
+        }
     }
     if (call->params) {
         for (int i = 0; i < call->params->len; i++) {

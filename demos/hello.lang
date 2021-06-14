@@ -1,6 +1,5 @@
 basic := #import "std/basic.lang"
 
 proc main() {
-    t: basic.Printer;
-	// basic.print("Hello, world\n".data);
+	basic.printf("Hello, world\n".data);
 }

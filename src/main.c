@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 
 #include "headers/arena.h"
 #include "headers/lexer.h"
@@ -8,8 +9,18 @@
 #include "headers/context.h"
 #include "headers/passes.h"
 
-#include <assert.h>
+#define STB_DS_IMPLEMENTATION
 #include "headers/stb/stb_ds.h"
+
+//
+// No type mismatch error when assigning float to int
+// 'Using' import
+//
+// For specific imports, just add it to the file scope and do inference and checking.
+//   printf := #import "hi.mule" :: printf ??`
+//
+
+// Recursively load all the ASTs of imported modules into memory.
 void load_used_modules(Ast *module, Context *ctx) {
     for (u64 i = 0; i < module->len; i++) {
         AstNode *node = module->nodes[i];
@@ -17,14 +28,12 @@ void load_used_modules(Ast *module, Context *ctx) {
         AstDecl *decl = (AstDecl *)node;
         if (decl->tag != Decl_VAR) continue;
         AstVar *var = (AstVar *)decl;
-        if (!var->value && var->value->tag != Expr_IMPORT) continue;
+        if (!var->value || var->value->tag != Expr_IMPORT) continue;
         
         char *path = var->value->as.import.path;
         char *file_data = read_file(path);
         int module_i = shgeti(ctx->modules, path);
-        if (module_i != -1) {
-            continue;
-        }
+        if (module_i != -1) continue;
         assert(file_data); // TODO: scuffed
         Lexer lexer;
         lexer_init(&lexer, path, file_data);
@@ -45,6 +54,21 @@ void load_used_modules(Ast *module, Context *ctx) {
     }
 }
 
+static void ensure_main_is_declared(Context *ctx) {
+    if (!ctx->decl_for_main) {
+        compile_error(ctx, (Token){0}, "no entry point found. Please declare \"main\"");
+        return;
+    } 
+    Token main_decl_token = decl_tok(ctx->decl_for_main);
+    if (ctx->decl_for_main->tag != Decl_PROC) {
+        compile_error(ctx, main_decl_token, "entry point \"main\" must be a procedure");
+    } else if (((AstProcedure *)ctx->decl_for_main)->params) {
+        compile_error(ctx, main_decl_token, "entry point \"main\" must not take any arguments");
+    } else if (((AstProcedure *)ctx->decl_for_main)->return_type->as.type != ctx->type_void) {
+        compile_error(ctx, main_decl_token, "entry point \"main\" must return void");
+    }
+}
+
 int main(int arg_count, char **args) {
     if (arg_count < 2) {
         fprintf(stderr, "error: expected root compilation target (a single file path) as argument.\n");
@@ -54,7 +78,7 @@ int main(int arg_count, char **args) {
 
     Context context;
     init_context(&context);
-    init_types(&context, NULL);
+    init_types(&context);
     
     char *data = read_file(path);
     if (!data) return -1;
@@ -69,6 +93,9 @@ int main(int arg_count, char **args) {
     Ast the_ast;
     parser_init(&parser, &tokens);
     parse(&context, &parser, &the_ast, path);
+    if (context.error_count > 0) return -1;
+
+    ensure_main_is_declared(&context);
     if (context.error_count > 0) return -1;
 
     load_used_modules(&the_ast, &context);
@@ -96,27 +123,6 @@ int main(int arg_count, char **args) {
 
     parser_free(&parser, &the_ast);
     free_context(&context);
-    // free_types(&context.type_table);
+    free_types(&context);
     return 0;
 }
-
-//
-// TODO: Imports inside imports
-//       Function calls from modules
-//       'Using' import
-//
-//       Local imports. Maybe. Could disallow them.
-// 
-// To query for a function in an external module: lex, parse, iterate scope and check it. Copy declarations 
-// into the current Scope.
-// Checking and resolution idk yet.
-// Do code gen only for main Scope.
-//
-// For specific imports, just add it to the file scope and do inference and checking.
-//   printf := #import "hi.mule" :: printf ??`
-//
-// Make a fucking Scope abstraction that declarations can point to the scope they're defined in.
-// Make some way to know if a declaration is from that file or not, I can make a flag for the variables.
-// 
-// Basically instead of looking for the imported stuff in the file scope, just insert a thing that says
-// "hey go look in this file and check that function"
