@@ -1,6 +1,0 @@
-ee := #import "ee.lang"
-proc print(fmt: ^u8, args: []any..) #foreign "printf";
-type Message: struct {
-    txt := "hi";
-    // extern: ee.Extern;
-}
