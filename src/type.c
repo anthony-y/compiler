@@ -14,7 +14,7 @@
 #include <stdio.h>
 #include <assert.h>
 
-static Arena type_arena; // the structure which types are allocated from
+// static Arena type_arena; // the structure which types are allocated from
 
 // Allocates and initializes a Type from the type_arena,
 // and returns a reference to it.
@@ -52,6 +52,8 @@ static inline Type *make_and_insert_primitive(Context *ctx, char *name, u64 size
 }
 
 void free_types(Context *ctx) {
+    for (int i = 0; i < shlen(ctx->builtin_types); i++)
+        free(ctx->builtin_types[i].value);
     shfree(ctx->builtin_types);
 }
 

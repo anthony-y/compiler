@@ -116,6 +116,7 @@ void ast_init(Ast *list, int cap) {
 }
 
 void ast_free(Ast *list) {
+    // free_subtrees_and_blocks(list);
     assert(list->nodes);
     free(list->nodes);
     list->cap = 0;
