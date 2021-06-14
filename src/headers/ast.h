@@ -152,11 +152,6 @@ typedef struct {
 } AstEnum;
 
 typedef struct {
-    struct AstExpr *name;
-    struct AstExpr *value;
-} AstAssignment;
-
-typedef struct {
     struct AstExpr *condition;
     struct AstStmt *block_or_stmt;
 

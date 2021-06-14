@@ -949,7 +949,7 @@ static AstNode *parse_top_level_directive(Context *ctx, Parser *parser) {
     return NULL;
 }
 
-static AstNode *parse_top_level(Context *ctx, Parser *parser) { 
+static AstNode *parse_top_level(Context *ctx, Parser *parser) {
     switch (parser->curr->type) {
     case Token_PROC: return parse_proc(ctx, parser, false);
     case Token_IDENT: return parse_var_as_decl(ctx, parser, /*top_level=*/true, /*is_const=*/false);
@@ -1018,7 +1018,7 @@ void parse(Context *ctx, Parser *parser, Ast *out, char *path) {
         if (curr.type == Token_EOF) break;
         parser->current_scope = NULL;
         AstNode *node = parse_top_level(ctx, parser);
-        if (is_decl(node) && ((AstDecl *)node)->name == make_name_from_string(ctx, "main")) {
+        if (node && is_decl(node) && ((AstDecl *)node)->name == make_name_from_string(ctx, "main")) {
             if (node->tag != Node_PROCEDURE) {
                 compile_error(ctx, node->token, "main must be a procedure");
             } else ctx->decl_for_main = (AstDecl *)node;

@@ -100,19 +100,6 @@ static void emit_c_for_call(AstCall *call) {
     fprintf(output, ")");
 }
 
-static void emit_c_for_assignment(AstBinary *ass) {
-    emit_c_for_expr(ass->left);
-    fprintf(output, " ");
-    switch (ass->op) {
-    case Token_PLUS_EQUAL: fprintf(output, "+"); break;
-    case Token_MINUS_EQUAL: fprintf(output, "-"); break;
-    case Token_STAR_EQUAL: fprintf(output, "*"); break;
-    case Token_SLASH_EQUAL: fprintf(output, "/"); break;
-    }
-    fprintf(output, "= ");
-    emit_c_for_expr(ass->right);
-}
-
 static void emit_c_for_expr(AstExpr *expr) {
     Token t = expr_tok(expr);
     switch (expr->tag) {
@@ -159,6 +146,11 @@ static void emit_c_for_expr(AstExpr *expr) {
         case Token_MINUS: fprintf(output, "-"); break;
         case Token_SLASH: fprintf(output, "/"); break;
         case Token_STAR: fprintf(output, "*"); break;
+        case Token_EQUAL: fprintf(output, "="); break;
+        case Token_PLUS_EQUAL: fprintf(output, "+="); break;
+        case Token_MINUS_EQUAL: fprintf(output, "-="); break;
+        case Token_STAR_EQUAL: fprintf(output, "*="); break;
+        case Token_SLASH_EQUAL: fprintf(output, "/="); break;
         case Token_DOT: {
             if (binary->left->resolved_type->kind == Type_POINTER)
                 fprintf(output, "->");
@@ -216,7 +208,7 @@ static void emit_c_for_stmt(AstNode *stmt) {
         emit_c_for_call((AstCall *)stmt);
         break;
     case Node_ASSIGN:
-        emit_c_for_assignment((AstBinary *)stmt);
+        emit_c_for_expr((AstExpr *)stmt);
         break;
     case Node_BLOCK: {
         AstBlock *block = (AstBlock *)stmt;

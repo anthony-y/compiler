@@ -192,12 +192,19 @@ static Type *resolve_expression_1(AstExpr *expr, Context *ctx, Ast *file_scope) 
 
         if (!left_type || !right_type) return NULL;
 
+        bool left = is_type_numeric(left_type) || left_type->kind == Type_POINTER;
+        bool right = is_type_numeric(right_type) || right_type->kind == Type_POINTER;
+        if (!left || !right) {
+            compile_error(ctx, t, "operands of arithmetic must be of pointer or numerical type");
+            return NULL;
+        }
+
         // You can add and substract to/from pointers
         if (bin->op == Token_PLUS || bin->op == Token_MINUS) {
             if (left_type->kind == Type_POINTER)
                 return left_type;
             if (right_type->kind == Type_POINTER)
-                return left_type;
+                return right_type;
         }
 
         return ctx->type_int;
@@ -237,9 +244,14 @@ void resolve_struct(AstStruct *def, Context *ctx, Ast *file_scope) {
 // Resolves an unresolved type to it's "real" type
 static Type *resolve_type(Context *ctx, Type *type, AstNode *site, bool cyclic_allowed, Ast *file_scope) {
     if (type->kind == Type_PRIMITIVE) return type;
+
     if (type->kind == Type_ANON_STRUCT) {
         resolve_struct(&type->data.user->as.stmt.as._struct, ctx, file_scope);
         return type;
+    }
+
+    if (type->kind == Type_ALIAS) {
+        return resolve_type(ctx, type->data.alias_of, site, false, file_scope);
     }
 
     //
@@ -543,6 +555,7 @@ static void resolve_procedure(AstDecl *procsym, Context *ctx, Ast *file_scope) {
 void resolve_module(Context *ctx, Ast *module) {
     resolve_procedure(ctx->decl_for_main, ctx, module);
 
+#if 1
     // Resolving main will resolve all the symbols in the code
     // that are actually used. There may be some top level symbols
     // that are left as unresolved because they do not get used.
@@ -550,7 +563,7 @@ void resolve_module(Context *ctx, Ast *module) {
     // are still correct, however we will keep their status as Status_UNRESOLVED
     // so that later on the compiler will correctly assert that they were not
     // referred to in the code.
- 
+
     for (u64 i = 0; i < module->len; i++) {
         AstNode *node = module->nodes[i];
         assert(is_decl(node));
@@ -576,6 +589,7 @@ void resolve_module(Context *ctx, Ast *module) {
         }
         // decl->status = Status_UNRESOLVED;
     }
+#endif
     stbds_arrfree(proc_stack);
     stbds_arrfree(scope_stack);
 }

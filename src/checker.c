@@ -561,21 +561,13 @@ void check_struct(Context *ctx, AstStruct *s) {
     }
 }
 
-void check_typedef(Context *ctx, AstDecl *node) {
-    // AstTypedef *td = &node->as.typedefi;
-    Type *type = node->as.type;
-    AstNode *decl = type->data.user;
-    if (decl->tag == Node_STRUCT) {
-        check_struct(ctx, (AstStruct *)decl);
-        return;
+void check_typedef(Context *ctx, AstDecl *decl) {
+    Type *real_type = decl->as.type;
+    switch (real_type->kind) {
+    case Type_STRUCT: check_struct(ctx, (AstStruct *)real_type->data.user); return;
+    case Type_PRIMITIVE: return;
+    case Type_ENUM: assert(false);
     }
-    if (decl->tag == Node_TYPENAME) {
-        if (type->kind == Type_ALIAS) {
-            compile_error(ctx, decl->token, "you cannot create a type alias from another type alias");
-        }
-        return;
-    }
-    assert(decl->tag == Node_ENUM);
 }
 
 // Recursively perform semantic analysis and type-checking on an Ast.
