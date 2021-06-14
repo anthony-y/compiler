@@ -1,6 +1,4 @@
-// resolve.c contains code which recursively traverses an abstract syntax tree
-// to resolve identifiers to the symbols which declared them, resolve expressions to types
-// and to apply type inference to variable declarations which specify it.
+// Code which recursively traverses an abstract syntax tree to resolve identifiers to the symbols which declared them, resolve expressions to types, and to apply type inference to variable declarations which specify it.
 #include "headers/common.h"
 #include "headers/ast.h"
 #include "headers/type.h"

@@ -1,6 +1,4 @@
-// The lexer transforms a chunk of bytes
-// (typically a loaded file) into an array
-// of Tokens, ready to be handed off to the parser.
+// The lexer transforms a chunk of bytes (typically a loaded file) into an array of Tokens, ready to be handed off to the parser.
 #include "headers/lexer.h"
 #include "headers/token.h"
 #include "headers/context.h"

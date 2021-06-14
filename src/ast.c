@@ -1,3 +1,4 @@
+// Functions to create, delete and query AST (Abstract Syntax Tree) nodes.
 #include "headers/ast.h"
 #include "headers/token.h"
 #include "headers/parser.h"
@@ -16,6 +17,22 @@
 inline Token decl_tok(AstDecl *d) {return ((AstNode *)d)->token;}
 inline Token expr_tok(AstExpr *e) {return ((AstNode *)e)->token;}
 inline Token stmt_tok(AstStmt *s) {return ((AstNode *)s)->token;}
+
+inline bool is_assignment(AstBinary b) {
+    return (b.op > Token_ASSIGNMENTS_START && b.op < Token_ASSIGNMENTS_END);
+}
+
+inline bool is_binary_comparison(AstBinary b) {
+    return (b.op > Token_BINARY_COMPARE_START && b.op < Token_BINARY_COMPARE_END);
+}
+
+inline bool is_decl(AstNode *n) {
+    return (n->tag > Node_DECLS_START && n->tag < Node_DECLS_END);
+}
+
+inline bool is_literal(AstNode *n) {
+    return (n->tag > Node_LITERALS_START && n->tag < Node_LITERALS_END);
+}
 
 void free_block(AstStmt *stmt) {
     if (!stmt || stmt->tag != Stmt_BLOCK) return;
@@ -91,24 +108,6 @@ AstNode *ast_stmt(Context *c, AstNodeType tag, Token t, const AstStmt *stmt) {
     return node;
 }
 
-inline bool is_assignment(AstBinary b) {
-    return (b.op > Token_ASSIGNMENTS_START && b.op < Token_ASSIGNMENTS_END);
-}
-
-inline bool is_binary_comparison(AstBinary b) {
-    return (b.op > Token_BINARY_COMPARE_START && b.op < Token_BINARY_COMPARE_END);
-}
-
-inline bool is_decl(AstNode *n) {
-    return (n->tag > Node_DECLS_START && n->tag < Node_DECLS_END);
-}
-
-inline bool is_literal(AstNode *n) {
-    return (n->tag > Node_LITERALS_START && n->tag < Node_LITERALS_END);
-}
-
-/* These functions allocate and return AST nodes */
-/* --------------------------------------------- */
 void ast_init(Ast *list, int cap) {
     list->nodes = malloc(cap * sizeof(AstNode *));
     list->cap   = cap;

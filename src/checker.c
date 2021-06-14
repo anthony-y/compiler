@@ -1,3 +1,4 @@
+// Invoked after symbol and type resolution, the checker ensures an AST is semantically correct.
 #include "headers/passes.h"
 #include "headers/ast.h"
 #include "headers/common.h"

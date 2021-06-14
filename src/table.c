@@ -1,3 +1,4 @@
+// A scuffed hash table implementation.
 #include "headers/table.h"
 #include <stdio.h>
 #include <stdlib.h>

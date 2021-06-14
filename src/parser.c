@@ -1,6 +1,4 @@
-// Code to enforce the language grammar while
-// transforming the program text into an
-// abstract syntax tree.
+// Code to enforce the language grammar while transforming the program text into an abstract syntax tree.
 #include "headers/common.h"
 #include "headers/parser.h"
 #include "headers/token.h"

@@ -1,3 +1,4 @@
+// Mostly utility functions for find declarations in scopes, error logging, and initialising the Context struct.
 #include "headers/context.h"
 #include "headers/ast.h"
 
@@ -125,7 +126,6 @@ void free_context(Context *c) {
         free(c->name_table[i].value);
     shfree(c->name_table);
     arena_free(&c->scratch);
-    arena_free(&c->node_allocator);
 }
 
 void compile_error(Context *ctx, Token t, const char *fmt, ...) {

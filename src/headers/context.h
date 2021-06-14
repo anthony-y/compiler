@@ -17,14 +17,14 @@
 // An entry in the name table.
 typedef struct Name {char *text;} Name;
 
-// Central compiler context, a reference to an instance of this struct is
-// passed to most functions in the compiler.
 //
-// This structure does probably not fit into a cache line so it's slow to get if it's not in cache,
-// probs gets cached anyway tho.
+// This structure almost certainly does not fit into a single cache line, so it's slow to access if it gets evicted from cache.
+// It is used in almost all functions in the compiler though, so I find it unlikely that that will happen often, if at all.
+//
 typedef struct Context {
-    Arena string_allocator; // lexer
-    Arena node_allocator; // parser
+    int error_count;
+
+    Arena string_allocator;
     Arena scratch;
 
     // The name table is basically just a big string table,
@@ -46,17 +46,24 @@ typedef struct Context {
 
     AstDecl *decl_for_main;
 
-    /* Handles to types in the type table
-       for easy comparison in type-checking, etc. */
-    Type *type_int, *type_s64, *type_u64, *type_u32, *type_s32,
-        *type_u16, *type_s16, *type_u8, *type_s8;
-    Type *type_f32, *type_f64;
-    Type *type_string, *type_void, *type_bool; // non-integer types
-    Type *null_type; // type of "null" literal
-    Type *type_any; // any
+    // Handles to types in the type table for easy comparison in type-checking, etc.
+    Type *type_int;
+    Type *type_s64;
+    Type *type_u64;
+    Type *type_u32;
+    Type *type_s32;
+    Type *type_u16;
+    Type *type_s16;
+    Type *type_u8;
+    Type *type_s8;
+    Type *type_f32;
+    Type *type_f64;
+    Type *type_string;
+    Type *type_void;
+    Type *type_bool;
+    Type *null_type;
+    Type *type_any;
     Type *import_type;
-
-    int error_count;
 } Context;
 
 Ast *get_module(Context *ctx, Name *name, Ast *in, Token site);
@@ -79,7 +86,6 @@ AstDecl *lookup_struct_field(AstStruct *, Name *);
 AstDecl *lookup_in_block(AstBlock *, Name *);
 AstDecl *find_decl(Ast *ast, Name *name);
 
-void add_symbol(Context *, AstDecl *decl, char *name);
 char *read_file(const char *path);
 
 #endif

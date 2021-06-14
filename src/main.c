@@ -1,3 +1,4 @@
+// The entry point, this code invokes each step of the compilation pipeline.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

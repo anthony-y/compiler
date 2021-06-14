@@ -1,3 +1,4 @@
+// The final step in compilation, the now known-to-be-correct ASTs are fed into the code generator to produce C output, which is given to a C compiler to generate the binary.
 #include "headers/passes.h"
 #include "headers/context.h"
 #include "headers/ast.h"

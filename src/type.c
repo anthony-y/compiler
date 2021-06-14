@@ -1,5 +1,4 @@
-// Functions for working with the compilers
-// internal representation of a data-type.
+// Functions for working with the compilers internal representation of a data-type.
 #include "headers/common.h"
 #include "headers/passes.h"
 #include "headers/ast.h"
