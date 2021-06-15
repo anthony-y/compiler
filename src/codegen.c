@@ -363,27 +363,11 @@ static void emit_c_for_proc(AstProcedure *proc, bool entry_point) {
     fprintf(output, "}\n");
 }
 
-char *generate_and_write_c_code(Context *ctx, Ast *ast, const char *file_name) {
-    name_for_main = make_name_from_string(ctx, "main");
+static void emit_forward_decls_for_module(Context *ctx, Ast *module, bool main) {
+    for (u64 i = 0; i < module->len; i++) {
+        if (module->nodes[i]->tag == Node_IMPORT) continue;
 
-    const char *postfix = "_generated.c";
-    u64 len = strlen(file_name) + strlen(postfix) + 1;
-    char *output_file = arena_alloc(&ctx->scratch, len);
-    strcpy(output_file, file_name);
-    strcat(output_file, postfix);
-
-    output = fopen(output_file, "w");
-    assert(output);
-
-    emit_boilerplate(file_name);
-
-    //
-    // Generate forward decls
-    //
-    for (u64 i = 0; i < ast->len; i++) {
-        if (ast->nodes[i]->tag == Node_IMPORT) continue;
-
-        AstDecl *decl = (AstDecl *)ast->nodes[i];
+        AstDecl *decl = (AstDecl *)module->nodes[i];
         if (decl->status == Status_UNRESOLVED) continue; // Don't emit code for unused declarations
 
         switch (decl->tag) {
@@ -402,7 +386,7 @@ char *generate_and_write_c_code(Context *ctx, Ast *ast, const char *file_name) {
             }
         } break;
         case Decl_PROC: {
-            if (decl == ctx->decl_for_main)
+            if (main && decl == ctx->decl_for_main)
                 fprintf(output, "void compiler_main()");
             else 
                 emit_c_for_proc_header((AstProcedure *)decl);
@@ -410,16 +394,14 @@ char *generate_and_write_c_code(Context *ctx, Ast *ast, const char *file_name) {
         }
         fprintf(output, ";\n");
     }
-
     fprintf(output, "\n");
+}
 
-    //
-    // Generate struct and enum bodies
-    //
-    for (u64 i = 0; i < ast->len; i++) {
-        if (ast->nodes[i]->tag == Node_IMPORT) continue;
+static void emit_struct_enum_bodies(Ast *module) {
+    for (u64 i = 0; i < module->len; i++) {
+        if (module->nodes[i]->tag == Node_IMPORT) continue;
 
-        AstDecl *decl = (AstDecl *)ast->nodes[i];
+        AstDecl *decl = (AstDecl *)module->nodes[i];
         if (decl->status == Status_UNRESOLVED) continue;
         if (decl->tag == Decl_TYPEDEF) {
             Type *type = decl->as.type;
@@ -432,14 +414,12 @@ char *generate_and_write_c_code(Context *ctx, Ast *ast, const char *file_name) {
             }
         }
     }
-
     fprintf(output, "\n");
-    
-    //
-    // Generate implicit initializers for structs.
-    //
-    for (u64 i = 0; i < ast->len; i++) {
-        AstDecl *decl = (AstDecl *)ast->nodes[i];
+}
+
+static void emit_implicit_initers(Ast *module) {
+    for (u64 i = 0; i < module->len; i++) {
+        AstDecl *decl = (AstDecl *)module->nodes[i];
         if (decl->status == Status_UNRESOLVED) continue;
         if (decl->tag != Decl_TYPEDEF) {
             continue;
@@ -459,16 +439,14 @@ char *generate_and_write_c_code(Context *ctx, Ast *ast, const char *file_name) {
         }
         fprintf(output, "}\n");
     }
-
     fprintf(output, "\n");
+}
 
-    //
-    // Generate procedure decls
-    //
-    for (u64 i = 0; i < ast->len; i++) {
-        if (ast->nodes[i]->tag == Node_IMPORT) continue;
+static void emit_procedure_bodies(Context *ctx, Ast *module) {
+    for (u64 i = 0; i < module->len; i++) {
+        if (module->nodes[i]->tag == Node_IMPORT) continue;
 
-        AstDecl *decl = (AstDecl *)ast->nodes[i];
+        AstDecl *decl = (AstDecl *)module->nodes[i];
 
         // Don't emit code for unused declarations
         if (decl->status == Status_UNRESOLVED) continue;
@@ -478,6 +456,53 @@ char *generate_and_write_c_code(Context *ctx, Ast *ast, const char *file_name) {
             emit_c_for_proc(proc, (decl == ctx->decl_for_main));
             fprintf(output, "\n");
         }
+    }
+}
+
+char *generate_and_write_c_code(Context *ctx, Ast *ast, const char *file_name) {
+    name_for_main = make_name_from_string(ctx, "main");
+
+    const char *postfix = "_generated.c";
+    u64 len = strlen(file_name) + strlen(postfix) + 1;
+    char *output_file = arena_alloc(&ctx->scratch, len);
+    strcpy(output_file, file_name);
+    strcat(output_file, postfix);
+
+    output = fopen(output_file, "w");
+    assert(output);
+
+    emit_boilerplate(file_name);
+
+    //
+    // Generate forward decls
+    //
+    emit_forward_decls_for_module(ctx, ast, true);
+    for (u64 i = 0; i < shlen(ctx->modules); i++) {
+        emit_forward_decls_for_module(ctx, ctx->modules[i].value, false);
+    }
+
+    //
+    // Generate struct and enum bodies
+    //
+    emit_struct_enum_bodies(ast);
+    for (u64 i = 0; i < shlen(ctx->modules); i++) {
+        emit_struct_enum_bodies(ctx->modules[i].value);
+    }
+
+    //
+    // Generate implicit initializers for structs.
+    //
+    emit_implicit_initers(ast);
+    for (u64 i = 0; i < shlen(ctx->modules); i++) {
+        emit_implicit_initers(ctx->modules[i].value);
+    }
+
+    //
+    // Generate procedure decls
+    //
+    emit_procedure_bodies(ctx, ast);
+    for (u64 i = 0; i < shlen(ctx->modules); i++) {
+        emit_procedure_bodies(ctx, ctx->modules[i].value);
     }
 
     //

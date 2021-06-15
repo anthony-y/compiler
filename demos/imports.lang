@@ -15,5 +15,5 @@ proc main() {
 	basic.mem_copy(bytes, msg.data, len);
 	bytes[len] = 0;
 
-	basic.print("%s".data, bytes);
+	basic.printf("%s".data, bytes);
 }

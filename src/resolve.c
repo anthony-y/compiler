@@ -72,7 +72,7 @@ static AstProcedure *resolve_call(AstNode *callnode, Context *ctx, Ast *file_sco
         resolve_expression(arg, ctx, file_scope);
     }
     
-    if (scope != file_scope) ast_add(file_scope, (AstNode *)hopefully_proc);
+    // if (scope != file_scope) ast_add(file_scope, (AstNode *)hopefully_proc);
 
     AstProcedure *calling = (AstProcedure *)hopefully_proc;
     call->calling = calling;
@@ -409,7 +409,7 @@ static Type *resolve_imported_type(Context *ctx, AstBinary *selector, Ast *file_
     
     // TODO: consider adding a dummy/placeholder node instead of directly copying the node itself.
     //       Then, at codegen time we could just go find the node and do the codegen for it instead of adding it to this scope directly.
-    ast_add(file_scope, (AstNode *)type_decl);
+    // ast_add(file_scope, (AstNode *)type_decl);
     return type_decl->as.type;
 }
 

@@ -4,7 +4,7 @@ type Arena: struct {
     fixed    : bool = true;
     cursor   : int  = 0;
     capacity : int  = 2048;
-    mem: ^u8; // b.alloc(2048); // TODO this is a bad idea
+    mem: ^u8 = b.malloc(2048); // TODO this is a bad idea
 }
 
 proc arena_init(a: ^Arena, cap: u64) {

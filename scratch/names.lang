@@ -1,9 +1,9 @@
-//#import "scratch/interp.lang"
+fmt := #import "std/basic.lang"
 
 proc main() {
 //	main: int = 0
 	other(10)
-	print("H".data);
+	fmt.printf("H".data);
 }
 
 proc other(k: int) {

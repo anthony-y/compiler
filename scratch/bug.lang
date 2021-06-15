@@ -1,7 +1,10 @@
+b := #import "std/basic.lang"
+
 proc main() {
     file_data := magic_os_proc("bug.lang")
     ptr := ^file_data
     *(cast(^string)ptr) = ":)"
+    b.printf("%s".data, ptr.data);
 }
 
-proc magic_os_proc(_: string): string #foreign "hi"
+proc magic_os_proc(_: string): string { return "hi"; }

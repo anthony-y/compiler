@@ -19,7 +19,7 @@ proc whatever() {
 }
 
 proc _1() {
-    i := 10 + "st"
+    i := 10 + "st" // error
 }
 
 type Field: struct {
