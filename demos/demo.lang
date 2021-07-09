@@ -1,15 +1,21 @@
 basic := #import "std/basic.lang"
-proc main() {
-	const msg := "Hello, world!";
-    const sec := "Hell";
+
+main :: proc() {
+    msg := "Hello, world!";
+    sec := "Hell";
     // const sub := "Hello"; TODO: redefinition warning
 
-	sub := basic.substring(msg, sec.length);
-	defer basic.free_substring(sub);
+    sub := basic.substring(msg, sec.length);
+    defer basic.free_substring(sub);
 
-	fmt_string := basic.c_string("%s\n%s\nThe demo:\n\t%s\nI will now print a number: %f\n");
-	defer basic.free(fmt_string);
+    fmt_string := basic.c_string("%s\n%s\nThe demo:\n\t%s\nI will now print a number: %f\n");
+    defer basic.free(fmt_string);
 
-	basic.printf(fmt_string, msg.data, sub.data, "Wow printf works".data, 42.6);
+    free()
+
+    basic.printf(fmt_string, msg.data, sub.data, "Wow printf works".data, 42.6);
 }
+
+free :: proc(){}
+
 // proc main() {} // TODO stop redefintion

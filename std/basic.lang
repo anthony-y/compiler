@@ -1,23 +1,23 @@
-proc puts(s: ^u8) #foreign;
-proc free(ptr: ^void) #foreign;
-proc malloc(size: u64): ^void #foreign;
-proc realloc(ptr: ^void, size: u64): ^void #foreign;
-proc printf(fmt: ^u8, args: []any..) #foreign;
-proc mem_copy(dest: ^void, src: ^void, n: u64) #foreign "memcpy";
+puts :: proc(s: ^u8) #foreign;
+free :: proc(ptr: ^void) #foreign;
+malloc :: proc(size: u64) -> ^void #foreign;
+realloc :: proc(ptr: ^void, size: u64) -> ^void #foreign;
+printf :: proc(fmt: ^u8, args: []Any..) -> int #foreign;
+mem_copy :: proc(dest: ^void, src: ^void, n: u64) #foreign "memcpy";
 
-proc c_string(s: string): ^u8 {
+c_string :: proc(s: string) -> ^u8 {
     s2 := substring(s, s.length);
     return s2.data;
 }
 
-proc Print(fmt: string, args: []any..) {
+Print :: proc(fmt: string, args: []Any..) {
     // TODO: both of these cause bugs
     // printf(fmt.data, args..);
     // printf(fmt.data, ..args);
     // printf(fmt.data, args);
 }
 
-proc substring(s: string, up_to: u64): string {
+substring :: proc(s: string, up_to: u64) -> string {
     sub: string;
     sub.data = malloc(up_to+1);
     mem_copy(sub.data, s.data, up_to);
@@ -26,6 +26,6 @@ proc substring(s: string, up_to: u64): string {
     return sub;
 }
 
-proc free_substring(s: string) {
+free_substring :: proc(s: string) {
     free(s.data);
 }

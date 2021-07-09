@@ -2,7 +2,9 @@
 #define TOKEN_h
 
 #include "common.h"
-typedef enum { Token_EOF,
+
+typedef enum {
+    Token_EOF,
     Token_END_OF_CHUNK,
     Token_ERROR,
     Token_UNKNOWN,
@@ -40,7 +42,6 @@ typedef enum { Token_EOF,
     Token_THEN,
     Token_INLINE,
     Token_USING,
-    Token_CONST,
 
     Token_CLOSE_PAREN,
     Token_OPEN_BRACE,
@@ -55,6 +56,7 @@ typedef enum { Token_EOF,
     Token_DOT_DOT,
     Token_CARAT,
     Token_HASH,
+    Token_ARROW,
 
     Token_BINOP_START,
 
@@ -122,7 +124,6 @@ void token_list_free(TokenList *list);
 void token_list_print(const TokenList *list);
 
 struct Lexer;
-
 Token token_new(struct Lexer *, TokenType);
 void token_print(Token t);
 

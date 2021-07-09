@@ -1,20 +1,16 @@
+basic := #import "std/basic.lang"
+
 proc main() {
 	c := concat("Hello, ", "world\n");
-	defer free(c.data);
-
-	puts(c.data);
+	defer basic.free(c.data);
+	basic.puts(c.data);
 }
 
 proc concat(a: string, b: string): string {
 	out := "";
 	out.length = a.length + b.length;
-	out.data = alloc(out.length);
-	mem_copy(out.data, a.data, a.length);
-	mem_copy(out.data+a.length, b.data, b.length);
+	out.data = basic.malloc(out.length);
+	basic.mem_copy(out.data, a.data, a.length);
+	basic.mem_copy(out.data+a.length, b.data, b.length);
 	return out;
 }
-
-proc puts(s: ^u8) #foreign;
-proc free(ptr: ^void) #foreign;
-proc alloc(size: u64): ^void #foreign "malloc";
-proc mem_copy(dest: ^void, src: ^void, n: u64) #foreign "memcpy";

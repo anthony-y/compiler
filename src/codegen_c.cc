@@ -11,6 +11,8 @@
 #include <string.h>
 #include <assert.h>
 
+#if 0
+
 static FILE *output;
 static Name *name_for_main;
 
@@ -81,11 +83,11 @@ static void emit_c_for_call(AstCall *call) {
         Token t = expr_tok(call->calling->foreign_link_name);
         fprintf(output, "%s(", t.text);
     } else {
-        if (call->name->tag == Expr_BINARY) {
+        if (call->name->tag == Node_BINARY) {
             AstBinary *selector = (AstBinary *)call->name;
-            assert(selector->right->tag == Expr_NAME);
+            assert(selector->right->tag == Node_IDENT);
             fprintf(output, "%s(", selector->right->as.name->text);
-        } else if (call->name->tag == Expr_NAME) {
+        } else if (call->name->tag == Node_IDENT) {
             fprintf(output, "%s(", call->name->as.name->text);
         }
     }
@@ -103,30 +105,30 @@ static void emit_c_for_call(AstCall *call) {
 static void emit_c_for_expr(AstExpr *expr) {
     Token t = expr_tok(expr);
     switch (expr->tag) {
-    case Expr_STRING:
+    case Node_STRING:
         // -2 because quotes are counted in the length of the token.
         // TODO fix this at lexer level.
         fprintf(output, "__make_string(\"%s\", %d)", t.text, t.length-2);
         return;
-    case Expr_NULL:
+    case Node_NULL:
         fprintf(output, "NULL");
         return;
-    case Expr_CALL:
+    case Node_CALL:
         emit_c_for_call((AstCall *)expr);
         return;
-    case Expr_BOOL: {
+    case Node_BOOL: {
         bool val = ((AstLiteral *)expr)->data.boolean;
         fprintf(output, val ? "true" : "false");
         return;
     } break;
-    case Expr_INDEX: {
+    case Node_INDEX: {
         AstArrayIndex *i = (AstArrayIndex *)expr;
         emit_c_for_expr(i->name);
         fprintf(output, "[");
         emit_c_for_expr(i->index);
         fprintf(output, "]");
     } break;
-    case Expr_BINARY: {
+    case Node_BINARY: {
         AstBinary *binary = (AstBinary *)expr;
         if (binary->left->resolved_type->kind == Type_ENUM) {
             fprintf(output, "%s__%s", binary->left->resolved_type->name, binary->right->as.name->text);
@@ -162,7 +164,7 @@ static void emit_c_for_expr(AstExpr *expr) {
         emit_c_for_expr(binary->right);
         return;
     } break;
-    case Expr_UNARY: {
+    case Node_UNARY: {
         AstUnary *unary = (AstUnary *)expr;
         switch (unary->op) {
         case Token_MINUS: fprintf(output, "-"); break;
@@ -174,12 +176,12 @@ static void emit_c_for_expr(AstExpr *expr) {
         emit_c_for_expr(unary->expr);
         return;
     } break;
-    case Expr_PAREN:
+    case Node_PAREN:
         fprintf(output, "(");
         emit_c_for_expr(((AstParen *)expr)->sub_expr);
         fprintf(output, ")");
         return;
-    case Expr_CAST: {
+    case Node_CAST: {
         AstCast *cast = (AstCast *)expr;
         fprintf(output, "(cast(");
         emit_c_for_type(cast->typename->as.type);
@@ -231,7 +233,7 @@ static void emit_c_for_stmt(AstNode *stmt) {
 
         if (iff->other_branch) {
             fprintf(output, "else ");
-            if (iff->other_branch->tag == Stmt_BLOCK) {
+            if (iff->other_branch->tag == Node_BLOCK) {
                 fprintf(output, "{\n");
                 emit_c_for_stmt((AstNode *)iff->other_branch);
                 fprintf(output, "}");
@@ -363,6 +365,9 @@ static void emit_c_for_proc(AstProcedure *proc, bool entry_point) {
     fprintf(output, "}\n");
 }
 
+
+FILE *output = NULL;
+
 static void emit_forward_decls_for_module(Context *ctx, Ast *module, bool main) {
     for (u64 i = 0; i < module->len; i++) {
         if (module->nodes[i]->tag == Node_IMPORT) continue;
@@ -460,7 +465,7 @@ static void emit_procedure_bodies(Context *ctx, Ast *module) {
 }
 
 char *generate_and_write_c_code(Context *ctx, Ast *ast, const char *file_name) {
-    name_for_main = make_name_from_string(ctx, "main");
+    name_for_main = make_name_string(ctx, "main");
 
     const char *postfix = "_generated.c";
     u64 len = strlen(file_name) + strlen(postfix) + 1;
@@ -478,7 +483,7 @@ char *generate_and_write_c_code(Context *ctx, Ast *ast, const char *file_name) {
     //
     emit_forward_decls_for_module(ctx, ast, true);
     for (u64 i = 0; i < shlen(ctx->modules); i++) {
-        emit_forward_decls_for_module(ctx, ctx->modules[i].value, false);
+        emit_forward_decls_for_module(ctx, &ctx->modules[i].value->ast, false);
     }
 
     //
@@ -486,7 +491,7 @@ char *generate_and_write_c_code(Context *ctx, Ast *ast, const char *file_name) {
     //
     emit_struct_enum_bodies(ast);
     for (u64 i = 0; i < shlen(ctx->modules); i++) {
-        emit_struct_enum_bodies(ctx->modules[i].value);
+        emit_struct_enum_bodies(&ctx->modules[i].value->ast);
     }
 
     //
@@ -494,7 +499,7 @@ char *generate_and_write_c_code(Context *ctx, Ast *ast, const char *file_name) {
     //
     emit_implicit_initers(ast);
     for (u64 i = 0; i < shlen(ctx->modules); i++) {
-        emit_implicit_initers(ctx->modules[i].value);
+        emit_implicit_initers(&ctx->modules[i].value->ast);
     }
 
     //
@@ -502,7 +507,7 @@ char *generate_and_write_c_code(Context *ctx, Ast *ast, const char *file_name) {
     //
     emit_procedure_bodies(ctx, ast);
     for (u64 i = 0; i < shlen(ctx->modules); i++) {
-        emit_procedure_bodies(ctx, ctx->modules[i].value);
+        emit_procedure_bodies(ctx, &ctx->modules[i].value->ast);
     }
 
     //
@@ -553,3 +558,4 @@ static void emit_boilerplate(const char *file_name) {
     fprintf(output, "}\n");
     fprintf(output, "\n");
 }
+#endif

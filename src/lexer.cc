@@ -2,7 +2,7 @@
 #include "headers/lexer.h"
 #include "headers/token.h"
 #include "headers/context.h"
-#include "headers/table.h"
+
 
 #include <string.h>
 #include <stdlib.h>
@@ -20,12 +20,6 @@ void lexer_init(Lexer *tz, const char *path, char *data) {
 
     tz->curr = data;
     tz->start = data;
-}
-
-void lexer_free(Lexer *tz) {
-    // arena_free(tz->string_allocator);
-    tz->curr = NULL;
-    tz->line = 0;
 }
 
 /*
@@ -80,12 +74,12 @@ Token token_new(Lexer *tz, TokenType type) {
 
     if (type == Token_IDENT || type == Token_INT_LIT || type == Token_STRING_LIT || type == Token_FLOAT_LIT || type == Token_RESERVED_TYPE) {
         if (type == Token_STRING_LIT) {
-            t.text = arena_alloc(tz->string_allocator, t.length-1);
+            t.text = (char *)arena_alloc(tz->string_allocator, t.length-1);
             strncpy(t.text, tz->start+1, t.length-2);
             t.text[t.length-2] = 0;
             return t;
         }
-        t.text = arena_alloc(tz->string_allocator, t.length + 1);
+        t.text = (char *)arena_alloc(tz->string_allocator, t.length + 1);
         strncpy(t.text, tz->start, t.length);
         t.text[t.length] = 0;
     }
@@ -174,12 +168,11 @@ static Token tokenize_ident_or_keyword(Lexer *tz) {
     u64 len = (u64)(tz->curr-tz->start);
 
     switch (*tz->start) {
-    case 'a': {
+    case 'A': {
         if (len == 3 && strncmp(tz->start+1, "ny", 2) == 0) return token_new(tz, Token_RESERVED_TYPE);
     } break;
     case 'c': {
         if (len == 4 && strncmp(tz->start+1, "ast", 3) == 0) return token_new(tz, Token_CAST);
-        if (len == 5 && strncmp(tz->start+1, "onst", 4) == 0) return token_new(tz, Token_CONST);
     } break;
     case 'i': {
         if (len == 3 && strncmp(tz->start+1, "nt", 2) == 0) return token_new(tz, Token_RESERVED_TYPE);
@@ -210,7 +203,11 @@ static Token tokenize_ident_or_keyword(Lexer *tz) {
         if (len != 4) break;
         if (strncmp(tz->start+1, "rue", 3) == 0) return token_new(tz, Token_TRUE);
         if (strncmp(tz->start+1, "hen", 3) == 0) return token_new(tz, Token_THEN);
-        if (strncmp(tz->start+1, "ype", 3) == 0) return token_new(tz, Token_TYPEDEF);
+    } break;
+
+    case 'T': {
+		if (len != 4) break;
+        if (strncmp(tz->start+1, "ype", 3) == 0) return token_new(tz, Token_RESERVED_TYPE);
     } break;
 
     case 'v': {
@@ -332,7 +329,7 @@ Token next_token(Lexer *tz) {
         case '+': return token_new(tz, next_if_match(tz, '=') ? Token_PLUS_EQUAL    : Token_PLUS);
         case '>': return token_new(tz, next_if_match(tz, '=') ? Token_GREATER_EQUAL : Token_GREATER);
         case '<': return token_new(tz, next_if_match(tz, '=') ? Token_LESS_EQUAL    : Token_LESS);
-        case '-': return token_new(tz, next_if_match(tz, '=') ? Token_MINUS_EQUAL   : Token_MINUS);
+        case '-': return token_new(tz, next_if_match(tz, '=') ? Token_MINUS_EQUAL   : next_if_match(tz, '>') ? Token_ARROW : Token_MINUS);
 
         case '&': return token_new(tz, next_if_match(tz, '&') ? Token_AMP_AMP       : Token_AMPERSAN);
         case '|': return token_new(tz, next_if_match(tz, '|') ? Token_BAR_BAR       : Token_BAR);

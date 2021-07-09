@@ -4,10 +4,10 @@ basic := #import "std/basic.lang"
 //    msg: string = get_message();
 msg := get_message();
 
-proc main() {
+main :: proc() {
     basic.printf(msg.data);
 }
 
-proc get_message(): string {
+get_message :: proc() -> string {
     return "Hello, world\n";
 }

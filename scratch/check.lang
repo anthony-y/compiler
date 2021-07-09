@@ -1,11 +1,6 @@
 proc main() {
     my_s: S
     my_s.s[0].d.s[0] = null // TODO bug
-    msg := hi()
-}
-
-proc hi(): string {
-    return "Hi"
 }
 
 type S: struct {

@@ -1,0 +1,3 @@
+main :: proc() {
+	p: ^[]int;
+}

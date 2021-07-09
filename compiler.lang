@@ -1,0 +1,14 @@
+TYPE_STRUCT  :: 0;
+TYPE_ALIAS   :: 1;
+TYPE_INTEGER :: 2;
+
+TypeInfo :: struct {
+    type: int;
+    size: u64;
+    name: string;
+}
+
+__get_type_info :: proc() -> TypeInfo {
+    t: TypeInfo;
+    return t;
+}

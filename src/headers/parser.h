@@ -6,17 +6,18 @@
 #include "ast.h"
 #include "token.h"
 
+struct Module;
+struct Context;
+
 typedef struct Parser {
     Token *curr;
     Token *prev;
     AstBlock *current_scope;
-    Ast *ast;
+    Module *module;
+    bool in_type_instantiation = false; // TODO better name, it's a thing that tells us whether we're in a pointer or array typename thingy
 } Parser;
 
-void parser_init(Parser *, const TokenList *);
-void parser_free(Parser *, Ast *);
-
-struct Context;
-void parse(struct Context *ctx, Parser *parser, Ast *out, char *path);
+void parser_init(Parser *, struct Module *);
+void parse(struct Context *ctx, Parser *parser, char *path);
 
 #endif

@@ -8,13 +8,13 @@
 void token_list_init(TokenList *list) {
     list->len = 0;
     list->cap = 64;
-    list->tokens = malloc(sizeof(Token) * 64);
+    list->tokens = (Token *)malloc(sizeof(Token) * 64);
 }
 
 void token_list_add(TokenList *list, Token token) {
     if (list->len >= list->cap) {
         list->cap *= 2;
-        Token *tmp = realloc(list->tokens, list->cap * sizeof(Token));
+        Token *tmp = (Token *)realloc(list->tokens, list->cap * sizeof(Token));
         if (tmp) {
             list->tokens = tmp;
         } else {

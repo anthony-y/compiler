@@ -6,18 +6,18 @@
 #include "ast.h"
 #include "type.h"
 
-typedef struct Interp {
+struct Interp {
     char **call_stack; // stb_sb
     u8 *code; // stb_sb
     u8 *stack;
-} Interp;
+};
 
 void interp_run(Interp *);
 void interp_free(Interp *);
 
 struct Context;
 
-Interp compile_to_bytecode(struct Context *ctx, Ast *ast);
+Interp compile_to_bytecode(Context *ctx, Ast *ast);
 
 // Opcodes
 enum {

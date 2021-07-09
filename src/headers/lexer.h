@@ -3,7 +3,7 @@
 
 #include "token.h"
 #include "arena.h"
-#include "table.h"
+
 
 typedef struct Lexer {
     const char *file_name;
@@ -19,7 +19,6 @@ typedef struct Lexer {
 } Lexer;
 
 void lexer_init(Lexer *, const char *path, char *data);
-void lexer_free(Lexer *);
 
 bool lexer_lex(Lexer *, struct TokenList *list);
 Token next_token(Lexer *);
