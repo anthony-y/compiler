@@ -30,7 +30,7 @@ static AstTypeDecl *resolve_typename_in_type_slot(AstTypename *ref, Context *ctx
     // For pointers, arrays, and built-in types, resolved_type is set at parse time.
     if (ref->resolved_type) {
         // Placeholders only appear as the base of type of a pointer or array type, which get resolved below
-		// by calling resolve_type_decl directly. If one gets through here, there's a bug.
+        // by calling resolve_type_decl directly. If one gets through here, there's a bug.
         assert(ref->resolved_type->expr_type != TypeDecl_PLACEHOLDER);
 
         // This should only happen for builtin types since they are flagged as Status_RESOLVED when they're created in type.cc.
@@ -75,31 +75,31 @@ AstTypeDecl *resolve_decl(AstDecl *decl, Context *ctx, Module *module) {
     if (decl->status == Status_RESOLVED) return decl->given_type->resolved_type;
 
     if (!(decl->flags & DECL_IS_INFERRED)) {
-		AstTypeDecl *resolved_typename = resolve_typename_in_type_slot(decl->given_type, ctx, module);
-    	if (!resolved_typename) return NULL;
+        AstTypeDecl *resolved_typename = resolve_typename_in_type_slot(decl->given_type, ctx, module);
+        if (!resolved_typename) return NULL;
 
-		if (!decl->expr) {
-			decl->given_type->resolved_type = resolved_typename;
-        	decl->status = Status_RESOLVED;
-        	return resolved_typename;
-		}
+        if (!decl->expr) {
+            decl->given_type->resolved_type = resolved_typename;
+            decl->status = Status_RESOLVED;
+            return resolved_typename;
+        }
     }
 
     decl->status = Status_RESOLVING;
     AstTypeDecl *inferred_type = resolve_expression(decl->expr, ctx, module);
     decl->status = Status_RESOLVED;
 
-	if (!inferred_type) return NULL;
+    if (!inferred_type) return NULL;
 
-	if (decl->flags & DECL_IS_CONST && decl->expr) {
-		if (decl->expr->tag == Node_IDENT) {
-			auto ident = (AstIdent *)decl->expr;
-			if (!(ident->resolved_decl->flags & DECL_IS_CONST)) {
-				compile_error(ctx, decl->token, "attempt to assign non-constant value to constant declaration");
-				return NULL;
-			}
-		}
-	}
+    if (decl->flags & DECL_IS_CONST && decl->expr) {
+        if (decl->expr->tag == Node_IDENT) {
+            auto ident = (AstIdent *)decl->expr;
+            if (!(ident->resolved_decl->flags & DECL_IS_CONST)) {
+                compile_error(ctx, decl->token, "attempt to assign non-constant value to constant declaration");
+                return NULL;
+            }
+        }
+    }
 
     if (decl->flags & DECL_IS_INFERRED) {
         if (inferred_type == ctx->null_type) {
@@ -183,9 +183,9 @@ static AstTypeDecl *resolve_imported_type(Context *ctx, AstBinary *selector, Mod
         compile_error(ctx, token, "undeclared type '%s' - not defined in target package '%s'", type_name->name->text, module_name->name->text);
         return NULL;
     }
-	if (type_decl->tag != Node_TYPE_DECL) {
-		compile_error(ctx, token, "'%s.%s' was used as a typename, but it's declaration does not create one", module_name->name->text, type_name->name->text);
-	}
+    if (type_decl->tag != Node_TYPE_DECL) {
+        compile_error(ctx, token, "'%s.%s' was used as a typename, but it's declaration does not create one", module_name->name->text, type_name->name->text);
+    }
     return (AstTypeDecl *)type_decl;
 }
 
@@ -271,7 +271,7 @@ static AstTypeDecl *resolve_procedure(AstProcedure *proc, Context *ctx, Module *
     }
 
     AstTypeDecl *resolved_return_type = resolve_typename_in_type_slot(proc->return_type, ctx, module);
-	if (!resolved_return_type) return NULL;
+    if (!resolved_return_type) return NULL;
 
     if (proc->flags & PROC_IS_FOREIGN) {
         // return make_procedure_type(resolved_return_type, NULL); // TODO argument types
@@ -309,9 +309,9 @@ static AstTypeDecl *resolve_selector(Context *ctx, AstBinary *accessor, Module *
     }
 */
 
-	// If it was a pointer, unwrap it, but only by one "level",
+    // If it was a pointer, unwrap it, but only by one "level",
     // selectors shouldn't be able to reach into far-down structs in pointers.
-	// TODO could do this higher up but it would break some stuff
+    // TODO could do this higher up but it would break some stuff
     if (lhs_type->expr_type == TypeDecl_POINTER) {
         lhs_type = lhs_type->base_type;
     }
@@ -452,14 +452,14 @@ static AstTypeDecl *resolve_name(Context *ctx, AstIdent *name, AstNode *site, Mo
 
     if (decl->tag == Node_TYPE_DECL) {
         // TODO: this doesn't work because site is probably just the expression of the identifier itself, and not the declaration that it is on. Maybe add a AstDecl * to AstExpr, which can be non-null in the case that the expression belongs to a declaration. Then, here, I could check that pointer through the site.
-		if (site->tag == Node_DECL) {
-			auto sitedecl = (AstDecl *)site;
+        if (site->tag == Node_DECL) {
+            auto sitedecl = (AstDecl *)site;
             if (sitedecl->flags & DECL_IS_CONST) {
                 printf("we got a type alias over here\n");
             } else {
                 printf("we got just a runtime type decl that's fine we don't have to do anything\n");
             }
-		}
+        }
 
         // This should be fine but I don't know yet.
         printf("resolve_name() :: decl->tag == Node_TYPE_DECL, site->tag == %d\n", site->tag);
@@ -557,8 +557,8 @@ static AstTypeDecl *resolve_expression_to_type(AstExpr *expr, Context *ctx, Modu
     case Node_CAST: {
         AstCast *cast = (AstCast *)expr;
         assert(cast->type->tag == Node_TYPENAME);
-		resolve_typename_in_type_slot(cast->type, ctx, module);
-		resolve_expression(cast->expr, ctx, module);
+        resolve_typename_in_type_slot(cast->type, ctx, module);
+        resolve_expression(cast->expr, ctx, module);
         return cast->type->resolved_type;
     } break;
 

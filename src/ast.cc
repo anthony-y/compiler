@@ -92,7 +92,7 @@ inline AstNode *ast_node(Context *c, AstNodeType tag, Token t) {
 AstDecl *ast_decl(Context *c, Token t, const AstDecl decl) {
     AstDecl *node = (AstDecl *)malloc(sizeof(AstDecl));
     *node = decl;
-	node->tag = Node_DECL;
+    node->tag = Node_DECL;
     return node;
 }
 
@@ -128,32 +128,32 @@ void ast_add(Ast *list, AstNode *node) {
 }
 
 AstIdent *ast_name(Context *c, Token t) {
-	auto n = (AstIdent *)malloc(sizeof(AstIdent));
-	n->tag = Node_IDENT;
-	n->token = t;
+    auto n = (AstIdent *)malloc(sizeof(AstIdent));
+    n->tag = Node_IDENT;
+    n->token = t;
     n->name = make_name_from_token(c, t);
-	n->resolved_decl = NULL;
+    n->resolved_decl = NULL;
     return n;
 }
 
 AstBinary *ast_binary(Context *c, Token t, const AstBinary *binary) {
     auto n = (AstBinary *)malloc(sizeof(AstBinary));
-	*n = *binary;
-	n->token = t;
+    *n = *binary;
+    n->token = t;
     n->tag = Node_BINARY;
     return n;
 }
 
 AstUnary *ast_unary(Context *c, Token t, const AstUnary *unary) {
-	auto n = (AstUnary *)malloc(sizeof(AstUnary));
-	*n = *unary;
+    auto n = (AstUnary *)malloc(sizeof(AstUnary));
+    *n = *unary;
     n->tag = Node_UNARY;
-	n->token = t;
+    n->token = t;
     return n;
 }
 
 AstParen *ast_paren(Context *c, Token t, const AstParen *paren) {
-	auto n = (AstParen *)malloc(sizeof(AstParen));
+    auto n = (AstParen *)malloc(sizeof(AstParen));
     *n = *paren;
     n->tag = Node_PAREN;
     n->token = t;
@@ -164,7 +164,7 @@ AstCast *ast_cast(Context *c, Token t, const AstCast *cast) {
     auto n = (AstCast *)malloc(sizeof(AstCast));
     *n = *cast;
     n->tag = Node_CAST;
-	n->token = t;
+    n->token = t;
     return n;
 }
 
@@ -172,7 +172,7 @@ AstArrayIndex *ast_index(Context *c, Token t, const AstArrayIndex *index) {
     auto n = (AstArrayIndex *)malloc(sizeof(AstArrayIndex));
     *n = *index;
     n->tag = Node_INDEX;
-	n->token = t;
+    n->token = t;
     return n;
 }
 
@@ -180,7 +180,7 @@ AstVarArgsExpand *ast_var_args_expand(Context *c, Token t, const AstVarArgsExpan
     auto n = (AstVarArgsExpand *)malloc(sizeof(AstVarArgsExpand));
     *n = *expand;
     n->tag = Node_VAR_ARGS_EXPAND;
-	n->token = t;
+    n->token = t;
     return n;
 }
 
@@ -188,7 +188,7 @@ AstImport *ast_import(Context *c, Token t, const AstImport *imp) {
     auto n = (AstImport *)malloc(sizeof(AstImport));
     *n = *imp;
     n->tag = Node_IMPORT;
-	n->token = t;
+    n->token = t;
     return n;
 }
 
@@ -197,7 +197,7 @@ AstLibrary *ast_library(Context *c, Token t, char *library, bool is_static) {
     n->is_static = is_static;
     n->library = library;
     n->tag = Node_LIBRARY;
-	n->token = t;
+    n->token = t;
     return n;
 }
 
@@ -205,7 +205,7 @@ AstProcedure *ast_procedure(Context *c, Token t, const AstProcedure *proc) {
     auto n = (AstProcedure *)malloc(sizeof(AstProcedure));
     *n = *proc;
     n->tag = Node_PROCEDURE;
-	n->token = t;
+    n->token = t;
     return n;
 }
 
@@ -213,7 +213,7 @@ AstStruct *ast_struct(Context *c, Token t, const AstStruct *s) {
     auto n = (AstStruct *)malloc(sizeof(AstStruct));
     *n = *s;
     n->tag = Node_STRUCT;
-	n->token = t;
+    n->token = t;
     return n;
 }
 

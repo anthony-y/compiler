@@ -206,7 +206,7 @@ static Token tokenize_ident_or_keyword(Lexer *tz) {
     } break;
 
     case 'T': {
-		if (len != 4) break;
+        if (len != 4) break;
         if (strncmp(tz->start+1, "ype", 3) == 0) return token_new(tz, Token_RESERVED_TYPE);
     } break;
 

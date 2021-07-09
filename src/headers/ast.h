@@ -22,17 +22,17 @@ struct AstBlock;
 enum TypeDeclExprType {
     TypeDecl_PLACEHOLDER,
 
-	TypeDecl_BUILTIN_START,
+    TypeDecl_BUILTIN_START,
 
     TypeDecl_STRING,
     TypeDecl_INTEGER,
     TypeDecl_FLOAT,
     TypeDecl_BOOL,
-	TypeDecl_VOID,
+    TypeDecl_VOID,
     TypeDecl_ANY,
     TypeDecl_TYPE, // the type of 'Type'
 
-	TypeDecl_BUILTIN_END,
+    TypeDecl_BUILTIN_END,
 
     TypeDecl_POINTER,
     TypeDecl_ARRAY,
@@ -57,7 +57,7 @@ enum {
     DECL_IS_STRUCT_FIELD  = 1 << 3,
     DECL_IS_CONST         = 1 << 4,
     DECL_IS_INFERRED      = 1 << 5,
-	DECL_IS_VAR_ARGS      = 1 << 6,
+    DECL_IS_VAR_ARGS      = 1 << 6,
 };
 
 enum {
@@ -157,7 +157,7 @@ struct AstTypeDecl: public AstDecl {
         AstStruct *struct_;
         AstEnum   *enum_;
         AstTypeDecl *base_type;
-		AstTypename *alias;
+        AstTypename *alias;
     };
     TypeDeclExprType expr_type;
 };
@@ -185,21 +185,21 @@ struct AstProcedure: public AstExpr {
     AstTypename *return_type;
     AstExpr     *foreign_link_name;
     Name        *library_name;
-	int          var_args_index;
+    int          var_args_index;
     int          flags;
 };
 
 struct AstIdent: public AstExpr {
-	Name    *name          = NULL;
-	AstDecl *resolved_decl = NULL;
+    Name    *name          = NULL;
+    AstDecl *resolved_decl = NULL;
 };
 
 struct AstTypename: public AstExpr {
-	// Only one of these is set at a time
-	// When I used a union, it didn't work though.
-	// I need them both initialized to NULL at first.
-	Name      *name     = NULL;
-	AstBinary *selector = NULL;
+    // Only one of these is set at a time
+    // When I used a union, it didn't work though.
+    // I need them both initialized to NULL at first.
+    Name      *name     = NULL;
+    AstBinary *selector = NULL;
 };
 
 struct AstStruct: public AstExpr {

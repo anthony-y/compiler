@@ -91,12 +91,12 @@ void load_required_modules(Module *in, Context *ctx) {
 }
 
 static int cleanup_and_die(Context *ctx, Module *root) {
-	int code = (ctx->error_count > 0 ? -1 : 0);
+    int code = (ctx->error_count > 0 ? -1 : 0);
     token_list_free(&root->tokens);
     ast_free(&root->ast);
     free_context(ctx);
     free_types(ctx);
-	return code;
+    return code;
 }
 
 int main(int arg_count, char **args) {
@@ -116,34 +116,34 @@ int main(int arg_count, char **args) {
     char *file_data = read_file(path);
     if (!file_data) return -1;
 
-	init_context(&context);
+    init_context(&context);
     init_types(&context);
 
-	// Load the runtime
-	Module *runtime_stuff = load_module(&context, "compiler.lang");
-	if (context.error_count > 0) {
-		token_list_free(&runtime_stuff->tokens);
-		ast_free(&runtime_stuff->ast);
-		return cleanup_and_die(&context, &module);
-	}
+    // Load the runtime
+    Module *runtime_stuff = load_module(&context, "compiler.lang");
+    if (context.error_count > 0) {
+        token_list_free(&runtime_stuff->tokens);
+        ast_free(&runtime_stuff->ast);
+        return cleanup_and_die(&context, &module);
+    }
  
     lexer_init(&lexer, path, file_data);
     lexer.string_allocator = &context.string_allocator; 
     if (!lexer_lex(&lexer, &tokens)) {
         free(file_data);
-		free_context(&context);
-		free_types(&context);
-		return -1;
+        free_context(&context);
+        free_types(&context);
+        return -1;
     }
     free(file_data);
 
     module.tokens = tokens;
 
-	// Initialise the AST.
+    // Initialise the AST.
     parser_init(&parser, &module);
-	// And immediately add all the runtimet stuff to it.
-	for (u64 i = 0; i < runtime_stuff->ast.len; i++)
-		ast_add(&module.ast, runtime_stuff->ast.nodes[i]);
+    // And immediately add all the runtimet stuff to it.
+    for (u64 i = 0; i < runtime_stuff->ast.len; i++)
+        ast_add(&module.ast, runtime_stuff->ast.nodes[i]);
 
     parse(&context, &parser, path);
     if (context.error_count > 0) return cleanup_and_die(&context, &module);
@@ -173,7 +173,7 @@ int main(int arg_count, char **args) {
     if (system(command) != 0) return cleanup_and_die(&context, &module);
     printf("Success.\n");
 
-	return cleanup_and_die(&context, &module);
+    return cleanup_and_die(&context, &module);
 }
 
 static void ensure_main_is_declared(Context *ctx) {
@@ -187,7 +187,7 @@ static void ensure_main_is_declared(Context *ctx) {
         compile_error(ctx, main_decl_token, "entry point 'main' must be a procedure");
     }
 
-	auto proc = (AstProcedure *)ctx->decl_for_main->expr;
+    auto proc = (AstProcedure *)ctx->decl_for_main->expr;
 
     if ((proc->params && proc->params->len) || !proc->params) {
         compile_error(ctx, main_decl_token, "entry point 'main' must not take any arguments");

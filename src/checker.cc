@@ -83,8 +83,8 @@ static AstTypeDecl *maybe_unwrap_type_alias(AstTypeDecl *alias) {
 }
 
 static AstTypeDecl *maybe_unwrap_array_type(AstTypeDecl *array) {
-	if (array->expr_type != TypeDecl_ARRAY) return array;
-	return array->base_type;
+    if (array->expr_type != TypeDecl_ARRAY) return array;
+    return array->base_type;
 }
 
 // Performs type checking on a call and ensures it's arguments are correct.
@@ -104,7 +104,7 @@ static bool check_call(Context *ctx, AstCall *call) {
 
     AstProcedure *proc = call->calling;
 
-	AstDecl *var_args = (proc->var_args_index > -1 ? (AstDecl *)proc->params->nodes[proc->var_args_index] : NULL);
+    AstDecl *var_args = (proc->var_args_index > -1 ? (AstDecl *)proc->params->nodes[proc->var_args_index] : NULL);
 
     int proc_arg_count = (proc->params ? proc->params->len : 0);
     int call_arg_count = (call->params ? call->params->len : 0);
@@ -115,7 +115,7 @@ static bool check_call(Context *ctx, AstCall *call) {
         return false;
     }
 
-	if (var_args) proc_arg_count -= 1;
+    if (var_args) proc_arg_count -= 1;
 
     if (call_arg_count < proc_arg_count) {
         int diff = proc_arg_count - call_arg_count;
@@ -124,11 +124,11 @@ static bool check_call(Context *ctx, AstCall *call) {
     }
 
     for (int i = 0; i < call_arg_count-1; i++) {
-		AstTypeDecl *caller_type = ((AstExpr *)call->params->nodes[i])->resolved_type;
+        AstTypeDecl *caller_type = ((AstExpr *)call->params->nodes[i])->resolved_type;
 
-		if (i >= proc->var_args_index) continue;
+        if (i >= proc->var_args_index) continue;
 
-		AstDecl *defn = (AstDecl *)proc->params->nodes[i];
+        AstDecl *defn = (AstDecl *)proc->params->nodes[i];
 
         if (!do_types_match(ctx, caller_type, defn->given_type->resolved_type)) {
             compile_error_start(ctx, call->token, "type mismatch: argument %d of procedure \"%s\" is defined as type ", i+1, name);
@@ -394,7 +394,7 @@ bool check_decl(Context *ctx, AstDecl *decl) {
     if (decl->flags & DECL_IS_INFERRED) {
         AstTypeDecl *unwrapped = maybe_unwrap_type_alias(decl->expr->resolved_type);
         if (decl->expr->tag == Node_CALL && unwrapped == ctx->type_void) {
-			Name *call_name = ((AstIdent *)((AstCall *)decl->expr)->name)->name;
+            Name *call_name = ((AstIdent *)((AstCall *)decl->expr)->name)->name;
             compile_error(ctx, tok, "cannot assign void value (in the form of call to \"%s\") to variable \"%s\"", call_name->text, decl->name->text);
             return false;
         }
@@ -569,7 +569,7 @@ void check_statement(Context *ctx, AstStmt *node) {
     } break;
     case Node_RETURN: {
         check_proc_return_value(ctx, node);
-		curr_checker_proc->flags |= PROC_RET_VALUE_CHECKED;
+        curr_checker_proc->flags |= PROC_RET_VALUE_CHECKED;
     } break;
     }
 }
@@ -585,8 +585,8 @@ void check_struct(Context *ctx, AstStruct *s) {
 
 void check_typedef(Context *ctx, AstTypeDecl *decl) {
     if (!(decl->flags & DECL_IS_INFERRED)) {
-		assert(decl->given_type->tag == Node_TYPENAME);
-		auto given_type = (AstTypeDecl *)decl->given_type;
+        assert(decl->given_type->tag == Node_TYPENAME);
+        auto given_type = (AstTypeDecl *)decl->given_type;
         if (given_type != ctx->type_type) {
             compile_error(ctx, decl->token, "type mismatch: declaration creates a type, but it was declared as '%s' (use 'Type' as the type of the declaration, or omit the type-name and I'll infer it for you)", given_type->name->text);
         }
@@ -595,7 +595,7 @@ void check_typedef(Context *ctx, AstTypeDecl *decl) {
     switch (decl->expr_type) {
     case TypeDecl_STRUCT: check_struct(ctx, decl->struct_); return;
     case TypeDecl_ALIAS: return;
-	case TypeDecl_TYPE: return;
+    case TypeDecl_TYPE: return;
     default: printf("decl_expr_type = %d\n", decl->expr_type);
     }
 }

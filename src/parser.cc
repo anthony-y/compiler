@@ -403,11 +403,11 @@ static AstBlock *parse_block(Context *ctx, Parser *parser) {
     Token open = *parser->prev;
 
     AstBlock *block = (AstBlock *)malloc(sizeof(AstBlock));
-	block->tag = Node_BLOCK;
-	block->token = open;
+    block->tag = Node_BLOCK;
+    block->token = open;
     block->deferred = make_subtree(); 
     block->statements = make_subtree();
-	block->parent = block_stack_top(ctx->block_stack);
+    block->parent = block_stack_top(ctx->block_stack);
 
     block_stack_push(&ctx->block_stack, block);
 
@@ -509,8 +509,8 @@ static AstExpr *parse_struct(Context *ctx, Parser *parser) {
 }
 
 static AstExpr *parse_enum(Context *ctx, Parser *parser) {
-	return NULL;
-	#if 0
+    return NULL;
+    #if 0
     if (!consume(parser, Token_ENUM)) {
         compile_error(ctx, *parser->curr, "expected an enum declaration");
         parser_recover_to_declaration(parser);
@@ -580,13 +580,13 @@ static AstExpr *parse_enum(Context *ctx, Parser *parser) {
     }
 
     return ast_enum(ctx, start, &e);
-	#endif
+    #endif
 }
 
 static AstTypename *parse_typename(Context *ctx, Parser *parser) {
     Token t = *parser->curr;
 
-	AstTypeDecl *type     = NULL;
+    AstTypeDecl *type     = NULL;
     Name        *name     = NULL;
     AstBinary   *selector = NULL;
 
@@ -612,8 +612,8 @@ static AstTypename *parse_typename(Context *ctx, Parser *parser) {
             name = make_name_from_token(ctx, t);
             AstDecl *existing = find_decl_from_local_scope_upwards(ctx, name, parser->module);
             if (existing && existing->tag == Node_TYPE_DECL) {
-				type = (AstTypeDecl *)existing;
-			} else if (parser->in_type_instantiation) {
+                type = (AstTypeDecl *)existing;
+            } else if (parser->in_type_instantiation) {
                 type = make_placeholder_type(name);
             }
         }
@@ -779,8 +779,8 @@ static AstExpr *parse_proc(Context *ctx, Parser *parser, bool in_typedef) {
 
     AstProcedure proc;
     proc.params = NULL;
-	proc.tag = Node_PROCEDURE;
-	proc.var_args_index = -1;
+    proc.tag = Node_PROCEDURE;
+    proc.var_args_index = -1;
 
     // Skip the "proc" keyword.
     if (!consume(parser, Token_PROC)) {
@@ -794,9 +794,9 @@ static AstExpr *parse_proc(Context *ctx, Parser *parser, bool in_typedef) {
         return NULL;
     }
 
-	int arg_count = 0;
+    int arg_count = 0;
 
-	proc.params = make_subtree();
+    proc.params = make_subtree();
 
     // If the argument list isn't empty.
     if (!consume(parser, Token_CLOSE_PAREN)) {
@@ -836,16 +836,16 @@ static AstExpr *parse_proc(Context *ctx, Parser *parser, bool in_typedef) {
                     compile_error(ctx, arg->token, "multiple var-args arguments not allowed");
                     parser_recover(parser, Token_CLOSE_PAREN);
                 } else {
-					arg->flags |= DECL_IS_VAR_ARGS;
-					proc.var_args_index = arg_count;
-					got_var_args = true;
+                    arg->flags |= DECL_IS_VAR_ARGS;
+                    proc.var_args_index = arg_count;
+                    got_var_args = true;
                 }
             }
-			
-			ast_add(proc.params, arg);
+            
+            ast_add(proc.params, arg);
 
             consume(parser, Token_COMMA);
-			arg_count++;
+            arg_count++;
         }
     }
 
@@ -854,10 +854,10 @@ static AstExpr *parse_proc(Context *ctx, Parser *parser, bool in_typedef) {
     proc.params = proc.params;
     proc.foreign_link_name = NULL;
 
-	auto return_type   = (AstTypename *)malloc(sizeof(AstTypename));
+    auto return_type   = (AstTypename *)malloc(sizeof(AstTypename));
     return_type->tag   = Node_TYPENAME;
-	return_type->token = *parser->curr;
-	return_type->resolved_type = ctx->type_void;
+    return_type->token = *parser->curr;
+    return_type->resolved_type = ctx->type_void;
 
     if (consume(parser, Token_ARROW)) {
         return_type = parse_typename(ctx, parser);
@@ -923,10 +923,10 @@ static AstStmt *parse_statement(Context *ctx, Parser *parser) {
         // Function call
         if (parser->curr[1].type == Token_OPEN_PAREN) {
             AstExpr *call = parse_expression(ctx, parser, 1);
-			if (!call || call->tag != Node_CALL) {
-				assert(false);
-				// TODO real error
-			}
+            if (!call || call->tag != Node_CALL) {
+                assert(false);
+                // TODO real error
+            }
             return ast_call_stmt(ctx, start, (AstCall *)call);
         }
         // Variable declaration
@@ -975,21 +975,21 @@ static AstDecl *parse_declaration(Context *ctx, Parser *parser) {
     AstDecl spec = AstDecl{};
     spec.name = make_name_from_token(ctx, *parser->curr);
 
-	auto default_type = (AstTypename *)malloc(sizeof(AstTypename));
-	default_type->tag = Node_TYPENAME;
-	default_type->name = NULL;
-	default_type->resolved_type = NULL;
-	default_type->selector = NULL;
-	default_type->token = Token{};
+    auto default_type = (AstTypename *)malloc(sizeof(AstTypename));
+    default_type->tag = Node_TYPENAME;
+    default_type->name = NULL;
+    default_type->resolved_type = NULL;
+    default_type->selector = NULL;
+    default_type->token = Token{};
 
     spec.given_type = default_type;
     spec.status = Status_UNRESOLVED;
-	spec.tag = Node_DECL;
+    spec.tag = Node_DECL;
 
     if (!proc_stack_top(ctx->proc_stack)) spec.flags |= DECL_IS_TOP_LEVEL;
 
     Token loc = *parser->curr;
-	spec.token = loc;
+    spec.token = loc;
 
     parser_next(parser);
 
@@ -1037,8 +1037,8 @@ static AstDecl *parse_declaration(Context *ctx, Parser *parser) {
 
     if ((value->tag == Node_STRUCT /*|| value->tag == Node_ENUM*/|| value->tag == Node_TYPENAME) && spec.flags & DECL_IS_CONST) {
         auto typedecl = AstTypeDecl{};
-		typedecl.tag = Node_TYPE_DECL;
-		typedecl.token = loc;
+        typedecl.tag = Node_TYPE_DECL;
+        typedecl.token = loc;
         if (value->tag == Node_STRUCT) {
             typedecl.struct_ = (AstStruct *)value;
             typedecl.expr_type = TypeDecl_STRUCT;
@@ -1054,15 +1054,15 @@ static AstDecl *parse_declaration(Context *ctx, Parser *parser) {
 
         auto node = (AstTypeDecl *)malloc(sizeof(AstTypeDecl));
         *node = typedecl;
-		node->tag = Node_TYPE_DECL;
+        node->tag = Node_TYPE_DECL;
         return node;
     }
 
     spec.expr = value;
-	spec.tag  = Node_DECL;
-	spec.token = loc;
-	auto node = (AstDecl *)malloc(sizeof(AstDecl));
-	*node = spec;
+    spec.tag  = Node_DECL;
+    spec.token = loc;
+    auto node = (AstDecl *)malloc(sizeof(AstDecl));
+    *node = spec;
     return node;
 }
 
@@ -1135,58 +1135,58 @@ void parser_init(Parser *parser, Module *module) {
     parser->curr = module->tokens.tokens;
     parser->prev = module->tokens.tokens;
     parser->module = module;
-	ast_init(&parser->module->ast, 100);
+    ast_init(&parser->module->ast, 100);
 }
 
 static inline AstLiteral *int_literal(Context *ctx, Parser *parser) {
     parser_next(parser);
     AstLiteral *l = (AstLiteral *)malloc(sizeof(AstLiteral));
-	l->tag = Node_INT_LIT;
-	l->token = *parser->prev;
-	l->integer = atoi(parser->prev->text);
+    l->tag = Node_INT_LIT;
+    l->token = *parser->prev;
+    l->integer = atoi(parser->prev->text);
     return l;
 }
 
 static inline AstLiteral *string_literal(Context *ctx, Parser *parser) {
     parser_next(parser);
     AstLiteral *l = (AstLiteral *)malloc(sizeof(AstLiteral));
-	l->tag = Node_STRING_LIT;
-	l->token = *parser->prev;
-	l->string = parser->prev->text;
-	return l;
+    l->tag = Node_STRING_LIT;
+    l->token = *parser->prev;
+    l->string = parser->prev->text;
+    return l;
 }
 
 static inline AstLiteral *float_literal(Context *ctx, Parser *parser) {
-	parser_next(parser);
+    parser_next(parser);
     AstLiteral *l = (AstLiteral *)malloc(sizeof(AstLiteral));
-	l->tag = Node_FLOAT_LIT;
-	l->token = *parser->prev;
-	l->floating = strtod(parser->prev->text, NULL);
-	return l;
+    l->tag = Node_FLOAT_LIT;
+    l->token = *parser->prev;
+    l->floating = strtod(parser->prev->text, NULL);
+    return l;
 }
 
 static inline AstLiteral *false_literal(Context *ctx, Parser *parser) {
     parser_next(parser);
-	AstLiteral *l = (AstLiteral *)malloc(sizeof(AstLiteral));
-	l->tag = Node_BOOL_LIT;
-	l->token = *parser->prev;
-	l->boolean = false;
+    AstLiteral *l = (AstLiteral *)malloc(sizeof(AstLiteral));
+    l->tag = Node_BOOL_LIT;
+    l->token = *parser->prev;
+    l->boolean = false;
     return l;
 }
 
 static inline AstLiteral *true_literal(Context *ctx, Parser *parser) {
     parser_next(parser);
-	AstLiteral *l = (AstLiteral *)malloc(sizeof(AstLiteral));
-	l->tag = Node_BOOL_LIT;
-	l->token = *parser->prev;
-	l->boolean = true;
+    AstLiteral *l = (AstLiteral *)malloc(sizeof(AstLiteral));
+    l->tag = Node_BOOL_LIT;
+    l->token = *parser->prev;
+    l->boolean = true;
     return l;
 }
 
 static inline AstLiteral *null_literal(Context *ctx, Parser *parser) {
-	parser_next(parser);
-	AstLiteral *l = (AstLiteral *)malloc(sizeof(AstLiteral));
-	l->tag = Node_BOOL_LIT;
-	l->token = *parser->prev;
+    parser_next(parser);
+    AstLiteral *l = (AstLiteral *)malloc(sizeof(AstLiteral));
+    l->tag = Node_BOOL_LIT;
+    l->token = *parser->prev;
     return l;
 }
