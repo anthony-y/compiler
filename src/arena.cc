@@ -2,8 +2,6 @@
 // Used throughout the compiler, the parser uses it to allocate AST nodes, for example.
 // Adapted from Jonathan Blow's arena allocator, used in the Jai compiler.
 
-#define _GNU_SOURCE // needed to use mmap and co. in C99.
-
 #include "headers/arena.h"
 
 #include <stdlib.h>

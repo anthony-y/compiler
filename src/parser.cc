@@ -6,9 +6,6 @@
 #include "headers/arena.h"
 #include "headers/context.h"
 
-
-// Just for arrlen
-#include "headers/stb/stretchy_buffer.h"
 #include "headers/stb/stb_ds.h"
 
 #include <stdarg.h>
@@ -16,21 +13,20 @@
 #include <assert.h>
 
 static bool consume(Parser *, TokenType);
-static Ast *make_subtree();
 static void parser_recover_to_declaration(Parser *);
 static void parser_recover(Parser *parser, TokenType tt);
 
-static AstCall  parse_call(Context *, Parser *, AstExpr *name);
-static AstExpr *parse_expression(Context *, Parser *, int min_precedence);
-static AstStmt *parse_statement(Context *, Parser *);
-static AstExpr *parse_proc(Context *ctx, Parser *, bool in_typedef);
-static AstTypename *parse_typename(Context *ctx, Parser *parser);
-static AstNode *parse_top_level(Context *, Parser *);
-static AstNode *parse_top_level_directive(Context *ctx, Parser *parser);
-static AstExpr *parse_struct(Context *ctx, Parser *parser);
-static AstDecl *parse_declaration(Context *ctx, Parser *parser);
+static AstCall       parse_call(Context *, Parser *, AstExpr *name);
+static AstExpr      *parse_expression(Context *, Parser *, int min_precedence);
+static AstStmt      *parse_statement(Context *, Parser *);
+static AstDecl      *parse_top_level(Context *, Parser *);
+static AstExpr      *parse_struct(Context *ctx, Parser *parser);
+static AstExpr      *parse_enum(Context *ctx, Parser *parser);
+static AstDecl      *parse_declaration(Context *ctx, Parser *parser);
+static AstProcedure *parse_proc(Context *ctx, Parser *, bool in_typedef);
+static AstTypename  *parse_typename(Context *ctx, Parser *parser);
 
-// These are implemented at the very bottom of the file
+// These are implemented at the very bottom of the file.
 static inline AstLiteral *int_literal(Context *, Parser *);
 static inline AstLiteral *string_literal(Context *, Parser *);
 static inline AstLiteral *float_literal(Context *, Parser *);
@@ -42,10 +38,10 @@ static inline void parser_next(Parser *parser) {
     parser->prev = parser->curr++;
 }
 
-typedef struct {
-    u8 prec;
+struct BinaryOperator {
+    u8 precedence;
     bool left_assoc;
-} BinaryOperator;
+};
 
 static inline BinaryOperator get_binary_op_info(TokenType tt) {
     switch (tt) {
@@ -85,27 +81,31 @@ static inline BinaryOperator get_binary_op_info(TokenType tt) {
     case Token_OPEN_BRACKET:
         return BinaryOperator{9, true};
 
-    default: return BinaryOperator{.prec=0};
+    default: return BinaryOperator{0, false};
     }
 }
 
 static AstExpr *parse_simple_expr(Context *ctx, Parser *parser) {
     switch (parser->curr->type) {
+    case Token_IDENT: {
+        parser_next(parser);
+        return ast_name(ctx, *parser->prev);
+    } break;
+
     case Token_PROC: {
         return parse_proc(ctx, parser, false);
     } break;
 
-    /*
-    case Token_IDENT:
-    case Token_CARAT:
-    case Token_OPEN_BRACKET:
-    */
     case Token_RESERVED_TYPE: {
         return parse_typename(ctx, parser);
     } break;
 
     case Token_STRUCT: {
         return parse_struct(ctx, parser);
+    } break;
+
+    case Token_ENUM: {
+        return parse_enum(ctx, parser);
     } break;
 
     case Token_OPEN_PAREN: {
@@ -162,6 +162,10 @@ static AstExpr *parse_simple_expr(Context *ctx, Parser *parser) {
         }
 
         if (consume(parser, Token_IDENT)) {
+            if (strcmp(parser->prev->text, "type") == 0) {
+                return parse_typename(ctx, parser);
+            }
+
             bool is_static;
             if (strcmp(parser->prev->text, "static_library") == 0) {
                 is_static = true;
@@ -177,7 +181,9 @@ static AstExpr *parse_simple_expr(Context *ctx, Parser *parser) {
                 parser_recover(parser, Token_SEMI_COLON);
                 return NULL;
             }
-            return ast_library(ctx, *parser->prev, parser->prev->text, is_static);
+            auto lib = ast_library(ctx, *parser->prev, parser->prev->text, is_static);
+            ast_add(&ctx->link_libraries, lib);
+            return lib;
         }
 
         return NULL;
@@ -239,14 +245,7 @@ static AstExpr *parse_simple_expr(Context *ctx, Parser *parser) {
     case Token_FALSE:      return false_literal(ctx, parser);
     case Token_NIL:        return null_literal(ctx, parser);
 
-    case Token_IDENT: {
-        if (parser->curr[1].type == Token_COLON) {
-            compile_error(ctx, *parser->curr, "expected an expression, got a variable declaration");
-            return NULL;
-        }
-        parser_next(parser);
-        return ast_name(ctx, *parser->prev);
-    } break;
+    default: break;
     }
     return NULL;
 }
@@ -277,6 +276,7 @@ static AstExpr *parse_postfix_expr(Context *ctx, Parser *parser, AstExpr *left) 
         }
         return ast_index(ctx, start, &index);
     } break;
+    default: break;
     }
     return NULL;
 }
@@ -316,11 +316,11 @@ static AstExpr *parse_expression(Context *ctx, Parser *parser, int min_prec) {
         TokenType op = parser->curr->type;
         BinaryOperator info = get_binary_op_info(op);
 
-        if (!(op > Token_BINOP_START && op < Token_BINOP_END) || info.prec < min_prec) {
+        if (!(op > Token_BINOP_START && op < Token_BINOP_END) || info.precedence < min_prec) {
             break;
         }
 
-        int next_min_prec = info.prec;
+        int next_min_prec = info.precedence;
         if (info.left_assoc) next_min_prec++;
 
         AstExpr *right = NULL;
@@ -402,13 +402,7 @@ static AstCall parse_call(Context *ctx, Parser *parser, AstExpr *name) {
 static AstBlock *parse_block(Context *ctx, Parser *parser) {
     Token open = *parser->prev;
 
-    AstBlock *block = (AstBlock *)malloc(sizeof(AstBlock));
-    block->tag = Node_BLOCK;
-    block->token = open;
-    block->deferred = make_subtree(); 
-    block->statements = make_subtree();
-    block->parent = block_stack_top(ctx->block_stack);
-
+    AstBlock *block = ast_block(ctx, open);
     block_stack_push(&ctx->block_stack, block);
 
     while (!consume(parser, Token_CLOSE_BRACE) && parser->curr->type != Token_EOF) {
@@ -509,17 +503,21 @@ static AstExpr *parse_struct(Context *ctx, Parser *parser) {
 }
 
 static AstExpr *parse_enum(Context *ctx, Parser *parser) {
-    return NULL;
-    #if 0
+    Token start = *parser->curr;
     if (!consume(parser, Token_ENUM)) {
         compile_error(ctx, *parser->curr, "expected an enum declaration");
         parser_recover_to_declaration(parser);
         return NULL;
     }
 
-    Token start = *parser->curr;
     AstEnum e;
-    e.base_type = ctx->type_int;
+
+    AstTypename *base_type = parse_typename(ctx, parser);
+    if (!base_type) {
+        compile_error(ctx, start, "expected enum base-type");
+        parser_recover(parser, Token_CLOSE_BRACE);
+        return NULL;
+    }
 
     if (!consume(parser, Token_OPEN_BRACE)) {
         compile_error(ctx, *parser->curr, "expected a list of enum members");
@@ -527,20 +525,20 @@ static AstExpr *parse_enum(Context *ctx, Parser *parser) {
         return NULL;
     }
 
-    table_init(&e.fields);
+    e.constants = ast_block(ctx, start);
 
     while (parser->curr->type == Token_IDENT) {
         Token start = *parser->curr;
         AstExpr *expr = parse_expression(ctx, parser, 1);
         if (!expr) {
-            compile_error(ctx, start, "expected enum field specifier");
-            parser_recover_to_declaration(parser);
+            compile_error(ctx, start, "expected enum constant");
+            parser_recover(parser, Token_CLOSE_BRACE);
             return NULL;
         }
         Name *decl_name = NULL;
         AstExpr *value = NULL;
         if (expr->tag == Node_IDENT) {
-            decl_name = expr->as.name;
+            decl_name = ((AstIdent *)expr)->name;
             value = expr;
         }
         else if (expr->tag == Node_BINARY) {
@@ -550,8 +548,8 @@ static AstExpr *parse_enum(Context *ctx, Parser *parser) {
                 parser_recover(parser, Token_CLOSE_BRACE);
                 return NULL;
             }
-            decl_name = binary->left->as.name;
-            if (binary->right->tag != Node_IDENT && binary->right->tag != Node_INT) {
+            decl_name = ((AstIdent *)binary->left)->name;
+            if (binary->right->tag != Node_IDENT && binary->right->tag != Node_INT_LIT) {
                 compile_error(ctx, *parser->curr, "enum field can only be an int or other field");
                 parser_recover(parser, Token_CLOSE_BRACE);
                 return NULL;
@@ -565,11 +563,12 @@ static AstExpr *parse_enum(Context *ctx, Parser *parser) {
 
         AstDecl var;
         var.name = decl_name;
-        var.given_type = NULL;
+        var.given_type = base_type;
         var.expr = value;
         var.flags = 0;
+
         AstDecl *decl = ast_decl(ctx, start, &var);
-        assert(table_add(&e.fields, decl_name->text, (AstNode *)decl));
+        ast_add(e.constants->statements, decl);
         consume(parser, Token_COMMA);
     }
 
@@ -580,7 +579,6 @@ static AstExpr *parse_enum(Context *ctx, Parser *parser) {
     }
 
     return ast_enum(ctx, start, &e);
-    #endif
 }
 
 static AstTypename *parse_typename(Context *ctx, Parser *parser) {
@@ -595,6 +593,21 @@ static AstTypename *parse_typename(Context *ctx, Parser *parser) {
         parser_next(parser);
         type = shget(ctx->builtin_types, t.text);
         assert(type);
+    } break;
+
+    case Token_PROC: {
+        AstProcedure *proc = parse_proc(ctx, parser, true);
+        if (!proc) return NULL;
+        Ast argument_types;
+        ast_init(&argument_types, 8);
+        if (proc->params) {
+            for (u64 i = 0; i < proc->params->len; i++) {
+                auto decl = (AstDecl *)proc->params->nodes[i];
+                assert(decl->given_type);
+                ast_add(&argument_types, decl->given_type);
+            }
+        }
+        type = make_procedure_type(proc->return_type, argument_types);
     } break;
 
     case Token_IDENT: {
@@ -619,7 +632,6 @@ static AstTypename *parse_typename(Context *ctx, Parser *parser) {
         }
     } break;
 
-    //case Token_STAR: {
     case Token_CARAT: {
         parser_next(parser);
         parser->in_type_instantiation = true;
@@ -655,8 +667,8 @@ static AstTypename *parse_typename(Context *ctx, Parser *parser) {
     ref->token         = t;
     ref->resolved_type = type; // might be null, in which case it will get resolved later.
 
-         if (name)     ref->name = name;
-    else if (selector) ref->selector = selector;
+    ref->name = name;
+    ref->selector = selector;
 
     return ref;
 }
@@ -745,7 +757,7 @@ static AstWhile *parse_while(Context *ctx, Parser *parser) {
 
     AstBlock *block = parse_block(ctx, parser);
 
-    auto node = (AstWhile *)malloc(sizeof(AstWhile *));
+    auto node = (AstWhile *)malloc(sizeof(AstWhile));
     node->tag = Node_WHILE;
     node->token = start;
     node->condition = expr;
@@ -774,7 +786,7 @@ static int parse_proc_mod(Context *ctx, Parser *parser, AstExpr **out_maybe_fore
 }
 
 // Parse a procedure declaration.
-static AstExpr *parse_proc(Context *ctx, Parser *parser, bool in_typedef) { 
+static AstProcedure *parse_proc(Context *ctx, Parser *parser, bool in_typedef) { 
     Token start = *parser->curr;
 
     AstProcedure proc;
@@ -853,6 +865,7 @@ static AstExpr *parse_proc(Context *ctx, Parser *parser, bool in_typedef) {
     proc.block = NULL;
     proc.params = proc.params;
     proc.foreign_link_name = NULL;
+    proc.token = start;
 
     auto return_type   = (AstTypename *)malloc(sizeof(AstTypename));
     return_type->tag   = Node_TYPENAME;
@@ -919,9 +932,15 @@ static AstStmt *parse_statement(Context *ctx, Parser *parser) {
     Token start = *parser->curr;
 
     switch (start.type) {
+
     case Token_IDENT: {
+        Token next = parser->curr[1];
+
+        // Variable declaration
+        if (next.type == Token_COLON) return parse_declaration(ctx, parser);
+
         // Function call
-        if (parser->curr[1].type == Token_OPEN_PAREN) {
+        if (next.type == Token_OPEN_PAREN) {
             AstExpr *call = parse_expression(ctx, parser, 1);
             if (!call || call->tag != Node_CALL) {
                 assert(false);
@@ -929,16 +948,14 @@ static AstStmt *parse_statement(Context *ctx, Parser *parser) {
             }
             return ast_call_stmt(ctx, start, (AstCall *)call);
         }
-        // Variable declaration
-        if (parser->curr[1].type == Token_COLON) {
-            return parse_declaration(ctx, parser);
-        }
     } break;
+
     case Token_IF:         return parse_if(ctx, parser);
     case Token_WHILE:      return parse_while(ctx, parser);
     case Token_RETURN:     return parse_return(ctx, parser);
     case Token_DEFER:      return parse_defer(ctx, parser);
     case Token_OPEN_BRACE: return parse_block(ctx, parser);
+    default: break;
     }
 
     AstExpr *expr_left = parse_expression(ctx, parser, 1);
@@ -947,49 +964,45 @@ static AstStmt *parse_statement(Context *ctx, Parser *parser) {
         parser_recover_to_declaration(parser);
         return NULL;
     }
+
     if (expr_left->tag == Node_CALL) {
         return ast_call_stmt(ctx, expr_left->token, (AstCall *)expr_left);
     }
+
     if (expr_left->tag == Node_IDENT) {
         compile_error(ctx, expr_left->token, "unexpected identifier");
         return NULL;
     }
+
     if (expr_left->tag != Node_BINARY && expr_left->tag != Node_UNARY) {
         compile_error(ctx, *parser->curr, "only assignments are allowed as statements");
         return NULL;
     }
+
     return ast_assignment(ctx, start, expr_left);
 }
 
-static AstNode *parse_top_level_directive(Context *ctx, Parser *parser) { 
-    parser_next(parser); // #
-    if (parser->curr->type != Token_IDENT && parser->curr->type != Token_IMPORT) {
-        compile_error(ctx, *parser->curr, "expected an identifier after #");
-        parser_recover_to_declaration(parser);
-        return NULL;
-    }
-    return NULL;
-}
-
 static AstDecl *parse_declaration(Context *ctx, Parser *parser) {
+    Token loc = *parser->curr;
+
     AstDecl spec = AstDecl{};
     spec.name = make_name_from_token(ctx, *parser->curr);
+    spec.token = loc;
 
     auto default_type = (AstTypename *)malloc(sizeof(AstTypename));
-    default_type->tag = Node_TYPENAME;
-    default_type->name = NULL;
-    default_type->resolved_type = NULL;
-    default_type->selector = NULL;
-    default_type->token = Token{};
+    {
+        default_type->tag           = Node_TYPENAME;
+        default_type->name          = NULL;
+        default_type->resolved_type = NULL;
+        default_type->selector      = NULL;
+        default_type->token         = Token{};
+    }
 
     spec.given_type = default_type;
     spec.status = Status_UNRESOLVED;
     spec.tag = Node_DECL;
 
     if (!proc_stack_top(ctx->proc_stack)) spec.flags |= DECL_IS_TOP_LEVEL;
-
-    Token loc = *parser->curr;
-    spec.token = loc;
 
     parser_next(parser);
 
@@ -1011,7 +1024,7 @@ static AstDecl *parse_declaration(Context *ctx, Parser *parser) {
             parser_recover_to_declaration(parser);
             return NULL;
         }
-        return ast_decl(ctx, loc, spec);
+        return ast_decl(ctx, loc, &spec);
     }
 
     if (!type) {
@@ -1020,37 +1033,43 @@ static AstDecl *parse_declaration(Context *ctx, Parser *parser) {
         spec.given_type = type;
     }
 
-    parser_next(parser);
-
+    parser_next(parser); // ':' or '='
+    
+    int errors_before_expression = ctx->error_count;
     AstExpr *value = parse_expression(ctx, parser, 1);
     if (!value) {
-        compile_error(ctx, loc, "expected an expression on declaration of '%s'", spec.name->text);
+        if (ctx->error_count <= errors_before_expression) compile_error(ctx, loc, "expected an expression on declaration of '%s'", spec.name->text);
         parser_recover_to_declaration(parser);
         return NULL;
     }
 
-    // Type declarations look slighly different in the AST.
-    // TODO: this is messy though
-    // If the value was an identifier, the name of which is a type variable
-    // this needs to become a AstTypeDecl as well
-    // I have no idea how to do this.
-
-    if ((value->tag == Node_STRUCT /*|| value->tag == Node_ENUM*/|| value->tag == Node_TYPENAME) && spec.flags & DECL_IS_CONST) {
+    // In the case that the declaration creates a type.
+    if (spec.flags & DECL_IS_CONST && (value->tag == Node_STRUCT || value->tag == Node_ENUM || value->tag == Node_TYPENAME)) {
         auto typedecl = AstTypeDecl{};
-        typedecl.tag = Node_TYPE_DECL;
-        typedecl.token = loc;
-        if (value->tag == Node_STRUCT) {
+        if (spec.given_type) typedecl.given_type = spec.given_type;
+
+        typedecl.tag    = Node_TYPE_DECL;
+        typedecl.token  = loc;
+        typedecl.status = Status_UNRESOLVED;
+        typedecl.flags  = spec.flags;
+        typedecl.size   = 0;
+        typedecl.name   = spec.name;
+
+        switch (value->tag) {
+        case Node_STRUCT: {
             typedecl.struct_ = (AstStruct *)value;
             typedecl.expr_type = TypeDecl_STRUCT;
-        } else if (value->tag == Node_TYPENAME) {
+        } break;
+        case Node_TYPENAME: {
             typedecl.alias = (AstTypename *)value;
             typedecl.expr_type = TypeDecl_ALIAS;
+        } break;
+        case Node_ENUM: {
+            typedecl.enum_ = (AstEnum *)value;
+            typedecl.expr_type = TypeDecl_ENUM;
+        } break;
+        default: assert(false);
         }
-        typedecl.status = Status_UNRESOLVED;
-        typedecl.flags = spec.flags;
-        typedecl.size  = 0;
-        if (spec.given_type) typedecl.given_type = spec.given_type;
-        typedecl.name = spec.name;
 
         auto node = (AstTypeDecl *)malloc(sizeof(AstTypeDecl));
         *node = typedecl;
@@ -1061,20 +1080,42 @@ static AstDecl *parse_declaration(Context *ctx, Parser *parser) {
     spec.expr = value;
     spec.tag  = Node_DECL;
     spec.token = loc;
+
     auto node = (AstDecl *)malloc(sizeof(AstDecl));
     *node = spec;
+
+    if (spec.name == ctx->entry_point_name) {
+        ctx->decl_for_main = node;
+    }
+
     return node;
 }
 
 static AstDecl *parse_using(Context *ctx, Parser *parser) {
+    Token loc = *parser->curr;
     consume(parser, Token_USING);
-    return NULL;
+    AstDecl *decl = parse_declaration(ctx, parser);
+    if (!decl) {
+        compile_error(ctx, loc, "expected a declaration after 'using'");
+        return NULL;
+    }
+    AstUsing u;
+    u.what = (AstNode *)decl;
+    // return ast_using(ctx, loc, &u);
+    return decl;
 }
 
-static AstNode *parse_top_level(Context *ctx, Parser *parser) {
+static AstDecl *parse_top_level(Context *ctx, Parser *parser) {
     switch (parser->curr->type) {
-    case Token_USING: return (AstNode *)parse_using(ctx, parser);
+    case Token_USING: return parse_using(ctx, parser);
     case Token_IDENT: return parse_declaration(ctx, parser);
+
+    case Token_CLOSE_BRACE:
+    case Token_SEMI_COLON:
+        parser_next(parser);
+        return NULL;
+    
+    default: break;
     }
     compile_error(ctx, *parser->curr, "unexpected token");
     parser_recover(parser, Token_EOF);
@@ -1082,19 +1123,11 @@ static AstNode *parse_top_level(Context *ctx, Parser *parser) {
 }
 
 void parse(Context *ctx, Parser *parser, char *path) {
-    for (;;) {
-        Token curr = *parser->curr;
-        if (curr.type == Token_EOF) break;
-        
-        AstNode *node = parse_top_level(ctx, parser);
-        if (node && node->tag == Node_DECL) {
-            AstDecl *decl = (AstDecl *)node;
-            if (decl && decl->name == ctx->entry_point_name) {
-                ctx->decl_for_main = (AstDecl *)decl;
-            }
-        }
+    while (true) {
+        if (parser->curr->type == Token_EOF) break;
+        AstDecl *decl = parse_top_level(ctx, parser);
         consume(parser, Token_SEMI_COLON);
-        ast_add(&parser->module->ast, (AstNode *)node);
+        ast_add(&parser->module->ast, decl);
     }
 }
 
@@ -1109,7 +1142,7 @@ static bool consume(Parser *parser, TokenType tt) {
 
 // Allocates an AST on the heap using an arena so that it may persist between parse states,
 // and then freed neatly at the end of parsing.
-static Ast *make_subtree() {
+Ast *make_subtree() {
     Ast *ast = (Ast *)malloc(sizeof(Ast));
     ast_init(ast, 16);
     return ast;
@@ -1186,7 +1219,7 @@ static inline AstLiteral *true_literal(Context *ctx, Parser *parser) {
 static inline AstLiteral *null_literal(Context *ctx, Parser *parser) {
     parser_next(parser);
     AstLiteral *l = (AstLiteral *)malloc(sizeof(AstLiteral));
-    l->tag = Node_BOOL_LIT;
+    l->tag = Node_NULL_LIT;
     l->token = *parser->prev;
     return l;
 }

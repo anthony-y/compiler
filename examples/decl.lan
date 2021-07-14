@@ -1,0 +1,53 @@
+basic := #import "std/basic.lang";
+
+Entity :: struct {
+    name: string = "hi";
+
+    // TODO: disallow calls in structs
+    // ____ := puts(name.data);
+}
+
+copy_string :: proc(s: string) -> ^u8 {
+    buffer := cast(^u8)basic.malloc(s.length);
+    basic.memcpy(buffer, s.data, s.length);
+    return buffer;
+}
+
+window_callback :: proc(window: GlfwWindow, key: int, scancode: int, action: int, mods: int) -> void {
+    if key == GLFW_KEY_ESCAPE && action == GLFW_PRESS {
+        glfwSetWindowShouldClose(window, 1);
+    }
+}
+
+main :: proc() {
+    if !glfwInit() then return;
+
+    window := glfwCreateWindow(800, 600, "killme".data, null, null);
+
+    glfwSetKeyCallback(window, window_callback);
+
+    while !glfwWindowShouldClose(window) {
+        glfwPollEvents(window);
+    }
+
+    glfwDestroyWindow(window);
+}
+
+Glfw3    :: #static_library "glfw3"
+Math     :: #static_library "m"
+Pthread  :: #static_library "pthread"
+_        :: #static_library "dl"
+
+GLFW_KEY_ESCAPE :: 256;
+GLFW_PRESS      :: 1;
+
+GlfwWindow      :: #type ^void;
+GlfwKeyCallback :: #type proc(_: GlfwWindow, _: int, _: int, _: int, _: int) -> void;
+
+glfwInit                 :: proc()                                                         -> bool       #foreign "glfwInit": Glfw3
+glfwDestroyWindow        :: proc(window: GlfwWindow)                                       -> void       #foreign: Glfw3;
+glfwWindowShouldClose    :: proc(window: GlfwWindow)                                       -> bool       #foreign: Glfw3;
+glfwPollEvents           :: proc(window: GlfwWindow)                                       -> void       #foreign: Glfw3;
+glfwSetWindowShouldClose :: proc(window: GlfwWindow, value: int)                           -> void       #foreign: Glfw3;
+glfwCreateWindow         :: proc(w: int, h: int, title: ^u8, monitor: ^void, share: ^void) -> GlfwWindow #foreign: Glfw3;
+glfwSetKeyCallback       :: proc(window: ^void, callback: GlfwKeyCallback) #foreign: Glfw3;

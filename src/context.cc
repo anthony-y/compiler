@@ -8,18 +8,13 @@
 #include <assert.h>
 #include <stdlib.h>
 
-//
 // Move context.c's global proc/block stacks into Module
-// 
-// Make find_decl and find_type_decl search from the local scope upwards
-//
 // Maybe replace the Ast on Module with an AstBlock
-//
 
 AstDecl *find_in_block(AstBlock *block, Name *name) {
     for (u64 i = 0; i < block->statements->len; i++) {
         AstNode *node = block->statements->nodes[i];
-        if (node->tag != Node_DECL && node->tag != Node_TYPE_DECL) continue;
+        if (node->tag != Node_USING && node->tag != Node_DECL && node->tag != Node_TYPE_DECL) continue;
         auto decl = (AstDecl *)node;
         if (decl->name == name) return decl;
     }
@@ -29,7 +24,7 @@ AstDecl *find_in_block(AstBlock *block, Name *name) {
 AstDecl *find_top_level_decl(Module *in, Name *name) {
     for (u64 i = 0; i < in->ast.len; i++) {
         AstNode *node = in->ast.nodes[i];
-        assert(node->tag == Node_DECL || node->tag == Node_TYPE_DECL);
+        assert(node->tag == Node_USING || node->tag == Node_DECL || node->tag == Node_TYPE_DECL);
         auto decl = (AstDecl *)node;
         if (decl->name == name) return decl;
     }
@@ -37,11 +32,11 @@ AstDecl *find_top_level_decl(Module *in, Name *name) {
 }
 
 AstDecl *find_decl_from_local_scope_upwards(Context *ctx, Name *name, Module *file_scope) {
-    AstProcedure *proc = proc_stack_top(ctx->proc_stack);
-    AstBlock *start_from = block_stack_top(ctx->block_stack);
+    AstProcedure *proc        = proc_stack_top(ctx->proc_stack);
+    AstBlock     *local_scope = block_stack_top(ctx->block_stack);
 
     if (proc && proc->params) {
-        for (int i = 0; i < proc->params->len; i++) {
+        for (u64 i = 0; i < proc->params->len; i++) {
             auto decl = (AstDecl *)proc->params->nodes[i];
             if (decl->name == name) return decl;
         }
@@ -50,16 +45,16 @@ AstDecl *find_decl_from_local_scope_upwards(Context *ctx, Name *name, Module *fi
     AstDecl *global = find_top_level_decl(file_scope, name);
     if (global) return global;
 
-    if (!start_from) return NULL;
+    if (!local_scope) return NULL;
 
-    for (u64 i = 0; i < start_from->statements->len; i++) {
-        AstNode *node = start_from->statements->nodes[i];
+    for (u64 i = 0; i < local_scope->statements->len; i++) {
+        AstNode *node = local_scope->statements->nodes[i];
         if (node->tag != Node_DECL && node->tag != Node_TYPE_DECL) continue;
         auto decl = (AstDecl *)node;
         if (decl->name == name) return decl;
     }
 
-    AstBlock *parent = start_from->parent;
+    AstBlock *parent = local_scope->parent;
     while (parent) {
         for (u64 i = 0; i < parent->statements->len; i++) {
             AstNode *node = parent->statements->nodes[i];
@@ -101,7 +96,7 @@ Name *make_name_from_token(Context *ctx, Token token) {
 
 Name *make_name_string(Context *ctx, const char *txt) {
     assert(ctx->name_table);
-    u64 i = shgeti(ctx->name_table, txt);
+    s64 i = shgeti(ctx->name_table, txt);
     if (i == -1) { // not in the table yet
         Name *n = (Name *)malloc(sizeof(Name));
         n->text = (char *)txt;
@@ -113,10 +108,10 @@ Name *make_name_string(Context *ctx, const char *txt) {
 
 //
 // First-in-last-out stacks for procedures and blocks.
-// TODO: make sure top doesn't exceed CONTEXT_STACK_SIZE.
 //
 void block_stack_push(BlockStack *bs, AstBlock *block) {
     bs->data[++bs->top] = block;
+    assert(bs->top <= CONTEXT_STACK_SIZE);
 }
 
 AstBlock *block_stack_pop(BlockStack *bs) {
@@ -140,9 +135,9 @@ AstProcedure *proc_stack_pop(ProcedureStack *ps) {
 }
 
 AstProcedure *proc_stack_top(ProcedureStack ps) {
-    if (ps.top == -1) return NULL;
     return ps.data[ps.top];
 }
+
 
 void init_context(Context *ctx) {
     *ctx = Context{};
@@ -153,11 +148,13 @@ void init_context(Context *ctx) {
     sh_new_arena(ctx->name_table);
     sh_new_arena(ctx->modules);
 
+    ast_init(&ctx->link_libraries, 10);
+
     ctx->entry_point_name = make_name_string(ctx, "main");
 }
 
 void free_context(Context *ctx) {
-    for (int i = 0; i < shlen(ctx->modules); i++) {
+    for (s64 i = 0; i < shlen(ctx->modules); i++) {
         Ast *ast = &ctx->modules[i].value->ast;
         ast_free(ast);
         free(ast);
@@ -165,11 +162,13 @@ void free_context(Context *ctx) {
     shfree(ctx->modules);
 
     u64 len = shlenu(ctx->name_table);
-    for (int i = 0; i < len; i++)
+    for (u64 i = 0; i < len; i++)
         free(ctx->name_table[i].value);
     shfree(ctx->name_table);
 
     node_arena_free(&ctx->node_allocator);
+
+    ast_free(&ctx->link_libraries);
 }
 
 void compile_error(Context *ctx, Token t, const char *fmt, ...) {

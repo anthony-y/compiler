@@ -34,7 +34,7 @@ void token_list_free(TokenList *list) {
 }
 
 inline void token_list_print(const TokenList *list) {
-    for (int i = 0; i < list->len; i++) token_print(list->tokens[i]);
+    for (u64 i = 0; i < list->len; i++) token_print(list->tokens[i]);
 }
 
 void token_print(Token t) {

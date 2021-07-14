@@ -4,6 +4,7 @@ malloc :: proc(size: u64) -> ^void #foreign;
 realloc :: proc(ptr: ^void, size: u64) -> ^void #foreign;
 printf :: proc(fmt: ^u8, args: []Any..) -> int #foreign;
 mem_copy :: proc(dest: ^void, src: ^void, n: u64) #foreign "memcpy";
+memcpy   :: proc(dest: ^void, src: ^void, n: u64) ->   u64 #foreign;
 
 c_string :: proc(s: string) -> ^u8 {
     s2 := substring(s, s.length);

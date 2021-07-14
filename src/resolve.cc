@@ -10,7 +10,7 @@
 #include <assert.h>
 
 static AstTypeDecl  *resolve_procedure(AstProcedure *proc, Context *ctx, Module *module);
-static AstTypeDecl  *resolve_name(Context *ctx, Name *name, AstNode *site, Module *module);
+static AstTypeDecl  *resolve_name(Context *ctx, AstIdent *name, AstNode *site, Module *module);
 static AstTypeDecl  *resolve_selector(Context *ctx, AstBinary *accessor, Module *module);
 static AstTypeDecl  *resolve_expression(AstExpr *expr, Context *ctx, Module *module);
 static AstTypeDecl  *resolve_expression_to_type(AstExpr *expr, Context *ctx, Module *module);
@@ -38,6 +38,17 @@ static AstTypeDecl *resolve_typename_in_type_slot(AstTypename *ref, Context *ctx
             return ref->resolved_type;
         }
 
+        if (ref->resolved_type->expr_type == TypeDecl_PROCEDURE) {
+            ProcedureType *proc = ref->resolved_type->proc;
+            for (u64 i = 0; i < proc->argument_types.len; i++) {
+                auto type = (AstTypename *)proc->argument_types.nodes[i];
+                resolve_typename_in_type_slot(type, ctx, module);
+            }
+            resolve_typename_in_type_slot(proc->return_type, ctx, module);
+            assert(proc->return_type->resolved_type);
+            return ref->resolved_type;
+        }
+
         if (ref->resolved_type->expr_type == TypeDecl_POINTER || ref->resolved_type->expr_type == TypeDecl_ARRAY) {
             return resolve_type_decl(ctx, ref->resolved_type, ref, false, module);
         }
@@ -53,7 +64,7 @@ static AstTypeDecl *resolve_typename_in_type_slot(AstTypename *ref, Context *ctx
 
     AstDecl *decl = find_decl_from_local_scope_upwards(ctx, ref->name, module);
     if (!decl) {
-        compile_error(ctx, ref->token, "unknown type '%s'", ref->name->text);
+        compile_error(ctx, ref->token, "undeclared type '%s'", ref->name->text);
         return NULL;
     }
 
@@ -75,12 +86,14 @@ AstTypeDecl *resolve_decl(AstDecl *decl, Context *ctx, Module *module) {
     if (decl->status == Status_RESOLVED) return decl->given_type->resolved_type;
 
     if (!(decl->flags & DECL_IS_INFERRED)) {
+        // In case we return out of here early, we need to set the status to resolved, otherwise we will get duplicate errors.
+        decl->status = Status_RESOLVED; 
+
         AstTypeDecl *resolved_typename = resolve_typename_in_type_slot(decl->given_type, ctx, module);
         if (!resolved_typename) return NULL;
 
         if (!decl->expr) {
             decl->given_type->resolved_type = resolved_typename;
-            decl->status = Status_RESOLVED;
             return resolved_typename;
         }
     }
@@ -193,7 +206,7 @@ static AstTypeDecl *resolve_imported_type(Context *ctx, AstBinary *selector, Mod
 
 static void resolve_block(Context *ctx, AstBlock *block, Module *module) {
     block_stack_push(&ctx->block_stack, block);
-    for (int i = 0; i < block->statements->len; i++) {
+    for (u64 i = 0; i < block->statements->len; i++) {
         AstNode *stmt = block->statements->nodes[i];
         if (stmt->tag == Node_DECL) resolve_decl((AstDecl *)stmt, ctx, module);
         else if (stmt->tag == Node_TYPE_DECL) continue; // TODO
@@ -263,10 +276,17 @@ static void resolve_statement(Context *ctx, AstStmt *stmt, Module *module) {
 
 
 static AstTypeDecl *resolve_procedure(AstProcedure *proc, Context *ctx, Module *module) {
+    // Resolved argument types.
+    Ast argument_types;
+    ast_init(&argument_types, 8);
+
     if (proc->params) {
         u64 num_params = proc->params->len;
-        for (int i = 0; i < num_params; i++) {
-            resolve_decl((AstDecl *)proc->params->nodes[i], ctx, module);
+        for (u64 i = 0; i < num_params; i++) {
+            auto decl = (AstDecl *)proc->params->nodes[i];
+            resolve_decl(decl, ctx, module);
+            assert(decl->given_type->resolved_type);
+            ast_add(&argument_types, decl->given_type);
         }
     }
 
@@ -274,8 +294,8 @@ static AstTypeDecl *resolve_procedure(AstProcedure *proc, Context *ctx, Module *
     if (!resolved_return_type) return NULL;
 
     if (proc->flags & PROC_IS_FOREIGN) {
-        // return make_procedure_type(resolved_return_type, NULL); // TODO argument types
-        return resolved_return_type;
+        assert(proc->return_type->resolved_type);
+        return make_procedure_type(proc->return_type, argument_types);
     }
 
     proc_stack_push(&ctx->proc_stack, proc);
@@ -283,8 +303,7 @@ static AstTypeDecl *resolve_procedure(AstProcedure *proc, Context *ctx, Module *
     resolve_block(ctx, block, module);
     proc_stack_pop(&ctx->proc_stack);
 
-    // return make_procedure_type(resolved_return_type, NULL); // TODO argument types
-    return resolved_return_type;
+    return make_procedure_type(proc->return_type, argument_types);
 }
 
 // Resolves the dependencies of a selector and returns the type of the field it selects.
@@ -342,21 +361,28 @@ static AstTypeDecl *resolve_selector(Context *ctx, AstBinary *accessor, Module *
         }
     }
 
-    // In English: throw an error if the type of the left hand side is not either:
-    //  - a struct
-    //  - a pointer, the base type of which is a struct
-    if (lhs_type->expr_type != TypeDecl_STRUCT) {
+    AstBlock *target_block = NULL;
+    
+    if (lhs_type->expr_type == TypeDecl_ENUM) {
+        target_block = lhs_type->enum_->constants;
+    } else if (lhs_type->expr_type == TypeDecl_STRUCT) {
+        target_block = (AstBlock *)lhs_type->struct_->members;
+    } else {
         compile_error(ctx, accessor->left->token, "attempt to access member '%s' in value that doesn't create a namespace", rhs->name->text);
         return NULL;
     }
 
-    AstStruct *struct_def = lhs_type->struct_;
-    AstDecl *field = find_struct_field(struct_def, rhs->name);
+    AstDecl *field = find_in_block(target_block, rhs->name);
     if (!field) {
-        compile_error(ctx, accessor->left->token, "no such field as \"%s\" in struct field access", rhs->name->text);
+        compile_error(ctx, accessor->left->token, "undeclared field '%s'", rhs->name->text);
         return NULL;
     }
-    if (field->status != Status_RESOLVED) resolve_decl(field, ctx, module); 
+    if (field->status != Status_RESOLVED) {
+        resolve_decl(field, ctx, module);
+    }
+    if (lhs_type->expr_type == TypeDecl_ENUM) {
+        return lhs_type;
+    }
     return field->given_type->resolved_type;
 }
 
@@ -414,20 +440,26 @@ static AstProcedure *resolve_call(AstCall *call, Context *ctx, Module *module) {
         return NULL;
     }
 
+    if (!hopefully_proc->expr && hopefully_proc->given_type->resolved_type && hopefully_proc->given_type->resolved_type->expr_type == TypeDecl_PROCEDURE) {
+        compile_error(ctx, tok, "'%s' lacks a procedure body", name->text);
+        hopefully_proc->status = Status_RESOLVED; // tag as resolved so we don't get here again
+        return NULL;
+    }
+
     if (hopefully_proc->expr->tag != Node_PROCEDURE) {
         compile_error(ctx, tok, "can't invoke non-procedure '%s' as if it was a procedure", name->text);
         return NULL;
     }
 
     if (hopefully_proc->status == Status_UNRESOLVED) {
-        if (!resolve_procedure((AstProcedure *)hopefully_proc->expr, ctx, scope)) {
-            // TODO: might need an error
+        if (!resolve_decl(hopefully_proc, ctx, scope)) {
+            assert(ctx->error_count > 0);
             return NULL;
         }
     }
 
     // Ensure the module that the requested function was declared in is imported in the module from which the call was made.
-    if (call->params) for (int i = 0; i < call->params->len; i++) {
+    if (call->params) for (u64 i = 0; i < call->params->len; i++) {
         AstExpr *arg = (AstExpr *)call->params->nodes[i];
         resolve_expression(arg, ctx, module);
     }
@@ -511,6 +543,16 @@ static AstTypeDecl *resolve_expression_to_type(AstExpr *expr, Context *ctx, Modu
     case Node_IMPORT:     return ctx->import_type;
     case Node_LIBRARY:    return ctx->type_library;
 
+    case Node_STRUCT: {
+        compile_error(ctx, expr->token, "non-const struct declarations are not allowed");
+        return NULL;
+    } break;
+
+    case Node_ENUM: {
+        compile_error(ctx, expr->token, "non-const enum declarations are not allowed");
+        return NULL;
+    } break;
+
     case Node_TYPENAME: {
         return resolve_typename_as_rvalue((AstTypename *)expr, ctx, module);
     } break;
@@ -523,7 +565,6 @@ static AstTypeDecl *resolve_expression_to_type(AstExpr *expr, Context *ctx, Modu
         auto ident = (AstIdent *)expr;
         return resolve_name(ctx, ident, expr, module);
     } break;
-
 
     case Node_CALL: {
         AstProcedure *resolved = resolve_call((AstCall *)expr, ctx, module);
@@ -613,6 +654,8 @@ static AstTypeDecl *resolve_expression_to_type(AstExpr *expr, Context *ctx, Modu
 
         return ctx->type_int;
     } break;
+
+    default: break;
     }
     assert(false);
     return NULL;

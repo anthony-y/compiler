@@ -60,14 +60,22 @@ static bool do_types_match(Context *ctx, AstTypeDecl *a, AstTypeDecl *b) {
         return true;
     }
 
-    /*
-    if (b->expr_type == TypeDecl_INTEGER) {
-        if (a->expr_type == TypeDecl_FLOAT) return false;
-        if (b->size < a->size) return true;
-        if (a->expr_type == TypeDecl_INTEGER) return true;
-        return false;
+    if (a->expr_type == TypeDecl_PROCEDURE) {
+        if (b->expr_type != TypeDecl_PROCEDURE) return false;
+        if (a->proc->argument_types.len != b->proc->argument_types.len) return false;
+        bool return_types_match = do_types_match(ctx, a->proc->return_type->resolved_type, b->proc->return_type->resolved_type);
+        for (u64 i = 0; i < a->proc->argument_types.len; i++) {
+            auto a_argtypename = (AstTypename *)a->proc->argument_types.nodes[i];
+            AstTypeDecl *a_argtype = a_argtypename->resolved_type;
+
+            for (u64 j = 0; j < b->proc->argument_types.len; j++) {
+                auto b_argtypename = (AstTypename *)b->proc->argument_types.nodes[i];
+                AstTypeDecl *b_argtype = b_argtypename->resolved_type;
+                if (!do_types_match(ctx, a_argtype, b_argtype)) return false;
+            }
+        }
+        return return_types_match;
     }
-    */
 
     if (a->expr_type == TypeDecl_POINTER && b->expr_type == TypeDecl_POINTER) return do_pointer_types_match(ctx, a, b);
     if (a->expr_type == TypeDecl_ARRAY && b->expr_type == TypeDecl_ARRAY) return do_types_match(ctx, a->base_type, b->base_type);
@@ -80,11 +88,6 @@ static bool do_types_match(Context *ctx, AstTypeDecl *a, AstTypeDecl *b) {
 static AstTypeDecl *maybe_unwrap_type_alias(AstTypeDecl *alias) {
     if (alias->expr_type != TypeDecl_ALIAS) return alias;
     return alias->base_type;
-}
-
-static AstTypeDecl *maybe_unwrap_array_type(AstTypeDecl *array) {
-    if (array->expr_type != TypeDecl_ARRAY) return array;
-    return array->base_type;
 }
 
 // Performs type checking on a call and ensures it's arguments are correct.
@@ -123,10 +126,10 @@ static bool check_call(Context *ctx, AstCall *call) {
         return false;
     }
 
-    for (int i = 0; i < call_arg_count-1; i++) {
+    for (int i = 0; i < call_arg_count; i++) {
         AstTypeDecl *caller_type = ((AstExpr *)call->params->nodes[i])->resolved_type;
 
-        if (i >= proc->var_args_index) continue;
+        if (var_args && i >= proc->var_args_index) continue;
 
         AstDecl *defn = (AstDecl *)proc->params->nodes[i];
 
@@ -265,20 +268,29 @@ bool does_type_describe_expr(Context *ctx, AstTypeDecl *type, AstExpr *expr) {
     switch (expr->tag) {
     case Node_PROCEDURE: {
         AstTypeDecl *procedure_type = expr->resolved_type;
+
         auto proc = (AstProcedure *)expr;
         if (proc->params) {
-            for (int i = 0; i < proc->params->len; i++) {
+            for (u64 i = 0; i < proc->params->len; i++) {
                 check_decl(ctx, (AstDecl *)proc->params->nodes[i]);
             }
         }
-        if (proc->flags & PROC_IS_FOREIGN) return do_types_match(ctx, proc->return_type->resolved_type, type);
+
+        if (proc->flags & PROC_IS_FOREIGN) return do_types_match(ctx, procedure_type, type);
+
         curr_checker_proc = proc;
         check_block(ctx, (AstBlock *)((AstProcedure *)expr)->block);
+
+        /*
         if (!(curr_checker_proc->flags & PROC_RET_VALUE_CHECKED)) {
-            if (curr_checker_proc->return_type->resolved_type != ctx->type_void)
+            if (curr_checker_proc->return_type->resolved_type->proc->return_type->resolved_type != ctx->type_void) {
                 compile_error(ctx, expr_token, "Non-void procedure has no 'return' statement");
+                return FAILED_BUT_DONT_ERROR_AT_CALL_SITE;
+            }
         }
-        return do_types_match(ctx, expr->resolved_type, type);
+        */
+
+        return do_types_match(ctx, procedure_type, type);
     } break;
 
     case Node_BINARY: {
@@ -538,7 +550,7 @@ bool check_assignment(Context *ctx, AstExpr *expr, bool lhs_must_be_pointer) {
 }
 
 void check_block(Context *ctx, AstBlock *block) {
-    for (int i = 0; i < block->statements->len; i++) {
+    for (u64 i = 0; i < block->statements->len; i++) {
         AstNode *stmt = block->statements->nodes[i];
         if (stmt->tag == Node_DECL) check_decl(ctx, (AstDecl *)stmt);
         else if (stmt->tag == Node_TYPE_DECL) check_typedef(ctx, (AstTypeDecl *)stmt);
@@ -571,6 +583,7 @@ void check_statement(Context *ctx, AstStmt *node) {
         check_proc_return_value(ctx, node);
         curr_checker_proc->flags |= PROC_RET_VALUE_CHECKED;
     } break;
+    default: assert(false);
     }
 }
 
@@ -596,6 +609,7 @@ void check_typedef(Context *ctx, AstTypeDecl *decl) {
     case TypeDecl_STRUCT: check_struct(ctx, decl->struct_); return;
     case TypeDecl_ALIAS: return;
     case TypeDecl_TYPE: return;
+	case TypeDecl_ENUM: return;
     default: printf("decl_expr_type = %d\n", decl->expr_type);
     }
 }
@@ -604,7 +618,7 @@ void check_typedef(Context *ctx, AstTypeDecl *decl) {
 void check_ast(Context *ctx, Ast *ast) {
     if (!ast || !ast->nodes || ast->len == 0) return;
 
-    for (int i = 0; i < ast->len; i++) {
+    for (u64 i = 0; i < ast->len; i++) {
         AstNode *node = ast->nodes[i];
         if (!node) return;
 

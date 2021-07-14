@@ -3,37 +3,30 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
-
 #include "headers/arena.h"
 #include "headers/lexer.h"
 #include "headers/parser.h"
 #include "headers/context.h"
 #include "headers/passes.h"
 #include "headers/ast.h"
+#include "headers/bytecode.h"
 
 #define STB_DS_IMPLEMENTATION
 #include "headers/stb/stb_ds.h"
 
+#define IMPORT_RUNTIME 0
+
 static void ensure_main_is_declared(Context *ctx);
 
 /*
- * do enums
+ * using
  * do bytecode VM
  * do polymorphism
- * do type aliases for identifiers
- * complete typename as expression
- * cleanup C++ warnings
- * do C code generation again
  * do LLVM
  * do multiple return values
- * do procedure types/header parsing as typename
+ * load the runtime into imported modules, not just the root one
+ *
 */
-
-// No type mismatch error when assigning float to int
-// 'Using' import
-//
-// For specific imports, just add it to the file scope and do inference and checking.
-//   printf := #import "hi.mule" :: printf ??`
 
 // TODO: write a game in the language (2d thing, simply concept).
 //       fix bugs found during game dev
@@ -64,9 +57,7 @@ static Module *load_module(Context *ctx, char *path) {
 
     parser_init(&parser, module);
     parse(ctx, &parser, path);
-    if (ctx->error_count > 0) {
-        return NULL;
-    }
+    if (ctx->error_count > 0) return NULL;
     return module;
 }
 
@@ -75,7 +66,7 @@ void load_required_modules(Module *in, Context *ctx) {
     for (u64 i = 0; i < in->ast.len; i++) {
         if (ctx->error_count > 0) return;
 
-        AstDecl *decl = (AstDecl *)in->ast.nodes[i];
+        auto decl = (AstDecl *)in->ast.nodes[i];
         if (!decl->expr || decl->expr->tag != Node_IMPORT) continue;
         
         char *path = ((AstImport *)decl->expr)->path;
@@ -120,12 +111,19 @@ int main(int arg_count, char **args) {
     init_types(&context);
 
     // Load the runtime
-    Module *runtime_stuff = load_module(&context, "compiler.lang");
-    if (context.error_count > 0) {
-        token_list_free(&runtime_stuff->tokens);
-        ast_free(&runtime_stuff->ast);
-        return cleanup_and_die(&context, &module);
+    // TODO rename file
+#if IMPORT_RUNTIME
+    Module *runtime_stuff = load_module(&context, runtime_module_name);
+    {
+        constexpr char *runtime_module_name = "compiler.lan";
+        // shput(context.modules, runtime_module_name, runtime_stuff);
+        if (context.error_count > 0) {
+            token_list_free(&runtime_stuff->tokens);
+            ast_free(&runtime_stuff->ast);
+            return cleanup_and_die(&context, &module);
+        }
     }
+#endif
  
     lexer_init(&lexer, path, file_data);
     lexer.string_allocator = &context.string_allocator; 
@@ -140,38 +138,72 @@ int main(int arg_count, char **args) {
     module.tokens = tokens;
 
     // Initialise the AST.
-    parser_init(&parser, &module);
     // And immediately add all the runtimet stuff to it.
-    for (u64 i = 0; i < runtime_stuff->ast.len; i++)
-        ast_add(&module.ast, runtime_stuff->ast.nodes[i]);
+    parser_init(&parser, &module);
 
-    parse(&context, &parser, path);
-    if (context.error_count > 0) return cleanup_and_die(&context, &module);
+    // Make the ast for the root/main module/file
+    {
+        parse(&context, &parser, path);
+        if (context.error_count > 0) return cleanup_and_die(&context, &module);
+    }
 
-    load_required_modules(&module, &context);
-    if (context.error_count > 0) return cleanup_and_die(&context, &module);
+    // Recursively load all modules required by the code.
+    // This includes files imported by other files.
+    {
+        load_required_modules(&module, &context);
+        if (context.error_count > 0) return cleanup_and_die(&context, &module);
+    }
 
-    resolve_module(&context, &module);
-    if (context.error_count > 0) return cleanup_and_die(&context, &module);
+    // Resolve only the main module, any external symbols that were used will also get resolved.
+    {
+        resolve_module(&context, &module);
+        if (context.error_count > 0) return cleanup_and_die(&context, &module);
+    }
     
-    ensure_main_is_declared(&context);
-    if (context.error_count > 0) return cleanup_and_die(&context, &module);
+    // Make sure the entry point is declared and has the proper signature.
+    {
+        ensure_main_is_declared(&context);
+        if (context.error_count > 0) return cleanup_and_die(&context, &module);
+    }
 
-    check_ast(&context, &module.ast);
-    if (context.error_count > 0) return cleanup_and_die(&context, &module);
+    // Do semantic and type-checking on the code.
+    {
+        check_ast(&context, &module.ast);
+        if (context.error_count > 0) return cleanup_and_die(&context, &module);
+    }
 
-    return cleanup_and_die(&context, &module);
-    
-    //
-    // Make the build command to compile the C output.
-    //
-    char *output_path = generate_and_write_c_code(&context, &module.ast, path);
-    u64 len = strlen("tcc -g -std=c99") + strlen(output_path) + strlen("-o ") + strlen("-Wno-discarded-qualifiers ") + strlen("-Wno-return-local-addr") + strlen("-Wno-builtin-declaration-mismatch") + 1;
-    auto command = (char *)malloc(len);
-    sprintf(command, "tcc -g -std=c99 %s -Wno-return-local-addr -Wno-discarded-qualifiers -Wno-builtin-declaration-mismatch -o output_bin", output_path);
+    // Compile the program to bytecode chunks that we can interpret and/or use to generate C output.
+    {
+        assert(sizeof(Instruction) == 8);
+        Interp interp = compile_to_bytecode(&context, &module.ast, &module);
+        assert(context.error_count == 0);
+        interp_run(&interp);
+        interp_free(&interp);
+    }
 
-    if (system(command) != 0) return cleanup_and_die(&context, &module);
-    printf("Success.\n");
+    {
+        // Write the C output to a file and return it's name.
+        char *output_path = generate_and_write_c_code(&context, &module.ast, path);
+        assert(context.error_count == 0);
+
+        // Generate the command to invoke the C compiler on the output.
+        auto command = (char *)malloc(1024);
+        auto linker_flags = (char *)malloc(512);
+        sprintf(command, "gcc -g -std=c99 %s -Wno-return-local-addr -Wno-discarded-qualifiers -Wno-builtin-declaration-mismatch -o output_bin -L.", output_path);
+        for (u64 i = 0; i < context.link_libraries.len; i++) {
+            auto lib = (AstLibrary *)context.link_libraries.nodes[i];
+            sprintf(linker_flags, " -l%s", lib->library);
+            strcat(command, linker_flags);
+        }
+        printf("comamnd: %s\n", command);
+
+        // Compile the C code.
+        // Exit early if it failed.
+        if (system(command) != 0) return cleanup_and_die(&context, &module);
+
+        remove(output_path);
+        printf("Success.\n");
+    }
 
     return cleanup_and_die(&context, &module);
 }
@@ -193,7 +225,7 @@ static void ensure_main_is_declared(Context *ctx) {
         compile_error(ctx, main_decl_token, "entry point 'main' must not take any arguments");
     }
 
-    else if (ctx->decl_for_main->expr->resolved_type != ctx->type_void) {
+    else if (ctx->decl_for_main->expr->resolved_type->proc->return_type->resolved_type != ctx->type_void) {
         compile_error(ctx, main_decl_token, "entry point 'main' must return void");
     }
 }

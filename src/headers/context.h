@@ -56,6 +56,9 @@ struct Context {
 
     struct { char *key;    AstTypeDecl *value; } *builtin_types;
 
+    // List of #static_library expressions.
+    Ast link_libraries;
+
     // Handles to types in the type table for easy comparison in type-checking, etc.
     AstTypeDecl *type_int;
     AstTypeDecl *type_s64;

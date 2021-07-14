@@ -1,0 +1,8 @@
+TypeKind :: enum int {
+    STRING = 0,
+    INT,
+}
+
+main :: proc() {
+    kind :: TypeKind.STRING;
+}

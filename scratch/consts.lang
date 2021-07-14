@@ -1,9 +1,0 @@
-const PI := 3.14;
-
-proc main() {
-	PI = 3.1415;
-}
-
-proc const_args(const i := 10) {
-	i = -10
-}

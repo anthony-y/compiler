@@ -34,7 +34,7 @@ void free_block(AstStmt *stmt) {
     b->parent = NULL;
 } 
 void free_subtrees_and_blocks(Ast *ast) {
-    for (int i = 0; i < ast->len; i++) {
+    for (u64 i = 0; i < ast->len; i++) {
         AstNode *node = ast->nodes[i];
         switch (node->tag) {
         case Node_PROCEDURE: {
@@ -42,6 +42,7 @@ void free_subtrees_and_blocks(Ast *ast) {
             if (proc->params) ast_free(proc->params);
             free_block(proc->block);
         } break;
+        default: break;
         }
     }
 }
@@ -89,9 +90,9 @@ inline AstNode *ast_node(Context *c, AstNodeType tag, Token t) {
 }
 */
 
-AstDecl *ast_decl(Context *c, Token t, const AstDecl decl) {
+AstDecl *ast_decl(Context *c, Token t, const AstDecl *decl) {
     AstDecl *node = (AstDecl *)malloc(sizeof(AstDecl));
-    *node = decl;
+    *node = *decl;
     node->tag = Node_DECL;
     return node;
 }
@@ -241,11 +242,14 @@ AstAssignment *ast_assignment(Context *c, Token t, AstExpr *ass) {
     return n;
 }
 
-AstBlock *ast_block(Context *c, Token t, const AstBlock *blk) {
+AstBlock *ast_block(Context *c, Token t) {
     auto n = (AstBlock *)malloc(sizeof(AstBlock));
-    *n = *blk;
     n->tag = Node_BLOCK;
     n->token = t;
+    n->deferred = make_subtree(); 
+    n->statements = make_subtree();
+    n->parent = block_stack_top(c->block_stack);
+    ast_init(&n->usings, 12);
     return n;
 }
 

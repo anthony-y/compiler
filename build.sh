@@ -1,6 +1,6 @@
 #!/bin/bash
 
-compile="g++ -fmax-errors=15 -std=c++11 src/*.cc -o lang -Wall -Wpedantic -Wno-write-strings -Wno-switch -Wno-unused-function -g -ldl -lpthread -O0"
+compile="g++ -std=c++11 src/*.cc -o lang -Wall -Wpedantic -Wno-write-strings -g -ldl -lpthread -O0"
 run="./lang demos/hello.lang"
 
 echo -e "\nCompiling:"

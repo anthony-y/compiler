@@ -1,0 +1,52 @@
+using rl    := #import "raylib.lan";
+using basic := #import "std/basic.lang";
+
+// TODO local structs
+Guy :: struct {
+    x := 400;
+    y := 300;
+    radius := 10.0; // TODO: float literals don't implicitly cast to f32
+
+    color: rl.Color;
+}
+
+main :: proc() {
+
+    rl.set_target_fps(60);
+
+    rl.init_window(WIDTH, HEIGHT, "my window title");
+    defer rl.close_window();
+
+    guy: Guy;
+    guy.color  = rl.Red();
+    guy.radius = 50.0;
+
+    // ts: ^rl.TestStruct;
+
+    // TODO this was passing type-checking as void
+    while !rl.window_should_close() {
+        dt := rl.get_frame_time();
+
+        movement_amount := SPEED * dt;
+
+        if rl.IsKeyPressed(KEY_UP)    then guy.y -= movement_amount;
+        if rl.IsKeyPressed(KEY_DOWN)  then guy.y += movement_amount;
+        if rl.IsKeyPressed(KEY_LEFT)  then guy.x -= movement_amount;
+        if rl.IsKeyPressed(KEY_RIGHT) then guy.x += movement_amount;
+
+        rl.begin_drawing();
+            rl.clear_background(rl.White());
+            rl.draw_circle(guy.x, guy.y, cast(f32)guy.radius, guy.color);
+        rl.end_drawing();
+    }
+}
+
+WIDTH     :: 800;
+HEIGHT    :: 600;
+KEY_UP    :: 265;
+KEY_DOWN  :: 264;
+KEY_LEFT  :: 263;
+KEY_RIGHT :: 262;
+SPEED     :: 1000.0;
+
+// TODO line 14 blocks crash

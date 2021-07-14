@@ -4,10 +4,7 @@
 #include "token.h"
 #include "common.h"
 
-struct Parser;
 struct Ast;
-struct Name; // context.h
-struct Context;
 struct AstExpr;
 struct AstStmt;
 struct AstDecl;
@@ -18,6 +15,12 @@ struct AstBinary;
 struct AstIdent;
 struct AstTypename;
 struct AstBlock;
+struct AstUnary;
+
+struct Name; // context.h
+struct Parser;
+struct Context;
+struct ProcedureType;
 
 enum TypeDeclExprType {
     TypeDecl_PLACEHOLDER,
@@ -147,23 +150,25 @@ struct AstDecl: public AstStmt {
     Name        *name       = NULL;
     AstExpr     *expr       = NULL;
     AstTypename *given_type = NULL;
-    int          flags      = 0;
     DeclStatus   status     = Status_UNRESOLVED;
+    int          flags      = 0;
 };
 
 struct AstTypeDecl: public AstDecl {
     u64 size = 0;
     union {
-        AstStruct *struct_;
-        AstEnum   *enum_;
+        AstStruct   *struct_;
+        AstEnum     *enum_;
         AstTypeDecl *base_type;
         AstTypename *alias;
+        ProcedureType *proc;
     };
     TypeDeclExprType expr_type;
 };
 
 struct AstUsing: public AstDecl {
-    AstIdent *what;
+    AstNode  *what           = NULL;
+    AstBlock *resolved_scope = NULL;
 };
 
 
@@ -198,8 +203,10 @@ struct AstTypename: public AstExpr {
     // Only one of these is set at a time
     // When I used a union, it didn't work though.
     // I need them both initialized to NULL at first.
-    Name      *name     = NULL;
-    AstBinary *selector = NULL;
+    Name      *name        = NULL;
+    AstBinary *selector    = NULL;
+    AstUnary  *ptr         = NULL;
+    AstExpr   *array_count = NULL;
 };
 
 struct AstStruct: public AstExpr {
@@ -207,7 +214,7 @@ struct AstStruct: public AstExpr {
 };
 
 struct AstEnum: public AstExpr {
-    // Table fields;
+    AstBlock    *constants;
     AstTypename *base_type;
 };
 
@@ -294,6 +301,7 @@ struct AstBlock: public AstStmt {
     Ast *statements;
     AstBlock *parent;
     Ast *deferred;
+    Ast usings;
 };
 
 
@@ -326,6 +334,8 @@ void ast_init(Ast *, int);
 void ast_free(Ast *);
 void ast_add(Ast *, AstNode *);
 
+Ast *make_subtree();
+
 bool node_arena_init(NodeArena *);
 void node_arena_free(NodeArena *);
 AstNode *node_arena_alloc(NodeArena *);
@@ -334,7 +344,7 @@ AstNode *ast_node(struct Context *, AstNodeType tag, Token);
 AstNode *ast_expr(struct Context *, AstNodeType tag, Token, const AstExpr *);
 AstNode *ast_stmt(struct Context *, AstNodeType tag, Token, const AstStmt *);
 
-AstDecl *ast_decl(struct Context *c, Token t, const AstDecl decl);
+AstDecl *ast_decl(struct Context *c, Token t, const AstDecl *decl);
 
 AstIdent *ast_name(struct Context *, Token t);
 AstBinary *ast_binary(struct Context *, Token t, const AstBinary *binary);
@@ -350,7 +360,7 @@ AstStruct *ast_struct(struct Context *, Token t, const AstStruct *s);
 AstEnum *ast_enum(struct Context *, Token t, const AstEnum *e);
 
 AstAssignment *ast_assignment(struct Context *, Token t, AstExpr *ass);
-AstBlock *ast_block(struct Context *, Token t, const AstBlock *blk);
+AstBlock *ast_block(struct Context *, Token t);
 AstIf *ast_if(struct Context *, Token t, const AstIf *i);
 AstWhile *ast_while(struct Context *, Token t, const AstWhile *w);
 AstReturn *ast_return(struct Context *, Token t, const AstReturn *r);

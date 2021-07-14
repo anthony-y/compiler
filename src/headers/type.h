@@ -7,30 +7,30 @@
 
 struct Name;
 
-typedef struct {
+struct StringType {
     u64 len;
     char *data;
-} StringType;
+};
 
-typedef struct {
+struct ArrayType {
     u64 len;
     void *data;
-} ArrayType;
+};
 
-typedef struct {
+struct AnyType {
     void *data;
     TypeDeclExprType kind;
-} AnyType;
+};
 
-typedef struct {
-    AstTypeDecl *return_type;
-    void *argument_types; // TODO
-} ProcedureType;
+struct ProcedureType {
+    AstTypename *return_type;
+    Ast argument_types; // TODO
+};
 
 AstTypeDecl *make_type(TypeDeclExprType kind, struct Name *name, u64 size);
 AstTypeDecl *make_pointer_type(AstTypeDecl *base_type);
 AstTypeDecl *make_array_type(AstTypeDecl *base);
-AstTypeDecl *make_procedure_type(AstTypeDecl *return_type, struct AstTypeDecl **argument_types);
+AstTypeDecl *make_procedure_type(AstTypename *return_type, Ast argument_types);
 AstTypeDecl *make_type_alias(AstTypeDecl *of);
 AstTypeDecl *make_placeholder_type(Name *name);
 

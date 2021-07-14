@@ -38,13 +38,12 @@ AstTypeDecl *make_array_type(AstTypeDecl *base) {
     return out;
 }
 
-AstTypeDecl *make_procedure_type(AstTypeDecl *return_type, AstTypeDecl **argument_types) {
+AstTypeDecl *make_procedure_type(AstTypename *return_type, Ast argument_types) {
     AstTypeDecl *base = make_type(TypeDecl_PROCEDURE, NULL, sizeof(ProcedureType));
-    /*
-    base->data.procedure.return_type = return_type;
-    base->data.procedure.argument_types = NULL; // TODO lol
-    */
-    // TODO
+    auto proc = (ProcedureType *)malloc(sizeof(ProcedureType));
+    proc->return_type = return_type;
+    proc->argument_types = argument_types;
+    base->proc = proc;
     return base;
 }
 
@@ -64,7 +63,6 @@ bool is_type_numeric(AstTypeDecl *t) {
     return (t->expr_type == TypeDecl_INTEGER || t->expr_type == TypeDecl_FLOAT);
 }
 
-// Allocates and initializes a primitive type, and returns it.
 static inline AstTypeDecl *make_and_insert_primitive(TypeDeclExprType tag, Context *ctx, char *sname, u64 size, bool is_signed) {
     Name *name = make_name_string(ctx, sname);
     AstTypeDecl *t = make_type(tag, name, size);
@@ -75,14 +73,21 @@ static inline AstTypeDecl *make_and_insert_primitive(TypeDeclExprType tag, Conte
 }
 
 void free_types(Context *ctx) {
-    for (int i = 0; i < shlen(ctx->builtin_types); i++)
-        free(ctx->builtin_types[i].value);
+	/*
+    for (int i = 0; i < shlen(ctx->builtin_types); i++) {
+		auto ptr = ctx->builtin_types[i].value;
+		if (ptr) {
+			auto a = ptr;
+			*(&ptr) = NULL;
+			free(a);
+		}
+	}
+	*/
     shfree(ctx->builtin_types);
 }
 
 // Initialize the type table and add the primitive types to it.
 // Then, create some handles to internal types.
-// Uses a const SourceStats * to compute the type arenas allocation size.
 void init_types(Context *ctx) {
     sh_new_arena(ctx->builtin_types);
 
@@ -102,6 +107,7 @@ void init_types(Context *ctx) {
 
     ctx->type_f64 = make_and_insert_primitive(TypeDecl_FLOAT, ctx, "f64", sizeof(double), false);
     ctx->type_f32 = make_and_insert_primitive(TypeDecl_FLOAT, ctx, "f32", sizeof(float), false);
+	shput(ctx->builtin_types, "float", ctx->type_f32);
 
     ctx->type_bool = make_and_insert_primitive(TypeDecl_BOOL, ctx, "bool", sizeof(u8), false);
     ctx->type_void = make_and_insert_primitive(TypeDecl_VOID, ctx, "void", 0, false);
@@ -136,11 +142,16 @@ void print_type(AstTypeDecl *type) {
     }
 
     switch (type->expr_type) {
+    case TypeDecl_PROCEDURE: {
+        fprintf(stream, "procedure");
+    } break;
+
     case TypeDecl_STRING:
     case TypeDecl_INTEGER:
     case TypeDecl_FLOAT:
     case TypeDecl_ENUM:
     case TypeDecl_STRUCT:
+    case TypeDecl_BOOL:
     case TypeDecl_VOID:
     case TypeDecl_ANY:
         fprintf(stream, "%s", type->name->text);
