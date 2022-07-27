@@ -58,6 +58,10 @@ static AstTypeDecl *resolve_typename_in_type_slot(AstTypename *ref, Context *ctx
         return resolve_imported_type(ctx, ref->selector, module);
     }
 
+    if (ref->ptr) {
+        return make_pointer_type(resolve_typename_in_type_slot(ref->ptr, ctx, module));
+    }
+
     // For user-defined types, we need the name of the type to find the declaration for it.
     // This asserts that we have one to lookup the declaration with.
     assert(ref->name && !ref->selector);
@@ -92,8 +96,9 @@ AstTypeDecl *resolve_decl(AstDecl *decl, Context *ctx, Module *module) {
         AstTypeDecl *resolved_typename = resolve_typename_in_type_slot(decl->given_type, ctx, module);
         if (!resolved_typename) return NULL;
 
+        decl->given_type->resolved_type = resolved_typename;
+
         if (!decl->expr) {
-            decl->given_type->resolved_type = resolved_typename;
             return resolved_typename;
         }
     }
@@ -292,6 +297,7 @@ static AstTypeDecl *resolve_procedure(AstProcedure *proc, Context *ctx, Module *
 
     AstTypeDecl *resolved_return_type = resolve_typename_in_type_slot(proc->return_type, ctx, module);
     if (!resolved_return_type) return NULL;
+    proc->return_type->resolved_type = resolved_return_type;
 
     if (proc->flags & PROC_IS_FOREIGN) {
         assert(proc->return_type->resolved_type);

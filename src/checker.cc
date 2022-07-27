@@ -86,7 +86,7 @@ static bool do_types_match(Context *ctx, AstTypeDecl *a, AstTypeDecl *b) {
 }
 
 static AstTypeDecl *maybe_unwrap_type_alias(AstTypeDecl *alias) {
-    if (alias->expr_type != TypeDecl_ALIAS) return alias;
+    if (!alias || alias->expr_type != TypeDecl_ALIAS) return alias;
     return alias->base_type;
 }
 

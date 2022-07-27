@@ -488,7 +488,7 @@ static void emit_struct_enum_bodies(Ast *module) {
         if (module->nodes[i]->tag == Node_IMPORT) continue;
 
         AstDecl *decl = (AstDecl *)module->nodes[i];
-        if (decl->status == Status_UNRESOLVED) continue;
+        //if (decl->status == Status_UNRESOLVED) continue;
         if (decl->tag == Node_TYPE_DECL) {
             auto type = (AstTypeDecl *)decl;
             if (type->expr_type == TypeDecl_STRUCT) {
@@ -506,7 +506,7 @@ static void emit_struct_enum_bodies(Ast *module) {
 static void emit_implicit_initers(Ast *module) {
     for (u64 i = 0; i < module->len; i++) {
         AstDecl *decl = (AstDecl *)module->nodes[i];
-        if (decl->status == Status_UNRESOLVED) continue;
+        //if (decl->status == Status_UNRESOLVED) continue;
         if (decl->tag != Node_TYPE_DECL) {
             continue;
         }

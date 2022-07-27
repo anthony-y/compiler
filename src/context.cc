@@ -151,6 +151,8 @@ void init_context(Context *ctx) {
     ast_init(&ctx->link_libraries, 10);
 
     ctx->entry_point_name = make_name_string(ctx, "main");
+
+    // make_name_string(ctx, "_");
 }
 
 void free_context(Context *ctx) {

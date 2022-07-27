@@ -587,6 +587,7 @@ static AstTypename *parse_typename(Context *ctx, Parser *parser) {
     AstTypeDecl *type     = NULL;
     Name        *name     = NULL;
     AstBinary   *selector = NULL;
+    AstTypename *ptr_subtype = NULL;
 
     switch (t.type) {
     case Token_RESERVED_TYPE: {
@@ -612,7 +613,7 @@ static AstTypename *parse_typename(Context *ctx, Parser *parser) {
 
     case Token_IDENT: {
         if (parser->curr[1].type == Token_DOT) {
-            AstExpr *maybe_selector = parse_expression(ctx, parser, 1);
+            AstExpr *maybe_selector = parse_expression(ctx, parser, 10);
             if (!maybe_selector) {
                 compile_error(ctx, *parser->curr, "expected a type name");
                 parser_recover_to_declaration(parser);
@@ -638,8 +639,14 @@ static AstTypename *parse_typename(Context *ctx, Parser *parser) {
         AstExpr *base = parse_typename(ctx, parser);
         parser->in_type_instantiation = false;
         if (!base) return NULL;
-        // TODO error
-        type = make_pointer_type(base->resolved_type);
+
+        if (base->tag != Node_TYPENAME) {
+            compile_error(ctx, t, "expected typename");
+            parser_recover_to_declaration(parser);
+            return NULL;
+        }
+
+        ptr_subtype = static_cast<AstTypename *>(base);
     } break;
 
     case Token_OPEN_BRACKET: {
@@ -660,7 +667,7 @@ static AstTypename *parse_typename(Context *ctx, Parser *parser) {
     default: return NULL;
     }
 
-    if (!type) assert(name || selector);
+    if (!type) assert(name || selector || ptr_subtype);
 
     auto ref           = (AstTypename *)malloc(sizeof(AstTypename));
     ref->tag           = Node_TYPENAME;
@@ -669,6 +676,7 @@ static AstTypename *parse_typename(Context *ctx, Parser *parser) {
 
     ref->name = name;
     ref->selector = selector;
+    ref->ptr = ptr_subtype;
 
     return ref;
 }

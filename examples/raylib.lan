@@ -1,6 +1,6 @@
 basic := #import "std/basic.lang"
 
-TestType :: struct {
+TestStruct :: struct {
     field := 10;
 }
 
@@ -49,5 +49,5 @@ White :: proc() -> Color {
 
 Raylib :: #static_library "raylib"
 _      :: #static_library "m"
-__     :: #static_library "pthread"
-___    :: #static_library "dl"
+_      :: #static_library "pthread"
+_      :: #static_library "dl"

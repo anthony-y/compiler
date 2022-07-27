@@ -90,7 +90,7 @@ struct Interp {
     u16       constants_count    = 0;
     u16       constants_capacity = 64;
 
-    u64 regs[UINT16_MAX];
+    u64 regs[32];
 };
 
 void interp_run(Interp *);

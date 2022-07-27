@@ -205,7 +205,8 @@ struct AstTypename: public AstExpr {
     // I need them both initialized to NULL at first.
     Name      *name        = NULL;
     AstBinary *selector    = NULL;
-    AstUnary  *ptr         = NULL;
+    // AstUnary  *ptr         = NULL;
+    AstTypename *ptr = NULL;
     AstExpr   *array_count = NULL;
 };
 

@@ -14,7 +14,7 @@
 #define STB_DS_IMPLEMENTATION
 #include "headers/stb/stb_ds.h"
 
-#define IMPORT_RUNTIME 0
+#define IMPORT_RUNTIME 1
 
 static void ensure_main_is_declared(Context *ctx);
 
@@ -92,7 +92,7 @@ static int cleanup_and_die(Context *ctx, Module *root) {
 
 int main(int arg_count, char **args) {
     if (arg_count < 2) {
-        printf("sizeof(AstNode) = %ld\nsizeof(AstDecl) = %ld\nsizeof(AstTypeDecl) = %ld\n", sizeof(AstNode), sizeof(AstDecl), sizeof(AstTypeDecl));
+        printf("sizeof(AstNode) = %ld\nsizeof(AstDecl) = %ld\nsizeof(AstTypeDecl) = %ld\nsizeof(Interp) = %ld", sizeof(AstNode), sizeof(AstDecl), sizeof(AstTypeDecl), sizeof(Interp));
         fprintf(stderr, "error: expected root compilation target (a single file path) as argument.\n");
         return -1;
     }
@@ -113,9 +113,9 @@ int main(int arg_count, char **args) {
     // Load the runtime
     // TODO rename file
 #if IMPORT_RUNTIME
+    constexpr char *runtime_module_name = "../compiler.lan";
     Module *runtime_stuff = load_module(&context, runtime_module_name);
     {
-        constexpr char *runtime_module_name = "compiler.lan";
         // shput(context.modules, runtime_module_name, runtime_stuff);
         if (context.error_count > 0) {
             token_list_free(&runtime_stuff->tokens);
@@ -191,7 +191,7 @@ int main(int arg_count, char **args) {
         auto linker_flags = (char *)malloc(512);
         sprintf(command, "gcc -g -std=c99 %s -Wno-return-local-addr -Wno-discarded-qualifiers -Wno-builtin-declaration-mismatch -o output_bin -L.", output_path);
         for (u64 i = 0; i < context.link_libraries.len; i++) {
-            auto lib = (AstLibrary *)context.link_libraries.nodes[i];
+            auto lib = static_cast<AstLibrary *>(context.link_libraries.nodes[i]);
             sprintf(linker_flags, " -l%s", lib->library);
             strcat(command, linker_flags);
         }
@@ -201,7 +201,7 @@ int main(int arg_count, char **args) {
         // Exit early if it failed.
         if (system(command) != 0) return cleanup_and_die(&context, &module);
 
-        remove(output_path);
+        // remove(output_path);
         printf("Success.\n");
     }
 

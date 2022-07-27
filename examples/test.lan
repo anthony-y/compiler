@@ -21,7 +21,9 @@ main :: proc() {
     guy.color  = rl.Red();
     guy.radius = 50.0;
 
-    // ts: ^rl.TestStruct;
+    ts: ^rl.TestStruct = basic.malloc(4);
+    ts.field = 12;
+    basic.printf("\n%d\n".data, ts.field);
 
     // TODO this was passing type-checking as void
     while !rl.window_should_close() {
