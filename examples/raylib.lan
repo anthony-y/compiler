@@ -12,6 +12,7 @@ init_window :: proc(w: int, h: int, title: string) {
 
 _init_window :: proc(w: int, h: int, title: ^u8) #foreign "InitWindow": Raylib
 get_frame_time :: proc() -> float #foreign "GetFrameTime": Raylib
+get_time :: proc() -> f64 #foreign "GetTime": Raylib
 window_should_close :: proc() -> bool #foreign "WindowShouldClose": Raylib
 close_window :: proc() #foreign "CloseWindow": Raylib
 set_target_fps :: proc(t: int) #foreign "SetTargetFPS": Raylib
@@ -20,8 +21,11 @@ begin_drawing :: proc() #foreign "BeginDrawing": Raylib
 end_drawing :: proc() #foreign "EndDrawing": Raylib
 draw_circle :: proc(centerX: int, centerY: int, radius: float, color: Color) #foreign "DrawCircle": Raylib
 
-IsKeyPressed :: proc(key: int) -> bool #foreign: Raylib
+IsKeyPressed :: proc(key: int) -> bool #foreign "IsKeyPressed": Raylib
 IsKeyDown    :: proc(key: int) -> bool #foreign: Raylib
+
+get_mouse_x :: proc() -> int #foreign "GetMouseX": Raylib
+get_mouse_y :: proc() -> int #foreign "GetMouseY": Raylib
 
 Color :: struct {
     r: u8
@@ -43,6 +47,14 @@ White :: proc() -> Color {
     c.r = 255
     c.g = 255
     c.b = 255
+    c.a = 255
+    return c
+}
+Blue :: proc() -> Color {
+    c: Color
+    c.r = 0
+    c.g = 50
+    c.b = 200
     c.a = 255
     return c
 }

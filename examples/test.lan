@@ -21,34 +21,59 @@ main :: proc() {
     guy.color  = rl.Red();
     guy.radius = 50.0;
 
-    ts: ^rl.TestStruct = basic.malloc(4);
-    ts.field = 12;
-    basic.printf("\n%d\n".data, ts.field);
+    enemy: Guy;
+    enemy.color  = rl.Blue();
+    enemy.radius = 60.0;
+    enemy.x = 72
+    enemy.y = 64
+
+    bg_color := rl.White()
+
+    dt: f64 = 0.0;
+    dt_end: f64 = 0.0;
 
     // TODO this was passing type-checking as void
     while !rl.window_should_close() {
-        dt := rl.get_frame_time();
+        // TODO rewrite entire expression parser lol
+        now := rl.get_time();
+        dt = (now - dt_end);
 
-        movement_amount := SPEED * dt;
+        movement_amount := SPEED;
 
-        if rl.IsKeyPressed(KEY_UP)    then guy.y -= movement_amount;
-        if rl.IsKeyPressed(KEY_DOWN)  then guy.y += movement_amount;
-        if rl.IsKeyPressed(KEY_LEFT)  then guy.x -= movement_amount;
-        if rl.IsKeyPressed(KEY_RIGHT) then guy.x += movement_amount;
+        basic.printf("dt = %f\nguy.x = %d\nmovement_amount = %f".data, dt, guy.x, movement_amount);
+
+        if rl.IsKeyDown(KEY_W) {
+            basic.printf("pressing w\n".data);
+            guy.y -= movement_amount;
+        }
+        if rl.IsKeyDown(KEY_S)  then guy.y += movement_amount;
+        if rl.IsKeyDown(KEY_A)  then guy.x -= movement_amount;
+        if rl.IsKeyDown(KEY_D) then guy.x += movement_amount;
+
+        x := rl.get_mouse_x()
+        y := rl.get_mouse_y()
+        basic.printf("(%d, %d)\n".data, x, y)
 
         rl.begin_drawing();
-            rl.clear_background(rl.White());
+            rl.clear_background(bg_color);
             rl.draw_circle(guy.x, guy.y, cast(f32)guy.radius, guy.color);
+            rl.draw_circle(enemy.x, enemy.y, cast(f32)enemy.radius, enemy.color);
         rl.end_drawing();
+
+        dt_end = rl.get_time()
     }
 }
 
 WIDTH     :: 800;
 HEIGHT    :: 600;
-KEY_UP    :: 265;
-KEY_DOWN  :: 264;
-KEY_LEFT  :: 263;
-KEY_RIGHT :: 262;
+// KEY_UP    :: 265;
+// KEY_DOWN  :: 264;
+// KEY_LEFT  :: 263;
+// KEY_RIGHT :: 262;
 SPEED     :: 1000.0;
+KEY_A :: 65;
+KEY_D :: 68;
+KEY_W :: 87;
+KEY_S :: 83;
 
 // TODO line 14 blocks crash

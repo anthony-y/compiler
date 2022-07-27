@@ -1179,47 +1179,6 @@ void parser_init(Parser *parser, Module *module) {
     ast_init(&parser->module->ast, 100);
 }
 
-bool node_allocator_init(NodeAllocator *allocator) {
-    NodeBlock *memory = (NodeBlock *)malloc(sizeof(NodeBlock));
-    if (!memory) {
-        return false;
-    }
-    *memory = {};
-    allocator->first   = memory;
-    allocator->current = memory;
-    allocator->num_blocks = 1;
-    return true;
-}
-
-AstNode *node_allocator(NodeAllocator *allocator) {
-    if (allocator->current->num_nodes+1 > NODE_BLOCK_LENGTH) {
-        NodeBlock *next = (NodeBlock *)malloc(sizeof(NodeBlock));
-        if (!next) {
-            printf("bad news, out of memory");
-            return NULL;
-        }
-        allocator->current->next = next;
-        allocator->current = next;
-        allocator->num_blocks++;
-    }
-
-    AstNode *out = (allocator->current->data + allocator->current->num_nodes);
-
-    allocator->current->num_nodes++;
-    allocator->total_nodes++;
-    
-    return out;
-}
-
-void node_allocator_free(NodeAllocator *allocator) {
-    NodeBlock *buffer = allocator->first;
-    while (buffer) {
-        NodeBlock *current = buffer;
-        buffer = current->next;
-        free(current);
-    }
-}
-
 static inline AstLiteral *int_literal(Context *ctx, Parser *parser) {
     parser_next(parser);
     AstLiteral *l = (AstLiteral *)malloc(sizeof(AstLiteral));

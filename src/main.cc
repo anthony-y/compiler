@@ -201,7 +201,7 @@ int main(int arg_count, char **args) {
         // Exit early if it failed.
         if (system(command) != 0) return cleanup_and_die(&context, &module);
 
-        // remove(output_path);
+        remove(output_path);
         printf("Success.\n");
     }
 
